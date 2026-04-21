@@ -40,6 +40,8 @@ jobs:
             pkg
             docs
             repo
+            deps
+            deps-dev
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$
           subjectPatternError: |
