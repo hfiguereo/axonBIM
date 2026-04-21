@@ -60,9 +60,38 @@ Proyecto en **Fase 1** (puente de comunicación). Ver [ROADMAP.md](ROADMAP.md).
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/)** como gestor de entorno (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- **Godot 4.3+** desde [godotengine.org](https://godotengine.org)
+- **Godot 4.3+** — **recomendado: binario oficial** (mismo que CI); ver [Godot sin Flatpak](#godot-sin-flatpak-recomendado) más abajo.
 - **Git LFS** (`git lfs install` tras clonar, necesario para PDFs normativos)
 - Opcional: **[gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit)** para linting GDScript (`pipx install gdtoolkit`)
+
+### Godot sin Flatpak (recomendado)
+
+En Fedora, **Flatpak** (`org.godotengine.Godot`) a veces provoca **SIGABRT** con GPU
+NVIDIA (Vulkan/sandbox), no por el proyecto AxonBIM. Lo más estable para desarrollo
+es el **binario oficial** Linux x86_64 (el mismo que usa GitHub Actions), instalado
+en tu usuario:
+
+```bash
+# 1) (Opcional) Quitar Godot Flatpak
+flatpak uninstall -y org.godotengine.Godot
+
+# 2) Instalar Godot 4.3 estable en ~/.local/bin/godot
+chmod +x scripts/dev/install_godot_official.sh
+./scripts/dev/install_godot_official.sh
+
+# 3) Asegurar que tu shell use primero ~/.local/bin (Fedora suele hacerlo ya)
+export PATH="$HOME/.local/bin:$PATH"
+hash -r
+godot --version
+```
+
+A partir de ahí, `make run-godot` detecta `~/.local/bin/godot` automáticamente. Si
+también tienes `/usr/bin/godot` (paquete `dnf`), el de `~/.local/bin` tiene
+prioridad si PATH está bien ordenado.
+
+**Alternativas:** [AppImage](https://godotengine.org/download/linux/) en la misma
+página de descargas, o extraer el `.zip` a mano desde
+[releases](https://github.com/godotengine/godot/releases) (misma URL que el script).
 
 ### Setup inicial
 
