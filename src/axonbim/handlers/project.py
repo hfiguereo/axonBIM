@@ -1,6 +1,8 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
-"""Handlers del dominio ``project.*``: save, load, y en el futuro
-estados ISO 19650 / undo / redo.
+"""Handlers del dominio ``project.*``.
+
+Expone ``project.save`` hoy; ``project.open`` y transiciones de estado ISO 19650
+(WIP/Shared/Published) quedan para Fase 2/4.
 """
 
 from __future__ import annotations
@@ -19,12 +21,19 @@ _log = logging.getLogger(__name__)
 
 
 class SaveParams(BaseModel):
+    """Parametros de ``project.save``: ruta destino en el filesystem local."""
+
     model_config = ConfigDict(extra="forbid")
 
     path: str
 
 
 async def save(params: dict[str, Any]) -> dict[str, Any]:
+    """Handler de ``project.save``: serializa la sesion IFC activa a ``path``.
+
+    Raises:
+        RpcError: con ``INTERNAL_ERROR`` si el filesystem rechaza la escritura.
+    """
     args = SaveParams.model_validate(params)
     target = Path(args.path).expanduser()
 

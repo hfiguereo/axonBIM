@@ -1,12 +1,12 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
-"""Framing LSP-style sobre streams asyncio.
+r"""Framing LSP-style sobre streams asyncio.
 
 Formato:
 
 .. code-block:: text
 
-    Content-Length: <N>\\r\\n
-    \\r\\n
+    Content-Length: <N>\r\n
+    \r\n
     <N bytes de cuerpo JSON UTF-8>
 
 ``Content-Type`` es opcional y se ignora si esta presente.

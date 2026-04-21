@@ -18,6 +18,8 @@ from axonbim.rpc.models import ErrorCode
 
 
 class _Point3(BaseModel):
+    """Punto 3D en coordenadas de mundo (metros). ``z`` por defecto = 0.0."""
+
     model_config = ConfigDict(extra="forbid")
 
     x: float
@@ -25,10 +27,13 @@ class _Point3(BaseModel):
     z: float = 0.0
 
     def as_tuple(self) -> Vec3:
+        """Proyeccion a la tupla ``Vec3`` usada por el backend geometrico."""
         return (self.x, self.y, self.z)
 
 
 class CreateWallParams(BaseModel):
+    """Parametros del metodo RPC ``ifc.create_wall``."""
+
     model_config = ConfigDict(extra="forbid")
 
     p1: _Point3
@@ -39,6 +44,11 @@ class CreateWallParams(BaseModel):
 
 
 async def create_wall(params: dict[str, Any]) -> dict[str, Any]:
+    """Handler de ``ifc.create_wall``: valida parametros, crea ``IfcWall`` y devuelve mesh.
+
+    Raises:
+        RpcError: con codigo ``INVALID_PARAMS`` si la geometria es invalida.
+    """
     args = CreateWallParams.model_validate(params)
 
     session = get_session()

@@ -38,10 +38,12 @@ class Mesh:
 
     @property
     def vertex_count(self) -> int:
+        """Numero de vertices (``len(vertices) / 3``)."""
         return len(self.vertices) // 3
 
     @property
     def triangle_count(self) -> int:
+        """Numero de triangulos (``len(indices) / 3``)."""
         return len(self.indices) // 3
 
     def to_dict(self) -> dict[str, Any]:

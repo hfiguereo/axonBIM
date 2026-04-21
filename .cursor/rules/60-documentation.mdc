@@ -1,0 +1,269 @@
+---
+description: Estándares de documentación y anotaciones: docstrings Google, cabeceras de licencia, TODOs rastreables, ADRs, CHANGELOG, reportes de cierre de fase, documentación viva del protocolo RPC.
+alwaysApply: true
+---
+
+# Documentación y anotaciones — AxonBIM
+
+La documentación es parte del producto, no un accesorio. El código se lee muchas más veces de las que se escribe, y este proyecto aspira a ser mantenido durante años por equipos que no estuvieron presentes cuando se diseñó.
+
+---
+
+## 1. Docstrings Python
+
+**Estilo canónico: Google.** Compatible con mypy, PyCharm, Sphinx (`sphinx.ext.napoleon`) y MkDocs (`mkdocstrings`). Sin configuración extra.
+
+### 1.1. Obligatorios
+
+| Entidad | Docstring requerido |
+|---------|---------------------|
+| Módulo (`.py`) | Primera línea: propósito en una frase. |
+| Paquete (`__init__.py`) | Obligatorio solo si el paquete expone API pública. `__init__.py` vacíos de solo-agrupación no lo requieren. |
+| Clase pública | Sí. Describe invariantes, no repetir la firma. |
+| Función/método público | Sí, con secciones `Args`, `Returns`, `Raises` cuando aplique. |
+| Función/método privado (`_foo`) | Opcional pero recomendado si la lógica no es trivial. |
+| Tests | Opcional. El nombre del test (`test_wall_raises_when_thickness_negative`) debe ser suficiente. |
+
+### 1.2. Plantilla
+
+```python
+def create_wall(
+    p1: Vec3,
+    p2: Vec3,
+    height: float,
+    thickness: float,
+) -> WallResult:
+    """Crea un ``IfcWall`` analítico entre dos puntos y devuelve malla + GUID.
+
+    El muro se construye con eje centrado en el segmento ``p1``–``p2`` y
+    extrusión vertical ``height``. La malla retornada es una caja simple
+    compatible con ``ArrayMesh`` de Godot (vertices/indices/normals).
+
+    Args:
+        p1: Extremo inicial del muro en coordenadas de mundo (metros).
+        p2: Extremo final. Debe cumplir ``|p2 - p1| >= _MIN_WALL_LENGTH_M``.
+        height: Altura en metros, estrictamente positiva.
+        thickness: Grosor total en metros, estrictamente positivo.
+
+    Returns:
+        ``WallResult`` con ``guid`` IFC, ``mesh`` analítica y ``topo_map``
+        de IDs topológicos persistentes.
+
+    Raises:
+        ValueError: Si alguno de los parámetros geométricos viola las
+            restricciones anteriores.
+    """
+```
+
+### 1.3. Qué SÍ incluir
+
+- **Invariantes y precondiciones** ("Debe cumplir |p2 - p1| >= …").
+- **Unidades y sistemas de referencia** (metros, radianes, coordenadas de mundo vs. locales).
+- **Casos borde** y comportamiento documentado (ej. "Devuelve ``None`` si la sesión no está inicializada").
+- **Referencias cruzadas** a ADRs, docs o ecuaciones clave: use comillas dobles invertidas y enlaces relativos.
+
+### 1.4. Qué NO incluir
+
+- Restatement de la firma ya tipada ("`p1` es un ``Vec3``" cuando la anotación ya lo dice).
+- Comentarios narrativos paso-a-paso que duplican el código (ver regla [`10-anti-patterns.mdc`](10-anti-patterns.mdc)).
+- Historia del archivo (eso va al git log).
+
+### 1.5. Enforcement
+
+- `ruff` con regla `D` (pydocstyle) configurada con convención Google.
+- Ignores tolerados: `D100` (missing module docstring) en `__init__.py` vacíos, `D104` (missing package docstring) cuando no hay API expuesta, `D203`/`D213`/`D212` por conflicto con la convención Google.
+- Los tests (`tests/**/*.py`) están eximidos de `D` salvo `D200`/`D201`/`D205` para legibilidad básica.
+
+---
+
+## 2. Anotaciones de tipo
+
+1. **Anotar toda firma pública.** Privadas (`_foo`) recomendadas, obligatorias si la función excede 20 líneas.
+2. `from __future__ import annotations` en todos los módulos (ya exigido por [`20-backend-python.mdc`](20-backend-python.mdc)).
+3. `mypy --strict` es verdad. Cualquier `Any` lleva **comentario justificativo** en la misma línea o la inmediata anterior.
+4. Usar `TypeAlias` para tipos compuestos reutilizados tres o más veces.
+5. `TypedDict` para diccionarios que cruzan la frontera RPC (validación estructural sin el coste de Pydantic para lecturas internas).
+
+---
+
+## 3. GDScript
+
+1. **Tipado estático obligatorio** (`: Tipo`, `-> Tipo`) en todas las declaraciones.
+2. `##` para documentación (equivale a docstring); `#` solo para comentarios de implementación.
+3. Primer `##` del archivo es el docstring del script.
+4. Señales documentadas con `##` antes de su `signal`.
+5. `@export` documentados con `##` describiendo el rango, unidad y efecto en el editor.
+
+```gdscript
+## Cliente JSON-RPC 2.0 sobre TCP loopback al backend Python.
+##
+## Framing LSP Content-Length, reconexión exponencial y
+## manejo de notificaciones `system.warning`/`system.info`.
+extends Node
+
+## Emitida al establecer conexión con el backend.
+signal connected
+
+## Puerto TCP del backend. 0 = lee de env `AXONBIM_RPC_PORT`.
+@export_range(0, 65535) var port: int = 0
+```
+
+---
+
+## 4. Cabecera de licencia
+
+Obligatoria en todo archivo fuente de `src/`, `tests/` y `frontend/scripts/`. No aplica a configs (YAML/TOML/JSON), migraciones SQL, assets ni markdown.
+
+**Python y GDScript:**
+
+```python
+# © 2026 Arq. Hector Nathanael Figuereo. GPLv3.
+```
+
+El carácter `©` puede sustituirse por `(c)` si editor/fuente no lo soportan. Nada de "All rights reserved" — este proyecto es GPLv3.
+
+---
+
+## 5. Comentarios TODO/FIXME/XXX
+
+Formato rastreable obligatorio. Ejemplo válido:
+
+```python
+# TODO(hfiguereo, 2026-06): reemplazar por OCP boolean cuando Fase 2 llegue.
+# FIXME(hfiguereo, 2026-05-12): race condition al guardar dos veces rápido.
+# XXX(hfiguereo, 2026-04-21): hack temporal, ver ADR-0003.
+```
+
+- `TODO` — mejora planificada, **con fecha tentativa** (año-mes o año-mes-día).
+- `FIXME` — bug conocido que hay que arreglar antes de que duela.
+- `XXX` — hack intencional que necesita revisión; referenciar ADR o issue.
+
+**Prohibidos:** `# TODO: arreglar esto`, `# TODO: algún día`, `# HACK: quien sabe`.
+
+---
+
+## 6. ADRs (Architecture Decision Records)
+
+Se escribe un ADR cuando:
+
+- La decisión **afecta múltiples módulos o el formato del IFC serializado**.
+- Hay **trade-off** real entre al menos dos alternativas.
+- La decisión es **difícil de revertir** (formato de persistencia, elección de motor, protocolo público).
+
+Ubicación: [`docs/architecture/decisions/`](../../docs/architecture/decisions/). Numeración correlativa de cuatro dígitos (`0001-...`, `0002-...`). Se basa en la plantilla [`0000-template.md`](../../docs/architecture/decisions/0000-template.md) (MADR simplificado).
+
+**Reglas:**
+
+- Los ADRs son **inmutables una vez aceptados**. Si una decisión se revisa, se crea un ADR nuevo que **supera** al anterior y el anterior se marca como `Superseded by ADR-NNNN`.
+- Los ADRs son **parte del código**: si un PR cambia una decisión arquitectónica sin ADR, el PR se rechaza.
+- El README de decisiones mantiene el índice actualizado con el estado de cada ADR.
+
+---
+
+## 7. CHANGELOG
+
+Se mantiene [`CHANGELOG.md`](../../CHANGELOG.md) siguiendo [Keep a Changelog](https://keepachangelog.com) 1.1 + SemVer.
+
+**Reglas operativas:**
+
+- Todo PR de tipo `feat`, `fix`, `perf` o cambio público **debe** tocar la sección `[Unreleased]`.
+- PRs `chore`/`docs`/`test`/`ci` solo si cambian cara externa.
+- Al tagear una release: mover `[Unreleased]` a la versión recién tageada, recrear `[Unreleased]` vacío, actualizar los enlaces de comparación al final.
+- Lenguaje **orientado al usuario**: escribe qué cambió para quien usa AxonBIM, no qué refactor interno se hizo.
+
+---
+
+## 8. Documentación viva del protocolo RPC
+
+[`docs/architecture/jsonrpc-protocol.md`](../../docs/architecture/jsonrpc-protocol.md) es la fuente única de verdad del contrato entre Godot y Python.
+
+Cuando un PR añade, modifica o elimina un método RPC, el PR **debe** actualizar en el mismo commit:
+
+- La tabla de métodos del protocolo.
+- El esquema de `params` y `result` (ejemplos JSON).
+- Los códigos de error nuevos (sección §4).
+
+Si la documentación y el código divergen, manda el documento (principio *docs-as-spec*). CI debería detectarlo en el futuro con validación de esquemas; mientras tanto, lo revisa el humano del PR.
+
+---
+
+## 9. Reportes de cierre de fase
+
+Al cerrar cada fase del [`ROADMAP.md`](../../ROADMAP.md) se **debe** generar un documento en [`docs/phase-reports/phase-N-report.md`](../../docs/phase-reports/) antes de tagear la release que cierra esa fase.
+
+### 9.1. Público objetivo
+
+1. **Principal: el propio autor** — como cuaderno de bitácora para interiorizar la estructura, las funciones y por qué existe cada pieza.
+2. **Arquitectos y profesionales BIM** que quieren contribuir o evaluar el proyecto sin ser programadores.
+3. **Colaboradores técnicos no-devs** (BIM managers, supervisores de obra, docentes).
+
+### 9.2. Tono y lenguaje
+
+- Español, natural, sin marketing.
+- Analogías cuando un concepto técnico tenga un paralelo del mundo arquitectónico o construcción.
+- Cero jerga sin definir. La primera aparición de un término va acompañada de una frase que lo aterriza.
+- Los fragmentos de código llevan **una línea previa que resume qué hacen en lenguaje humano**.
+
+### 9.3. Estructura mínima
+
+1. **Resumen ejecutivo** (1 frase + 3 bullets).
+2. **Qué puedes hacer hoy con AxonBIM** (demo paso a paso).
+3. **Por dentro: cómo está organizado el código**, carpeta por carpeta, con la metáfora arquitectónica correspondiente.
+4. **Recorrido de un flujo completo** (ej. "qué pasa cuando clicas *Crear muro*") atravesando frontend→backend→archivo IFC.
+5. **Decisiones que tomamos y por qué**, sin jerga (enlazar ADRs cuando existan).
+6. **Números de la fase** (líneas de código, tests, cobertura, duración, decisiones clave).
+7. **Lo que todavía no hace** (honestidad sobre límites actuales).
+8. **Qué viene en la fase siguiente**.
+9. **Glosario** de 10-15 términos técnicos mínimos.
+
+### 9.4. Relación con CHANGELOG y tag
+
+- El reporte puede reutilizar el contenido del CHANGELOG como base factual, pero lo **reescribe para humanos**.
+- El reporte se enlaza desde el GitHub Release de la fase.
+- Si el reporte no existe al momento de tagear, **no se tagea**.
+
+---
+
+## 10. Otros elementos documentales mantenidos
+
+- [`README.md`](../../README.md) — *por qué* existe el proyecto, cómo correrlo desde fuente. Se actualiza si cambia el Quick Start.
+- [`AGENTS.md`](../../AGENTS.md) — equivalente del README pero para agentes IA. Se actualiza si cambian las reglas del agente.
+- [`CONTRIBUTING.md`](../../CONTRIBUTING.md) — flujo de trabajo humano (ramas, PRs, commits).
+- [`ROADMAP.md`](../../ROADMAP.md) — visión estratégica. Se actualiza solo al cerrar una fase o al replantear el horizonte.
+- [`docs/normativa/`](../../docs/normativa/) — extractos operativos de normativa BIM (ver regla [`30-bim-normativa.mdc`](30-bim-normativa.mdc)).
+
+---
+
+## 11. Anti-ejemplos rápidos
+
+**Mal:**
+
+```python
+def save(path: str) -> int:
+    # Guarda el archivo
+    return _session.save(path)
+```
+
+**Bien:**
+
+```python
+def save(path: str) -> int:
+    """Serializa la sesión IFC activa a ``path`` y devuelve bytes escritos.
+
+    Raises:
+        RuntimeError: Si no hay sesión inicializada.
+    """
+    return _session.save(path)
+```
+
+---
+
+## 12. Aplicación al agente IA
+
+Cuando el agente genera código nuevo bajo estas reglas, **debe**:
+
+1. Incluir docstring Google-style en toda función/clase/módulo público nuevo.
+2. Añadir la cabecera de licencia en archivos creados bajo `src/`, `tests/` o `frontend/scripts/`.
+3. Si un TODO es apropiado, usar el formato rastreable con nombre y fecha.
+4. Si la tarea cierra una fase, recordar al usuario generar el reporte de fase antes del tag.
+5. Si la tarea toca protocolo RPC o decisiones arquitectónicas, proponer las actualizaciones de `jsonrpc-protocol.md` y/o un ADR en el mismo PR.

@@ -64,6 +64,7 @@ class Request(BaseModel):
 
     @property
     def is_notification(self) -> bool:
+        """``True`` si el request no tiene ``id`` (no se debe responder)."""
         return self.id is None
 
 
@@ -123,4 +124,5 @@ def make_error(
 
 
 def make_success(request_id: RpcId, result: dict[str, Any]) -> SuccessResponse:
+    """Construye una ``SuccessResponse`` con el ``result`` dado."""
     return SuccessResponse(id=request_id, result=result)
