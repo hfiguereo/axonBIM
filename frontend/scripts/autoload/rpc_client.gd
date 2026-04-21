@@ -29,6 +29,9 @@ const POLL_INTERVAL_MS: int = 16  # ~60Hz
 const MAX_BODY_BYTES: int = 64 * 1024 * 1024
 const RECONNECT_INITIAL_DELAY_MS: int = 500
 const RECONNECT_MAX_DELAY_MS: int = 10000
+## Tiempo maximo a esperar a que el TCP pase a conectado antes de rechazar ``call_rpc``.
+## Evita fallos si el usuario actua antes del primer ``_process`` o si el backend arranca justo despues del frontend.
+const CONNECT_WAIT_MS: int = 8000
 
 var _stream: StreamPeerTCP = StreamPeerTCP.new()
 var _buffer: PackedByteArray = PackedByteArray()
@@ -77,6 +80,9 @@ func is_connected_to_backend() -> bool:
 
 ## Llama un metodo RPC y espera su respuesta.
 ##
+## Si el TCP aun no esta en estado conectado, espera hasta ``CONNECT_WAIT_MS``
+## (p. ej. backend arrancando despues del frontend o primer frame de ``poll``).
+##
 ## Devuelve un Dictionary:
 ##   {"ok": true, "result": Dictionary} si exito.
 ##   {"ok": false, "error": {"code": int, "message": String, "data": Variant}} si error.
@@ -84,7 +90,14 @@ func is_connected_to_backend() -> bool:
 func call_rpc(
 	method: String, params: Dictionary = {}, timeout_ms: int = DEFAULT_TIMEOUT_MS
 ) -> Dictionary:
+	if _port <= 0:
+		return _timeout_like_error(-32099, "TCP desactivado (AXONBIM_RPC_PORT=0)")
 	if not _is_connected:
+		await _wait_until_connected(CONNECT_WAIT_MS)
+	if not _is_connected:
+		Logger.warn(
+			"RpcClient: sin conexion al backend (¿`uv run python -m axonbim --tcp` en otra terminal?)"
+		)
 		return _timeout_like_error(-32099, "backend no conectado")
 
 	_next_id += 1
@@ -112,6 +125,11 @@ func call_rpc(
 
 ## Envia una notificacion (sin id, sin respuesta esperada).
 func notify_rpc(method: String, params: Dictionary = {}) -> void:
+	if _port <= 0:
+		Logger.warn("RpcClient.notify_rpc('%s') sin TCP (AXONBIM_RPC_PORT=0)" % method)
+		return
+	if not _is_connected:
+		await _wait_until_connected(CONNECT_WAIT_MS)
 	if not _is_connected:
 		Logger.warn("RpcClient.notify_rpc('%s') sin conexion activa" % method)
 		return
@@ -229,6 +247,17 @@ func _send_framed(text: String) -> void:
 	var header: PackedByteArray = ("Content-Length: %d\r\n\r\n" % body.size()).to_ascii_buffer()
 	_stream.put_data(header)
 	_stream.put_data(body)
+
+
+func _wait_until_connected(max_wait_ms: int) -> void:
+	if _is_connected or _port <= 0:
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	var deadline: int = Time.get_ticks_msec() + max_wait_ms
+	while not _is_connected and Time.get_ticks_msec() < deadline:
+		await tree.process_frame
 
 
 func _connect_to_backend() -> void:
