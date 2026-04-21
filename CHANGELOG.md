@@ -7,6 +7,14 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Cambiado
+
+- Godot: el renderer por defecto del proyecto pasa de **Forward+** (Vulkan) a
+  **GL Compatibility** (OpenGL). En Fedora + Flatpak + GPU NVIDIA (p. ej. RTX
+  movil) Vulkan suele terminar en ``SIGABRT`` en el binario ``godot-bin`` (ABRT),
+  no en el codigo AxonBIM. Quien necesite Forward+ puede cambiarlo en Ajustes
+  del proyecto. Ver ``frontend/project.godot`` comentario en ``config/features``.
+
 ### Corregido
 
 - Godot: la herramienta **Crear muro** no recibia clics: con

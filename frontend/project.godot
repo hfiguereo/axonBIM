@@ -14,7 +14,10 @@ config_version=5
 config/name="AxonBIM"
 config/description="Software BIM open-source hibrido Godot + Python."
 run/main_scene="res://scenes/main/main.tscn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+; GL Compatibility por defecto: en Linux + NVIDIA (p. ej. RTX movil) + Flatpak,
+; Forward+ (Vulkan) a veces provoca SIGABRT al cerrar o al iniciar. OpenGL es mas estable.
+; Para Vulkan/Forward+ de nuevo: Project -> Project Settings -> Rendering -> Method.
+config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -30,5 +33,5 @@ window/size/resizable=true
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
+renderer/rendering_method="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true

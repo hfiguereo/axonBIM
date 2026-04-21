@@ -29,7 +29,7 @@ AxonBIM **no reinventa**. Integra tecnologías maduras y las orquesta:
 
 | Pieza | Rol |
 |-------|-----|
-| **Godot Engine 4.x** | Motor gráfico (Vulkan) — UI, viewport, interacción |
+| **Godot Engine 4.x** | Motor gráfico (GL Compatibility por defecto; Forward+/Vulkan opcional en ajustes) — UI, viewport |
 | **Python 3.12+** | Cerebro — geometría, IFC, normativa, persistencia |
 | **OCP / OpenCASCADE** | Geometría sólida y NURBS |
 | **IfcOpenShell** | Lectura/escritura IFC, generación 2D |
@@ -120,17 +120,22 @@ Si el backend cae, el `RpcClient` reintenta la conexión con backoff
 exponencial (500 ms → 10 s). Las notificaciones `system.warning` /
 `system.info` emitidas por el backend aparecen en el log.
 
-#### Godot Flatpak + NVIDIA (RTX): cierre inesperado o Vulkan
+#### Godot Flatpak + NVIDIA (RTX): cierre inesperado (ABRT / SIGABRT)
 
-Si al cerrar Godot sigue apareciendo el informe de **cierre inesperado** con GPU
-NVIDIA (p. ej. RTX 4070 Mobile), suele ser el stack **Vulkan + driver** dentro
-del sandbox de Flatpak, no un bug de AxonBIM. Prueba, en este orden:
+El proyecto ya usa **GL Compatibility** (OpenGL) por defecto en
+`frontend/project.godot` para evitar el camino **Vulkan (Forward+)** que en
+muchas laptops NVIDIA + Flatpak termina en ``godot-bin killed by SIGABRT`` (no
+es un fallo de nuestro GDScript).
 
-1. Arrancar con variable de entorno (a veces reduce crashes al salir):
+Si **aun asi** crashea o ABRT sigue generando volcados:
+
+1. Arranca con:
    `flatpak run --env=__GL_THREADED_OPTIMIZATIONS=0 org.godotengine.Godot --path frontend`
-2. En `frontend/project.godot`, sección `[rendering]`, cambiar temporalmente a
-   OpenGL: `renderer/rendering_method="gl_compatibility"` (más estable en
-   algunas laptops híbridas; peor rendimiento PBR que Forward+).
+2. Actualiza drivers NVIDIA y `flatpak update`.
+3. Prueba el **binario oficial** de [godotengine.org](https://godotengine.org/download/linux/)
+   (mismo `--path frontend`) para ver si el problema es solo el sandbox Flatpak.
+4. Solo si necesitas Forward+/Vulkan: *Project → Project Settings → Rendering →
+   Method → Forward+*, sabiendo que puede volver a inestabilidad en tu GPU.
 
 #### "Crear muro" no hace nada
 

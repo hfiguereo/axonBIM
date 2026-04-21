@@ -44,6 +44,8 @@ coverage.xml
 # ---------- Godot ----------
 .godot/
 .import/
+# Copias locales de volcados ABRT / diagnosticos (suelen ser >30 MiB)
+reporte de errores/
 export.cfg
 export_presets.cfg
 *.translation
