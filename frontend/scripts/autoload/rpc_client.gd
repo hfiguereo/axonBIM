@@ -53,6 +53,21 @@ func _ready() -> void:
 		)
 
 
+## Cierra el TCP ordenadamente al salir del editor o del juego.
+##
+## Sin esto, ``StreamPeerTCP`` puede seguir activo mientras Vulkan y el
+## driver destruyen el contexto; en Linux eso a veces dispara el dialogo de
+## "cierre inesperado" aunque no haya bug en la logica del proyecto.
+func _exit_tree() -> void:
+	_reconnect_enabled = false
+	set_process(false)
+	var status: int = _stream.get_status()
+	if status != StreamPeerTCP.STATUS_NONE:
+		_stream.disconnect_from_host()
+	_is_connected = false
+	_buffer = PackedByteArray()
+
+
 func is_connected_to_backend() -> bool:
 	return _is_connected
 

@@ -79,6 +79,8 @@ func _submit_wall(p1: Vector3, p2: Vector3) -> void:
 		"thickness": default_thickness,
 	}
 	var resp: Dictionary = await RpcClient.call_rpc("ifc.create_wall", params)
+	if not is_inside_tree():
+		return
 	if not resp.get("ok"):
 		Logger.error("create_wall fallo: %s" % str(resp.get("error")))
 		return
