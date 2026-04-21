@@ -34,10 +34,10 @@ uv sync --extra dev         # instala el backend Python + herramientas de desarr
 En una terminal:
 
 ```bash
-uv run python -m axonbim --tcp --port 7878
+uv run python -m axonbim --tcp
 ```
 
-El backend queda escuchando en el puerto TCP 7878 de tu propia máquina (no sale a internet). Imprime algo como `JSON-RPC escuchando en 127.0.0.1:7878`. Es el **cerebro** de AxonBIM: sabe de IFC, geometría y normativa.
+El backend queda escuchando en el puerto TCP `5799` de tu propia máquina (no sale a internet, es el puerto default; lo cambias con `--tcp-port 9000`). Imprime algo como `JSON-RPC escuchando en 127.0.0.1:5799`. Es el **cerebro** de AxonBIM: sabe de IFC, geometría y normativa.
 
 ### 2.3. Abrir el frontend Godot
 
@@ -498,11 +498,12 @@ uv run pytest --cov --cov-report=term-missing
 gdformat --check frontend/scripts frontend/tests
 gdlint frontend/scripts
 
-# Arrancar backend
-uv run python -m axonbim --tcp --port 7878
+# Arrancar backend (TCP en puerto default 5799)
+uv run python -m axonbim --tcp
+# o explicito: uv run python -m axonbim --tcp-port 5799
 
-# Abrir Godot
-godot --path frontend
+# Abrir Godot (apuntando al puerto del backend)
+AXONBIM_RPC_PORT=5799 godot --path frontend
 ```
 
 ## Anexo B — Convención de ramas y commits
