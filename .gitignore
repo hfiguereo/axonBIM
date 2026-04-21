@@ -1,0 +1,86 @@
+# ==========================================================
+# .gitignore — AxonBIM
+# ==========================================================
+
+# ---------- Python (uv) ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.hypothesis/
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# PyInstaller
+*.spec
+*.manifest
+
+# ---------- Godot ----------
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+*.translation
+
+# ---------- IDE ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------- AxonBIM runtime ----------
+# Bases de datos y logs locales
+*.log
+logs/
+axon_internal.db
+axon_internal.db-journal
+axon_catalog.db
+axon_catalog.db-journal
+
+# Snapshots ISO 19650 generados localmente
+snapshots/
+
+# Runtime socket (se crea en $XDG_RUNTIME_DIR, pero por si acaso)
+*.sock
+
+# ---------- OS ----------
+*.bak
+*.tmp
+.DS_Store
+
+# ---------- Packaging ----------
+packaging/flatpak/build/
+packaging/flatpak/.flatpak-builder/
+packaging/appimage/*.AppDir/
+
+# ---------- OCR output (regenerable, no versionar) ----------
+docs/normativa/sources/**/*-ocr.pdf

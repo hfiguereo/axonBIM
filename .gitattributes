@@ -1,0 +1,114 @@
+# ==========================================================
+# .gitattributes — AxonBIM
+# ==========================================================
+# Normalización de line endings, detección de tipos binarios
+# y configuración de Git LFS para archivos grandes.
+# ==========================================================
+
+# ----------------------------------------------------------
+# Normalización (texto)
+# ----------------------------------------------------------
+* text=auto eol=lf
+
+# Scripts que requieren LF aunque estén en Windows
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# Archivos que requieren CRLF en Windows (si los hubiera)
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Código fuente — texto con LF
+*.py        text eol=lf diff=python
+*.gd        text eol=lf
+*.gdshader  text eol=lf
+*.md        text eol=lf
+*.toml      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.json      text eol=lf
+*.cfg       text eol=lf
+
+# ----------------------------------------------------------
+# Diff especializado para Python
+# ----------------------------------------------------------
+# requiere: git config diff.python.xfuncname '^[ \t]*((class|def)[ \t].*)$'
+
+# ----------------------------------------------------------
+# Binarios que Git no debe intentar mergear
+# ----------------------------------------------------------
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.svg       text
+*.pdf       binary
+*.zip       binary
+*.tar.gz    binary
+*.7z        binary
+
+# Godot binarios
+*.tscn      text eol=lf -diff
+*.tres      text eol=lf -diff
+*.godot     text eol=lf -diff
+*.import    text eol=lf -diff
+*.res       binary
+*.scn       binary
+*.pck       binary
+*.exr       binary
+*.hdr       binary
+*.blend     binary
+*.fbx       binary
+*.glb       binary
+*.gltf      text eol=lf
+
+# IFC y CAD
+*.ifc       text eol=lf -diff
+*.ifczip    binary
+*.dxf       binary
+*.dwg       binary
+*.step      text eol=lf -diff
+*.stp       text eol=lf -diff
+*.brep      binary
+*.stl       binary
+
+# SQLite databases (usados en tests/fixtures)
+*.db        binary
+*.sqlite    binary
+*.sqlite3   binary
+
+# ----------------------------------------------------------
+# Git LFS — archivos grandes y fuentes normativas
+# ----------------------------------------------------------
+# PDFs de normativas (mantienen los originales versionados sin inflar el repo)
+docs/normativa/sources/**/*.pdf filter=lfs diff=lfs merge=lfs -text
+
+# Fixtures binarios grandes para tests (modelos IFC de referencia, mallas pesadas)
+tests/fixtures/**/*.ifc    filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/**/*.ifczip filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/**/*.dxf    filter=lfs diff=lfs merge=lfs -text
+
+# Assets pesados del frontend (si se añaden modelos 3D de biblioteca)
+frontend/assets/models/**/*.glb  filter=lfs diff=lfs merge=lfs -text
+frontend/assets/models/**/*.gltf filter=lfs diff=lfs merge=lfs -text
+frontend/assets/models/**/*.fbx  filter=lfs diff=lfs merge=lfs -text
+frontend/assets/models/**/*.blend filter=lfs diff=lfs merge=lfs -text
+
+# Paquetes de release (si alguna vez se suben a una rama release)
+dist/**/*.flatpak    filter=lfs diff=lfs merge=lfs -text
+dist/**/*.AppImage   filter=lfs diff=lfs merge=lfs -text
+
+# ----------------------------------------------------------
+# Generated — sin diff para reducir ruido en PRs
+# ----------------------------------------------------------
+*.lock                   -diff
+uv.lock                  -diff linguist-generated=true
+package-lock.json        -diff linguist-generated=true
+
+# ----------------------------------------------------------
+# Exclusiones de estadísticas de lenguaje (GitHub Linguist)
+# ----------------------------------------------------------
+docs/**                  linguist-documentation=true
+tests/fixtures/**        linguist-vendored=true

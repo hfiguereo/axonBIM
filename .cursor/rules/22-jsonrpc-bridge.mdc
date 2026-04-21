@@ -1,0 +1,55 @@
+---
+description: Protocolo JSON-RPC 2.0 entre Godot y Python. Cargar al editar código del puente.
+globs: ["**/rpc/**", "**/bridge/**", "**/RpcClient*", "**/rpc_client*"]
+alwaysApply: false
+---
+
+# Puente JSON-RPC — AxonBIM
+
+Especificación viva en `docs/architecture/jsonrpc-protocol.md`. Esta regla resume invariantes que el código debe respetar.
+
+## Transporte
+
+- **Socket Unix local** (`$XDG_RUNTIME_DIR/axonbim.sock`). No TCP, no HTTP.
+- Mensajes delimitados por **Content-Length** estilo LSP (header + cuerpo JSON UTF-8).
+- Una conexión persistente Godot ↔ Python por sesión.
+
+## Formato
+
+Cumple **JSON-RPC 2.0** estrictamente:
+
+```json
+{ "jsonrpc": "2.0", "id": 42, "method": "geom.extrude_face", "params": { "topo_id": "a1b2…", "vector": [0, 0, 0.5] } }
+```
+
+Respuesta de éxito:
+
+```json
+{ "jsonrpc": "2.0", "id": 42, "result": { "mesh": { "vertices": […], "indices": […] }, "topo_map": { "old_id": "new_id", … } } }
+```
+
+Respuesta de error (códigos en `docs/architecture/jsonrpc-protocol.md`):
+
+```json
+{ "jsonrpc": "2.0", "id": 42, "error": { "code": -32001, "message": "Boolean operation failed", "data": { "reason": "non-manifold-result" } } }
+```
+
+## Naming de métodos
+
+`<dominio>.<acción>` en `snake_case`. Dominios reservados:
+
+- `ifc.*` — entidades IFC (crear, leer, modificar, eliminar)
+- `geom.*` — operaciones geométricas (extrude, boolean, fillet)
+- `draw.*` — generación de planos 2D
+- `project.*` — estados ISO 19650, undo/redo, save/load
+- `system.*` — ping, version, shutdown
+
+**Prohibido** crear un dominio nuevo sin actualizar primero el doc.
+
+## Reglas para el agente
+
+1. Antes de añadir un método, lee el doc y verifica que no exista uno equivalente.
+2. Toda nueva firma se añade **simultáneamente** en el handler Python y en el cliente GDScript.
+3. Cambios incompatibles requieren bump del campo `system.version` y nota en `CHANGELOG.md`.
+4. Notificaciones (sin `id`) solo para eventos del backend al frontend (ej. `project.autosave_done`). Las acciones del usuario siempre llevan `id` y esperan respuesta.
+5. Timeout por defecto en el cliente Godot: **10s** para operaciones ligeras, **60s** para booleanas/parsing pesado. Configurable por método.

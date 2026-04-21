@@ -1,0 +1,53 @@
+---
+description: Convenciones de Git, ramas, commits y pull requests.
+alwaysApply: false
+---
+
+# Git y commits — AxonBIM
+
+## Modelo de ramas
+
+- `main` — solo releases. Protegida. Merge únicamente desde `develop` vía PR firmado.
+- `develop` — integración. Todo PR de feature/fix apunta aquí.
+- `feature/<scope>-<descripcion-corta>` — nuevas funcionalidades.
+- `fix/<scope>-<descripcion-corta>` — correcciones.
+- `refactor/<scope>-…`, `docs/<scope>-…`, `chore/<scope>-…` cuando aplique.
+
+`<scope>` es el dominio afectado: `rpc`, `geom`, `ifc`, `draw`, `ui`, `iso19650`, `mived`, `ci`, `pkg`.
+
+## Commits convencionales
+
+Formato:
+
+```
+<tipo>(<scope>): <descripción imperativa, en español, ≤72 chars>
+
+<cuerpo opcional explicando el porqué, no el qué>
+
+<footer opcional: refs #issue, BREAKING CHANGE: …>
+```
+
+Tipos permitidos: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`.
+
+Ejemplos:
+
+```
+feat(geom): añade fillet en aristas vía OCP
+fix(rpc): evita deadlock cuando el cliente cierra durante una llamada
+refactor(ifc): extrae lectura de propiedades a módulo separado
+docs(mived): completa tabla de grosores de línea para muros
+```
+
+## Pull Requests
+
+- Título idéntico al primer commit (formato convencional).
+- Cuerpo con tres secciones: **Qué** (resumen), **Por qué** (motivación), **Cómo probarlo** (pasos manuales si aplica).
+- CI verde obligatorio antes de mergear.
+- Squash merge a `develop`. Merge commit firmado a `main`.
+
+## Para el agente
+
+- **Nunca** hacer commits sin que el usuario lo solicite explícitamente.
+- Al sugerir mensajes de commit, respetar el formato convencional y el español imperativo.
+- Si una serie de cambios mezcla tipos (feat + refactor + docs), **proponer** dividir en commits separados.
+- Nunca hacer `git push --force` a `main` ni a `develop`.

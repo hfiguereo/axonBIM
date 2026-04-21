@@ -1,0 +1,32 @@
+---
+description: Reglas de comportamiento del agente para evitar código basura, alucinaciones y trabajo a medias.
+alwaysApply: true
+---
+
+# Anti-patrones — Comportamiento del agente
+
+## Antes de escribir código
+
+1. **Explora primero, pregunta después.** Si el contexto es ambiguo, lee los archivos relevantes con las herramientas disponibles antes de inventar firmas o estructuras. Solo solicita aclaración al usuario cuando, tras leer, persista una decisión que solo él puede tomar.
+2. **Identifica la capa.** Antes de generar, declara mentalmente si el código es Frontend (Godot) o Backend (Python). No mezcles.
+3. **Verifica el contrato RPC.** Si tocas algo que cruza el puente, abre `docs/architecture/jsonrpc-protocol.md` y respeta los métodos existentes.
+
+## Al escribir código
+
+- **Cero placeholders.** Prohibido `# tu código aquí`, `# TODO: implementar`, `pass  # rellenar`, `...`. Si no sabes qué va, dilo en texto y pide guía; no entregues un esqueleto vacío como si fuera trabajo terminado.
+- **Cero código muerto.** Importaciones huérfanas, variables sin uso y funciones nunca llamadas se eliminan en el mismo cambio.
+- **Cero duplicación.** Si una operación geométrica ya existe en el backend, no la reescribas en otro módulo. Refactoriza para reutilizar.
+- **Tipado explícito siempre** (Python). Anotaciones obligatorias en firmas públicas; `Any` requiere justificación en comentario.
+- **Sin comentarios narrativos.** No describas lo obvio (`# incrementa contador`). Comenta solo intención no evidente, restricciones o trade-offs.
+
+## Al modificar código existente
+
+- Devuelve archivos completos y funcionales. Si el cambio es parcial, deja claro qué se omitió y por qué.
+- Si una refactorización rompe la API pública de un módulo, actualiza también los llamantes en el mismo cambio.
+- Tras editar, verifica linters (`ruff check`, `mypy --strict`, `gdlint`).
+
+## Honestidad operacional
+
+- Si una librería no expone la función que necesitas, dilo y propón alternativa. No inventes APIs.
+- Si un requisito normativo (ej. "aplicar CCRD") no está definido operacionalmente en el extracto correspondiente bajo `docs/normativa/<organismo>/`, no improvises valores: pide la spec o marca `# TODO(<organismo>-<doc>): pendiente §<sección>`.
+- Si detectas que la solicitud del usuario contradice la arquitectura núcleo, señálalo antes de implementarla.

@@ -1,0 +1,143 @@
+---
+description: Cumplimiento de normativa BIM dominicana (CCRD/MIVED, reglamentos MOPC) e ISO 19650. Cargar al trabajar en planos 2D, validación de proyecto, exportación o estados ISO 19650.
+globs: ["**/drawing/**", "**/normativa/**", "**/iso19650/**", "**/validation/**"]
+alwaysApply: false
+---
+
+# Normativa BIM — AxonBIM
+
+AxonBIM debe cumplir y asistir a cumplir el marco normativo dominicano. La fuente única de verdad es [`docs/normativa/`](../../docs/normativa/), organizada por **organismo emisor**.
+
+## 1. Jerarquía de fuentes
+
+| Orden | Fuente | Cuándo prevalece |
+|-------|--------|------------------|
+| 1 | **CCRD MIVED** (Vol. I 2025, Vol. II 2025) | Siempre que cubra el tema. Es la norma vigente unificada. |
+| 2 | **Reglamentos MOPC R-XXX** | Cuando el CCRD no cubre o remite a ellos explícitamente. |
+| 3 | **Otros** (INAPA, SIE, INDOCAL, etc.) | Casos específicos (instalaciones, NORDOM puntuales). |
+
+En conflicto directo CCRD↔MOPC: **prevalece el CCRD**. Documentar el conflicto en el extracto.
+
+## 2. Inventario integrado
+
+### MIVED (Código de Construcción RD)
+- [`docs/normativa/mived/ccrd-vol-i.md`](../../docs/normativa/mived/ccrd-vol-i.md) — Generales, cargas sísmicas, planos, licencia, suelos, hormigón.
+- [`docs/normativa/mived/ccrd-vol-ii.md`](../../docs/normativa/mived/ccrd-vol-ii.md) — MHADL, aluminio, mampostería, acero, madera, vidrios.
+
+### MOPC (23 reglamentos descargados)
+Bloqueantes para Fase 3 (planos) y Fase 4 (licencia):
+- [`docs/normativa/mopc/r-005-dibujo-planos.md`](../../docs/normativa/mopc/r-005-dibujo-planos.md) — 🔴 Simbología y formato de planos.
+- [`docs/normativa/mopc/r-007-barreras-arquitectonicas.md`](../../docs/normativa/mopc/r-007-barreras-arquitectonicas.md) — 🔴 Accesibilidad.
+- [`docs/normativa/mopc/r-016-espacios-minimos.md`](../../docs/normativa/mopc/r-016-espacios-minimos.md) — 🔴 Áreas mínimas en vivienda.
+- [`docs/normativa/mopc/r-021-tramitacion-planos.md`](../../docs/normativa/mopc/r-021-tramitacion-planos.md) — 🔴 Licencia, memorias.
+- [`docs/normativa/mopc/r-031-circulacion-vertical.md`](../../docs/normativa/mopc/r-031-circulacion-vertical.md) — 🔴 Escaleras, rampas, ascensores.
+- [`docs/normativa/mopc/r-032-incendios.md`](../../docs/normativa/mopc/r-032-incendios.md) — 🔴 Rutas de escape, compartimentación.
+
+Índice completo: [`docs/normativa/mopc/README.md`](../../docs/normativa/mopc/README.md).
+
+Maestro e índice de fases: [`docs/normativa/README.md`](../../docs/normativa/README.md).
+Glosario de siglas: [`docs/normativa/glosario-organismos.md`](../../docs/normativa/glosario-organismos.md).
+
+## 3. Regla de oro
+
+> **Los PDFs en `sources/` son referencia humana. Las únicas fuentes válidas para código son los archivos `.md` extractados manualmente.**
+
+Si un valor concreto no está en un `.md` extractado, **no lo improvises**: marca `# TODO(<organismo>-<doc>): pendiente §<sección>` y notifica al usuario.
+
+### Correcto
+```python
+# TODO(MOPC-R005): pendiente OCR y extracción §3 (grosor de línea para cortes principales)
+WALL_CUT_LINEWEIGHT_MM: float | None = None
+```
+
+### Incorrecto (alucinación)
+```python
+WALL_CUT_LINEWEIGHT_MM = 0.5  # asumido por convención general — PROHIBIDO
+```
+
+## 4. PDFs escaneados
+
+Estos requieren OCR antes de extraer texto:
+- `r-003-electricas-parte-i-2017.pdf` (🔵)
+- `r-005-dibujo-planos-2017.pdf` (🔴 **bloqueante**)
+- `r-009-especificaciones-construccion-edificaciones.pdf` (🟡)
+- `r-010-electricas-parte-ii-2017.pdf` (🔵)
+
+Comando estándar:
+```bash
+ocrmypdf <in>.pdf <in>-ocr.pdf -l spa --rotate-pages --deskew
+```
+
+Los `-ocr.pdf` NO se versionan (excluidos en `.gitignore`).
+
+## 5. ISO 19650 — Gestión de información
+
+Resumen operativo parafraseado (no-copia) en [`docs/architecture/iso-19650.md`](../../docs/architecture/iso-19650.md). **El texto oficial de ISO 19650 está protegido por copyright — no lo descargues, no lo pegues en el repo, no lo cites literalmente.**
+
+### Cinco estados del contenedor de información
+
+| Estado | Descripción | Editable | Snapshot |
+|--------|-------------|----------|----------|
+| **WIP** | Borrador del autor | Sí | No |
+| **Shared** | Emitido para coordinación | No (deriva nueva WIP) | Sí |
+| **Published** | Aprobado, base de decisiones | No | Sí (firmado en v1.1+) |
+| **Rejected** | No aprobado en revisión | No (obligatorio derive_wip) | Sí (del Shared rechazado) |
+| **Archive** | Histórico | No | Ya congelado |
+
+Tabla `information_containers` en `axon_internal.db`. Toda transición es atómica (estado + snapshot + hash + log) y queda en `state_transitions`. De **Published** solo se sale archivando; de **Rejected** solo se sale derivando nueva WIP. Triggers SQLite impiden UPDATE/DELETE en `state_transitions` y `change_log` (append-only por diseño).
+
+### Atributos obligatorios por contenedor
+
+Cada contenedor (modelo, plano, memoria) debe tener:
+
+- `suitability_code` (S1, S2, A1…) — lista controlada por proyecto.
+- `revision_code` (P01, C02…).
+- `classification` (Uniclass o equivalente).
+- `author_user_id` + `parent_container_id`.
+
+### Perfil LOIN por proyecto
+
+`project_config.loin_profile` define qué propiedades IFC y qué validadores normativos son obligatorios para pasar de WIP a Shared: `anteproyecto` | `ejecutivo` | `construccion`.
+
+## 6. Trazabilidad de cambios
+
+- Todo cambio geométrico registra en `change_log`: `container_id`, `entity_guid`, `op`, `user_id`, `timestamp`, `delta_summary`, `rpc_method`.
+- Helper canónico (cuando exista): `with iso19650.tracked_change(container_id, entity_guid, op): ...`.
+- `change_log` y `state_transitions` son **append-only** (enforced por triggers SQLite).
+
+## 7. Para el agente
+
+### Al exportar planos (Fase 3)
+Lee en orden:
+1. `docs/normativa/mived/ccrd-vol-i.md` §3 (parte de Título 3).
+2. `docs/normativa/mopc/r-005-dibujo-planos.md`.
+3. Si aplica, `r-007`, `r-016`, `r-031`, `r-032`.
+
+Si cualquier constante figura como pendiente, lanza error `MIVED_SPEC_MISSING` (código RPC `-32004`) o notifica al usuario. **No exportes con valores asumidos.**
+
+### Al validar un proyecto
+Activa cascada de validadores según el tipo:
+- Vivienda → R-016 (espacios), R-007 (accesibilidad básica), R-031 (si ≥3 niveles), R-032.
+- Edificio público → todos los anteriores + R-007 ampliado + R-032 estricto.
+- Escuela → R-023 + comunes.
+
+### Al implementar transiciones ISO 19650
+- Transacción SQLite atómica: insertar en `state_transitions` + congelar snapshot + hash SHA-256 + registro en `change_log`.
+- Validar la transición contra la máquina de estados (ver §3.2 de `iso-19650.md`). Si la transición es inválida, lanzar error RPC `STATE_TRANSITION_INVALID` (`-32003`).
+- En `submit_for_share`: ejecutar validadores normativos según `loin_profile` antes de cambiar estado. Si faltan propiedades obligatorias → `LOIN_INCOMPLETE` (`-32007`).
+- Si se intenta mutar un contenedor que no está en WIP → `CONTAINER_IMMUTABLE` (`-32008`).
+- **Nunca** hagas UPDATE/DELETE sobre `state_transitions` o `change_log` — son append-only.
+
+### Sobre ISO 19650 y copyright
+- **Nunca** descargues, transcribas ni pegues texto literal de la norma ISO 19650 en el repo.
+- Para explicar conceptos usa el resumen parafraseado en [`docs/architecture/iso-19650.md`](../../docs/architecture/iso-19650.md).
+- Si el usuario pregunta por un valor específico de la norma que no está en nuestro resumen, responde que hay que consultar la edición oficial — **no inventes**.
+
+### Al añadir una normativa nueva
+Sigue [`docs/normativa/README.md`](../../docs/normativa/README.md) § "Cómo añadir". Si cambia comportamiento del agente, actualiza esta regla en el mismo PR.
+
+### Al completar un extracto operativo
+1. Cambiar el estado en el README del organismo de 🔴 a ✅.
+2. Llenar las constantes en el `.md` del documento.
+3. Crear test en `tests/normativa/test_<codigo>_compliance.py`.
+4. Actualizar este inventario (§2) si es bloqueante.

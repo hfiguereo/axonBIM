@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --python ${{ matrix.python-version }}
+
+      - name: Ruff format (check)
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Mypy (strict)
+        run: uv run mypy --strict src/
+
+      - name: Pytest + coverage
+        run: uv run pytest -q --cov=src/axonbim --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+
+      - name: Upload coverage artifact
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 7
+
+  gdscript-lint:
+    name: GDScript lint & format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install gdtoolkit
+        run: pip install "gdtoolkit==4.*"
+
+      - name: gdformat --check
+        run: gdformat --check frontend/
+
+      - name: gdlint
+        run: gdlint frontend/
+
+  godot-tests:
+    name: Godot headless (GUT)
+    runs-on: ubuntu-latest
+    # Se habilita cuando existan tests GUT reales (Sprint 1.3+).
+    if: ${{ hashFiles('frontend/addons/gut/**') != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/godot
+          key: godot-4.3-stable-linux
+
+      - name: Download Godot 4.3
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.local/bin
+          curl -sSL -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -p /tmp/godot.zip > ~/.local/bin/godot
+          chmod +x ~/.local/bin/godot
+
+      - name: Run GUT headless
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          ~/.local/bin/godot --headless --path frontend -s addons/gut/gut_cmdln.gd -gtest=res://tests/ -gexit
+
+  lfs-check:
+    name: Git LFS pointer check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (sin LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Verificar que los binarios esten como LFS pointer
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            if [ -f "$f" ]; then
+              head -c 64 "$f" | grep -q "git-lfs.github.com/spec" || {
+                echo "::error file=$f::Archivo binario no es pointer LFS"
+                bad=1
+              }
+            fi
+          done < <(git ls-files 'docs/normativa/sources/**/*.pdf' 'tests/fixtures/**/*.ifc' 'tests/fixtures/**/*.ifczip' 'tests/fixtures/**/*.dxf' 2>/dev/null)
+          exit "$bad"

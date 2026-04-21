@@ -1,0 +1,84 @@
+---
+description: Estándares del frontend Godot 4.x (GDScript, escenas, viewport 3D).
+globs: ["**/*.gd", "**/*.tscn", "**/*.tres", "**/*.gdshader", "**/project.godot"]
+alwaysApply: false
+---
+
+# Frontend Godot — AxonBIM
+
+## Versión
+
+- **Godot 4.x** (mínimo 4.3). Renderer: **Forward+** (Vulkan). No usar Compatibility salvo justificación.
+
+## Lenguaje
+
+- **GDScript estático**. Tipado obligatorio en parámetros y retornos:
+  ```gdscript
+  func extrude_face(face_id: String, vector: Vector3) -> Dictionary:
+      ...
+  ```
+- C# y GDExtension permitidos solo para hot paths identificados con profiler. Justificar en PR.
+
+## Calidad de código (obligatorio en CI)
+
+```bash
+uvx gdtoolkit gdformat .         # formato
+uvx gdtoolkit gdlint .           # lint
+```
+
+(o instalación local: `pipx install gdtoolkit`)
+
+## Cabecera de licencia
+
+Solo en `.gd` bajo `frontend/scripts/`:
+
+```gdscript
+# © 2026 Arq. Hector Nathanael Figuereo. GPLv3.
+```
+
+No en `.tscn`, `.tres`, ni `project.godot`.
+
+## Renderizado y rendimiento
+
+- Elementos repetitivos (paredes seriadas, mobiliario, perfiles estructurales): **`MultiMeshInstance3D`** obligatorio.
+- Geometría dinámica recibida del backend: `ArrayMesh` reconstruido in-place; reusar buffers cuando sea posible.
+- LOD automático en `MeshInstance3D` para modelos grandes.
+- Profiler de Godot integrado en el flujo de QA antes de cada release.
+
+## Comunicación con el backend
+
+- Toda llamada al backend pasa por el singleton `RpcClient` (autoload). **Prohibido** que un nodo abra sockets directamente.
+- Llamadas RPC son **asíncronas**: `await rpc_client.call("ifc.create_wall", params)`.
+- Manejo obligatorio de errores y timeouts: si la llamada falla, mostrar feedback al usuario y **no cerrar la app**.
+- El esquema de mensajes vive en `docs/architecture/jsonrpc-protocol.md`. No improvisar nombres de métodos.
+
+## IDs topológicos
+
+- Cada cara/arista renderizada lleva un `topo_id: String` (hash generado por el backend).
+- Operaciones del usuario (Push/Pull, mover arista) envían el `topo_id` al backend; nunca coordenadas brutas para identificar la entidad.
+
+## Convenciones
+
+- **Nombres**: `snake_case` para funciones/variables, `PascalCase` para clases y nombres de nodo en escena.
+- **Señales**: nombre en pasado (`face_extruded`, `model_loaded`). Conectar en `_ready()`, desconectar en `_exit_tree()` cuando aplique.
+- **Escenas**: una responsabilidad por escena. Nada de "GodScene" omnipresente.
+- **Autoloads**: solo para singletons reales (RpcClient, ProjectState, Logger). Listar y justificar en `docs/architecture/godot-autoloads.md` cuando se añada uno nuevo.
+
+## Estructura sugerida
+
+```
+frontend/
+├── project.godot
+├── scenes/
+│   ├── main/
+│   ├── viewport_3d/
+│   ├── tools/        # Push/Pull, selección, medición
+│   └── ui/           # paneles, menús, navegador de proyecto
+├── scripts/
+│   ├── autoload/     # RpcClient, ProjectState, Logger
+│   ├── tools/
+│   └── ui/
+└── assets/
+    ├── icons/
+    └── shaders/
+```

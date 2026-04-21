@@ -1,0 +1,147 @@
+[project]
+name = "axonbim"
+version = "0.1.0a1"
+description = "Software BIM open-source para Linux, hibrido Godot (frontend) + Python (backend)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Arq. Hector Nathanael Figuereo" },
+]
+keywords = ["BIM", "IFC", "CAD", "Godot", "OpenCASCADE"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "pydantic>=2.6,<3.0",
+    "ifcopenshell>=0.8,<0.9",
+    "cadquery-ocp>=7.7.0",
+    "ezdxf>=1.2",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+axonbim-backend = "axonbim.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/hector/AxonBIM"
+Repository = "https://github.com/hector/AxonBIM"
+Issues = "https://github.com/hector/AxonBIM/issues"
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/axonbim"]
+
+# -------------------- uv --------------------
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+# -------------------- ruff --------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # eradicate (commented-out code)
+    "PL",   # pylint
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "PLR0913", # too many arguments (arch decision)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["PLR2004", "S101", "ARG"]  # magic values, asserts, unused args in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# -------------------- mypy --------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["axonbim"]
+exclude = ["frontend/", "build/", "dist/"]
+
+[[tool.mypy.overrides]]
+module = [
+    "ifcopenshell.*",
+    "OCP.*",
+    "ezdxf.*",
+]
+ignore_missing_imports = true
+
+# -------------------- pytest --------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "integration: tests de integracion RPC (requieren subproceso)",
+    "slow: tests lentos (booleanas, parsing IFC grande)",
+]
+asyncio_mode = "auto"
+
+# -------------------- coverage --------------------
+[tool.coverage.run]
+source = ["src/axonbim"]
+branch = true
+omit = ["**/__main__.py"]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]

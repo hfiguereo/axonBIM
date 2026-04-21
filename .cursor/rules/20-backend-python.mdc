@@ -1,0 +1,81 @@
+---
+description: Estándares del backend Python (geometría, IFC, RPC, persistencia).
+globs: ["**/*.py", "pyproject.toml"]
+alwaysApply: false
+---
+
+# Backend Python — AxonBIM
+
+## Versión y entorno
+
+- Python **3.12+** estricto (usamos `match`, `type` aliases, PEP 695).
+- Gestor: **uv** (Astral). Comandos canónicos:
+  - `uv sync` instala dependencias del lockfile.
+  - `uv add <pkg>` añade y bloquea.
+  - `uv run <cmd>` ejecuta dentro del entorno.
+- Manifest: `pyproject.toml` (PEP 621). No hay `requirements.txt` ni `setup.py`.
+
+## Calidad de código (obligatorio en CI)
+
+```bash
+uv run ruff format .         # formato (sustituye a black)
+uv run ruff check . --fix    # lint + autofix
+uv run mypy --strict src/    # tipado
+uv run pytest -q             # tests headless
+```
+
+Configuración vive en `pyproject.toml`. No introducir `black`, `flake8`, `isort` ni `pylint`: ruff los reemplaza.
+
+## Tipado
+
+- Anotaciones en **toda** firma pública. Privadas (`_foo`) recomendadas.
+- `from __future__ import annotations` en todos los módulos.
+- `Any` requiere comentario justificándolo. Preferir `object` o `TypeVar`.
+- Modelos de datos cruzando RPC: **dataclasses** con `slots=True` o **Pydantic v2** si se necesita validación. Decidir por módulo, no mezclar dentro del mismo paquete.
+
+## Cabecera de licencia
+
+Solo en archivos fuente bajo `src/` y `tests/` (no en configs, migraciones SQL, ni assets):
+
+```python
+# © 2026 Arq. Hector Nathanael Figuereo. GPLv3.
+```
+
+## Geometría y BIM
+
+- Operaciones booleanas, NURBS, B-Rep: **exclusivamente** vía OCP/OpenCASCADE. Prohibido reimplementar.
+- Lectura/escritura IFC: **IfcOpenShell**. Nunca parsear el .ifc a mano.
+- Salida 2D (planos): **ezdxf** consumiendo `ifcopenshell.draw`. Aplicar simbología CCRD-MIVED desde `docs/normativa/mived/ccrd-vol-i.md` §3.7. Si una constante figura como pendiente, **no improvises** (ver regla `30-bim-normativa.mdc`).
+- IDs topológicos: SHA-1 sobre representación canónica (ver `docs/architecture/topological-naming.md`).
+
+## Concurrencia
+
+- Parsing pesado o booleanas costosas: `multiprocessing` o `concurrent.futures.ProcessPoolExecutor`. Nunca `threading` para CPU-bound (GIL).
+- El servidor RPC corre en su propio proceso; los workers de geometría son procesos hijos.
+- Toda función expuesta vía RPC debe ser **idempotente** o documentar explícitamente sus efectos secundarios.
+
+## Persistencia
+
+- SQLite vía `sqlite3` stdlib o `sqlalchemy` 2.x (decidir y mantener consistencia).
+- Dos bases:
+  - `axon_internal.db` — config, logs, historial Undo/Redo, estados ISO 19650.
+  - `axon_catalog.db` — materiales, perfiles, biblioteca de objetos.
+- Migraciones: `alembic` si se elige SQLAlchemy; si no, scripts numerados en `migrations/`.
+
+## Logging
+
+- `logging.getLogger(__name__)` en cada módulo. **Nunca `print`**.
+- Configuración centralizada en `src/axonbim/logging_config.py`.
+- Errores que cruzan RPC se serializan al formato definido en el protocolo (ver `docs/architecture/jsonrpc-protocol.md`, sección "Error codes").
+
+## Estructura sugerida
+
+```
+src/axonbim/
+├── rpc/           # servidor JSON-RPC y handlers
+├── geometry/      # wrappers OCP, booleanas, B-Rep, IDs topológicos
+├── ifc/           # IfcOpenShell, lectura/escritura, validación
+├── drawing/       # generación 2D (ezdxf) + MIVED
+├── persistence/   # SQLite, modelos, ISO 19650
+└── packaging/     # PyInstaller / Conda-pack para distribución
+```

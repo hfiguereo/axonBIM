@@ -1,0 +1,36 @@
+# Hooks opcionales. Instalar con:
+#   pipx install pre-commit
+#   pre-commit install
+#
+# Los mismos checks corren en CI, pero pre-commit acorta el feedback loop.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(LICENSE|docs/normativa/sources/)
+      - id: end-of-file-fixer
+        exclude: ^(LICENSE|.*\.ifc|.*\.pdf)
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]  # bloquea > 1MB que no este en LFS
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/Scony/godot-gdscript-toolkit
+    rev: 4.3.2
+    hooks:
+      - id: gdformat
+        files: ^frontend/.*\.gd$
+      - id: gdlint
+        files: ^frontend/.*\.gd$

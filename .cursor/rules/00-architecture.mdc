@@ -1,0 +1,32 @@
+---
+description: Núcleo arquitectónico de AxonBIM. Dualidad Godot (frontend) / Python (backend) con puente JSON-RPC.
+alwaysApply: true
+---
+
+# AxonBIM — Arquitectura núcleo
+
+Software BIM open-source para Linux. Compite con SketchUp en fluidez gráfica y con Revit en rigor paramétrico.
+
+## Dualidad limpia (no negociable)
+
+| Capa | Tecnología | Responsabilidades exclusivas |
+|------|------------|------------------------------|
+| **Frontend** | Godot Engine 4.x (GDScript, Vulkan) | UI, viewport 3D, input del usuario, renderizado, animaciones, captura de gestos Push/Pull |
+| **Backend** | Python 3.12+ (IfcOpenShell, OCP/OpenCASCADE, ezdxf) | Geometría sólida, NURBS, booleanas, IFC, planos 2D, persistencia, normativa MIVED/ISO 19650 |
+| **Puente** | JSON-RPC 2.0 sobre socket Unix local | Único canal de comunicación. Ver `docs/architecture/jsonrpc-protocol.md` |
+
+## Reglas inviolables
+
+1. **Cero cruce de stacks.** Ninguna lib de Python dentro de Godot. Ninguna UI en Python. Si surge la tentación, es señal de que el diseño está mal.
+2. **El backend es la verdad.** Godot muestra; Python decide. Toda mutación geométrica viaja a Python, se valida y vuelve como malla + IDs topológicos.
+3. **Identidad topológica persistente.** Caras y aristas B-Rep llevan un hash estable generado por el backend. Ver `docs/architecture/topological-naming.md`.
+4. **Resiliencia entre procesos.** Si Python falla (booleana inválida, parsing roto), Godot captura el error RPC y mantiene la UI viva. Nunca se cierra por un fallo del backend.
+5. **GPU al frontend, CPU al backend.** Renderizado 100% en Godot. Parsing pesado en Python con `multiprocessing` para no bloquear el hilo RPC.
+
+## Filosofía "Director de Orquesta"
+
+Antes de implementar algo desde cero, evaluar si una librería madura ya lo resuelve. Reimplementar es la última opción, no la primera. AxonBIM integra; no reinventa.
+
+## Gobernanza
+
+Arq. Hector Nathanael Figuereo mantiene la dirección del diseño (BDFL). Decisiones arquitectónicas estructurales requieren su aprobación explícita.
