@@ -14,7 +14,7 @@ jobs:
     if: ${{ !contains(fromJSON('["dependabot[bot]", "renovate[bot]"]'), github.actor) }}
     steps:
       - name: Validar titulo
-        uses: amannn/action-semantic-pull-request@v6
+        uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -46,6 +46,8 @@ jobs:
             repo
             deps
             deps-dev
+            cli
+            tests
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$
           subjectPatternError: |
