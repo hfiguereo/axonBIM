@@ -7,6 +7,14 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Añadido
+
+- `scripts/dev/install_godot_official.sh`: descarga Godot **4.3-stable** Linux
+  oficial a `~/.local/bin/godot` (misma version que CI). Documentado en README
+  junto con **desinstalar Flatpak** (`flatpak uninstall org.godotengine.Godot`)
+  cuando Vulkan/SIGABRT molesta.
+- `Makefile`: `run-godot` prefije `~/.local/bin/godot` si existe.
+
 ### Cambiado
 
 - Godot: el renderer por defecto del proyecto pasa de **Forward+** (Vulkan) a

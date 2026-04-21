@@ -2,7 +2,8 @@
         run-backend run-godot gdlint gdformat clean distclean
 
 UV ?= uv
-GODOT ?= godot
+# Binario oficial en ~/.local/bin/godot (ver scripts/dev/install_godot_official.sh); si no existe, usa `godot` del PATH.
+GODOT ?= $(shell test -x "$(HOME)/.local/bin/godot" && echo "$(HOME)/.local/bin/godot" || command -v godot 2>/dev/null || echo godot)
 
 help:
 	@echo "AxonBIM - targets disponibles:"
@@ -16,7 +17,7 @@ help:
 	@echo "  test-integration- pytest tests/integration -q"
 	@echo "  test-cov        - pytest con cobertura (falla si < 80%)"
 	@echo "  run-backend     - python -m axonbim"
-	@echo "  run-godot       - abre el proyecto Godot"
+	@echo "  run-godot       - abre el proyecto Godot (GODOT= ruta al binario)"
 	@echo "  gdlint          - gdtoolkit lint sobre frontend/"
 	@echo "  gdformat        - gdtoolkit format sobre frontend/"
 	@echo "  clean           - limpia artefactos de build"
