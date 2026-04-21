@@ -20,7 +20,7 @@ var _wall_tool: Node
 @onready var _rtt_label: Label = %RttLabel
 @onready var _log_label: Label = %LogLabel
 @onready var _camera: Camera3D = %Camera3D
-@onready var _project_view: AxonProjectView = %ProjectView
+@onready var _project_view: Node3D = %ProjectView
 
 
 func _ready() -> void:

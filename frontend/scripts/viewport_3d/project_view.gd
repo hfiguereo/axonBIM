@@ -1,5 +1,4 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
-class_name AxonProjectView
 extends Node3D
 
 ## Contenedor del proyecto 3D. Mantiene el mapa `guid -> MeshInstance3D`
