@@ -47,6 +47,11 @@ En otra terminal:
 godot --path frontend
 ```
 
+El `RpcClient` intenta por defecto `127.0.0.1:5799` (no hace falta exportar
+`AXONBIM_RPC_PORT` en la mayoría de casos). Con **Flatpak**, si cambias el
+puerto del backend o el sandbox no hereda variables del shell, usa:
+`flatpak run --env=AXONBIM_RPC_PORT=5799 org.godotengine.Godot --path frontend`.
+
 Se abre Godot. Si el editor te pregunta, importa el proyecto y luego pulsa **F5** para correr la escena principal. Verás la ventana de AxonBIM con un panel a la izquierda y un viewport 3D a la derecha (con una cuadrícula a ras de suelo).
 
 ### 2.4. La demo end-to-end
@@ -502,8 +507,9 @@ gdlint frontend/scripts
 uv run python -m axonbim --tcp
 # o explicito: uv run python -m axonbim --tcp-port 5799
 
-# Abrir Godot (apuntando al puerto del backend)
-AXONBIM_RPC_PORT=5799 godot --path frontend
+# Abrir Godot (5799 por defecto en RpcClient; env solo si cambias el puerto)
+godot --path frontend
+# Flatpak: flatpak run --env=AXONBIM_RPC_PORT=5799 org.godotengine.Godot --path frontend
 ```
 
 ## Anexo B — Convención de ramas y commits

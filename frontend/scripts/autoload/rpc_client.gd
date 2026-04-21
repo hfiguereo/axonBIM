@@ -20,7 +20,10 @@ signal notification_received(method: String, params: Dictionary)
 signal response_arrived(id: int, response: Dictionary)
 
 const DEFAULT_HOST: String = "127.0.0.1"
-const DEFAULT_PORT: int = 0  # 0 => lee de env AXONBIM_RPC_PORT o de argumentos
+## Puerto TCP por defecto (alineado con ``python -m axonbim --tcp``).
+## Flatpak y otros lanzadores a menudo no heredan variables del shell;
+## sin ``AXONBIM_RPC_PORT`` igual intentamos loopback en este puerto.
+const DEFAULT_PORT: int = 5799
 const DEFAULT_TIMEOUT_MS: int = 10000
 const POLL_INTERVAL_MS: int = 16  # ~60Hz
 const MAX_BODY_BYTES: int = 64 * 1024 * 1024
@@ -242,10 +245,13 @@ func _resolve_host() -> String:
 func _resolve_port() -> int:
 	var env: String = OS.get_environment("AXONBIM_RPC_PORT")
 	if env != "":
-		return int(env)
+		var parsed: int = int(env)
+		# AXONBIM_RPC_PORT=0 desactiva TCP (solo Unix en el backend).
+		return parsed if parsed > 0 else 0
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--rpc-port="):
-			return int(arg.split("=")[1])
+			var from_cli: int = int(arg.split("=")[1])
+			return from_cli if from_cli > 0 else 0
 	return DEFAULT_PORT
 
 

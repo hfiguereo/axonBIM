@@ -6,6 +6,9 @@ extends Node
 
 signal wall_created(guid: String)
 signal tool_cancelled
+## Emitido al terminar ``_submit_wall`` (exito o error). Sirve para quitar
+## la captura de clics del viewport sin depender de ``wall_created``.
+signal wall_submit_finished
 
 @export var default_height: float = 3.0
 @export var default_thickness: float = 0.2
@@ -80,9 +83,11 @@ func _submit_wall(p1: Vector3, p2: Vector3) -> void:
 	}
 	var resp: Dictionary = await RpcClient.call_rpc("ifc.create_wall", params)
 	if not is_inside_tree():
+		wall_submit_finished.emit()
 		return
 	if not resp.get("ok"):
 		Logger.error("create_wall fallo: %s" % str(resp.get("error")))
+		wall_submit_finished.emit()
 		return
 
 	var guid: String = resp["result"]["guid"]
@@ -90,3 +95,4 @@ func _submit_wall(p1: Vector3, p2: Vector3) -> void:
 	_project_view.add_entity(guid, mesh_dict)
 	wall_created.emit(guid)
 	Logger.info("Muro creado: %s" % guid)
+	wall_submit_finished.emit()

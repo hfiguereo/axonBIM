@@ -98,8 +98,13 @@ uv run python -m axonbim --tcp --log-level INFO
 # Equivalente explicito:
 #   uv run python -m axonbim --tcp-port 5799 --tcp-host 127.0.0.1 --log-level INFO
 
-# 2. Terminal B: abrir Godot indicandole el puerto
-AXONBIM_RPC_PORT=5799 godot --path frontend
+# 2. Terminal B: abrir Godot (el cliente ya intenta 127.0.0.1:5799 por defecto)
+godot --path frontend
+# Si usas otro puerto en el backend, fuerza la variable:
+#   AXONBIM_RPC_PORT=9000 godot --path frontend
+#
+# Flatpak (la variable del shell NO siempre entra al sandbox; usa --env):
+#   flatpak run --env=AXONBIM_RPC_PORT=5799 org.godotengine.Godot --path "$PWD/frontend"
 ```
 
 Flujo en la UI:
@@ -114,6 +119,27 @@ Flujo en la UI:
 Si el backend cae, el `RpcClient` reintenta la conexión con backoff
 exponencial (500 ms → 10 s). Las notificaciones `system.warning` /
 `system.info` emitidas por el backend aparecen en el log.
+
+#### Godot Flatpak + NVIDIA (RTX): cierre inesperado o Vulkan
+
+Si al cerrar Godot sigue apareciendo el informe de **cierre inesperado** con GPU
+NVIDIA (p. ej. RTX 4070 Mobile), suele ser el stack **Vulkan + driver** dentro
+del sandbox de Flatpak, no un bug de AxonBIM. Prueba, en este orden:
+
+1. Arrancar con variable de entorno (a veces reduce crashes al salir):
+   `flatpak run --env=__GL_THREADED_OPTIMIZATIONS=0 org.godotengine.Godot --path frontend`
+2. En `frontend/project.godot`, sección `[rendering]`, cambiar temporalmente a
+   OpenGL: `renderer/rendering_method="gl_compatibility"` (más estable en
+   algunas laptops híbridas; peor rendimiento PBR que Forward+).
+
+#### "Crear muro" no hace nada
+
+Comprueba que el backend esté en marcha (`uv run python -m axonbim --tcp`) y que
+el log de Godot muestre `RpcClient conectado`. Con Flatpak, si no pasas
+`--env=AXONBIM_RPC_PORT=...`, el cliente usa el puerto **5799**
+por defecto igualmente; si cambias el puerto del backend, usa `--env` como
+arriba. Los clics del muro se leen **dentro del SubViewport 3D** (no del panel
+lateral); debes hacer clic sobre el área del viewport, no sobre el botón.
 
 ### Estructura del repositorio
 
