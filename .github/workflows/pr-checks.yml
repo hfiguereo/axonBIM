@@ -8,6 +8,10 @@ jobs:
   conventional-commits:
     name: Conventional Commits (titulo del PR)
     runs-on: ubuntu-latest
+    # Dependabot y otros bots siguen sus propias convenciones
+    # (capitalizacion, scopes fijos). Su consistencia la garantiza el
+    # bot, no este workflow.
+    if: ${{ !contains(fromJSON('["dependabot[bot]", "renovate[bot]"]'), github.actor) }}
     steps:
       - name: Validar titulo
         uses: amannn/action-semantic-pull-request@v5
