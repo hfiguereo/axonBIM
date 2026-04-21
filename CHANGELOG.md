@@ -9,6 +9,14 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Corregido
 
+- Godot: la herramienta **Crear muro** no recibia clics: con
+  ``SubViewport.handle_input_locally = false`` los eventos van al viewport 3D,
+  no al ``gui_input`` del ``SubViewportContainer``. Los clics se capturan ahora
+  en ``AxonProjectView._unhandled_input`` y se reenvian a la herramienta.
+- Godot + Flatpak: ``RpcClient`` usaba puerto ``0`` si Flatpak no heredaba
+  ``AXONBIM_RPC_PORT`` del shell (conexion imposible). El puerto TCP por defecto
+  del cliente pasa a ser ``5799`` (mismo que ``python -m axonbim --tcp``);
+  ``AXONBIM_RPC_PORT=0`` sigue desactivando TCP.
 - Godot (Linux): cierre mas limpio del frontend. ``RpcClient`` ahora corta
   el ``StreamPeerTCP`` en ``_exit_tree()`` (desactiva reconexion, ``set_process(false)``,
   ``disconnect_from_host()``) para reducir reportes de "cierre inesperado"

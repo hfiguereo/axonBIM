@@ -10,7 +10,6 @@ extends Node
 ## - Labels de estado de conexion y log de operaciones.
 
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
-const ProjectView := preload("res://scripts/viewport_3d/project_view.gd")
 
 var _wall_tool: Node
 
@@ -21,8 +20,7 @@ var _wall_tool: Node
 @onready var _rtt_label: Label = %RttLabel
 @onready var _log_label: Label = %LogLabel
 @onready var _camera: Camera3D = %Camera3D
-@onready var _viewport_control: SubViewportContainer = %ViewportContainer
-@onready var _project_view: Node3D = %ProjectView
+@onready var _project_view: AxonProjectView = %ProjectView
 
 
 func _ready() -> void:
@@ -32,13 +30,15 @@ func _ready() -> void:
 	add_child(_wall_tool)
 	_wall_tool.setup(_camera, _project_view)
 	_wall_tool.wall_created.connect(_on_wall_created)
+	_wall_tool.tool_cancelled.connect(_on_wall_tool_idle)
+	_wall_tool.wall_submit_finished.connect(_on_wall_tool_idle)
 
 	RpcClient.connected.connect(_on_rpc_connected)
 	RpcClient.disconnected.connect(_on_rpc_disconnected)
 	_ping_button.pressed.connect(_on_ping_pressed)
 	_wall_button.pressed.connect(_on_create_wall_pressed)
 	_save_button.pressed.connect(_on_save_pressed)
-	_viewport_control.gui_input.connect(_on_viewport_input)
+	_project_view.viewport_left_click.connect(_on_project_view_left_click)
 
 	_refresh_status()
 
@@ -74,9 +74,11 @@ func _on_ping_pressed() -> void:
 func _on_create_wall_pressed() -> void:
 	if _wall_tool.is_active():
 		_wall_tool.deactivate()
+		_project_view.set_wall_clicks_enabled(false)
 		_log_label.text = "Crear muro: cancelado"
 		return
 	_wall_tool.activate()
+	_project_view.set_wall_clicks_enabled(true)
 	_log_label.text = "Crea muro: clickea P1 luego P2 en el viewport"
 
 
@@ -104,13 +106,14 @@ func _save_to_path(path: String, dialog: FileDialog) -> void:
 		_log_label.text = "Error al guardar: %s" % str(resp.get("error"))
 
 
-func _on_viewport_input(event: InputEvent) -> void:
+func _on_project_view_left_click(viewport_position: Vector2) -> void:
 	if not _wall_tool.is_active():
 		return
-	if event is InputEventMouseButton:
-		var mouse: InputEventMouseButton = event
-		if mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
-			_wall_tool.handle_viewport_click(mouse.position)
+	_wall_tool.handle_viewport_click(viewport_position)
+
+
+func _on_wall_tool_idle() -> void:
+	_project_view.set_wall_clicks_enabled(false)
 
 
 func _on_wall_created(guid: String) -> void:

@@ -18,7 +18,12 @@ El backend puede escuchar **simultáneamente** en dos transportes y los clientes
 | **TCP loopback** (`127.0.0.1:<puerto>`) | Godot 4.x (cliente oficial del frontend) | Godot expone `StreamPeerTCP` pero no `StreamPeerUnix` |
 
 - **Unix path:** `${XDG_RUNTIME_DIR}/axonbim.sock` (fallback: `${TMPDIR}/axonbim-${UID}.sock`).
-- **TCP:** el puerto lo elige el proceso lanzador (normalmente un orquestador de desarrollo o el futuro instalador Flatpak) y se pasa a Godot vía env `AXONBIM_RPC_PORT` o argumento `--rpc-port=<puerto>` (tras `--` en la línea de comandos Godot). El backend lo recibe con `--tcp-port`.
+- **TCP:** el backend usa `--tcp` (puerto default `5799`) o `--tcp-port=<N>`. El
+  cliente Godot (`RpcClient`) intenta `127.0.0.1:5799` si no hay env
+  `AXONBIM_RPC_PORT` (Flatpak a menudo no hereda variables del shell; el default
+  evita quedar en puerto `0`). Se puede forzar con `AXONBIM_RPC_PORT` o con
+  `--rpc-port=<puerto>` en los argumentos de usuario de Godot. `AXONBIM_RPC_PORT=0`
+  desactiva TCP en el cliente.
 - **Lifecycle:** Python crea el/los listeners al arrancar; los clientes conectan una sola vez y mantienen la conexión abierta durante toda la sesión.
 - **Encoding:** UTF-8 en el body, ASCII en los headers.
 
