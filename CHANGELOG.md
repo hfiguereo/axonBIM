@@ -7,18 +7,23 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Corregido
+
+- Godot (Linux): cierre mas limpio del frontend. ``RpcClient`` ahora corta
+  el ``StreamPeerTCP`` en ``_exit_tree()`` (desactiva reconexion, ``set_process(false)``,
+  ``disconnect_from_host()``) para reducir reportes de "cierre inesperado"
+  al salir con Vulkan/TCP aun activo. Tras ``await`` RPC, las escenas ignoran
+  el resultado si el arbol ya se destruyo (``is_inside_tree()``).
+- Documentación: `docs/phase-reports/phase-1-report.md` referenciaba el flag
+  inexistente `--tcp --port 7878`. Sustituido por el atajo nuevo `--tcp` y se
+  unifica el puerto a `5799` (alineado con el README).
+
 ### Añadido
 
 - CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
   `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
   funciona; antes argparse rechazaba `--tcp` por ambigüedad con
   `--tcp-host`/`--tcp-port`.
-
-### Corregido
-
-- Documentación: `docs/phase-reports/phase-1-report.md` referenciaba el flag
-  inexistente `--tcp --port 7878`. Sustituido por el atajo nuevo `--tcp` y se
-  unifica el puerto a `5799` (alineado con el README).
 
 ## [0.1.0-alpha.1] — 2026-04-20
 

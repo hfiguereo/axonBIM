@@ -61,6 +61,8 @@ func _on_ping_pressed() -> void:
 	_ping_button.disabled = true
 	var t0: int = Time.get_ticks_msec()
 	var resp: Dictionary = await RpcClient.call_rpc("system.ping", {})
+	if not is_inside_tree():
+		return
 	var rtt: int = Time.get_ticks_msec() - t0
 	if resp.get("ok"):
 		_rtt_label.text = "RTT: %d ms" % rtt
@@ -94,6 +96,8 @@ func _on_save_pressed() -> void:
 func _save_to_path(path: String, dialog: FileDialog) -> void:
 	dialog.queue_free()
 	var resp: Dictionary = await RpcClient.call_rpc("project.save", {"path": path})
+	if not is_inside_tree():
+		return
 	if resp.get("ok"):
 		_log_label.text = "Guardado: %s (%d bytes)" % [path, int(resp["result"].get("bytes", 0))]
 	else:
