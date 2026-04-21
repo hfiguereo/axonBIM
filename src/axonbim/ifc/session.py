@@ -50,6 +50,7 @@ class IfcSession:
         storey: entity_instance,
         body_context: entity_instance,
     ) -> None:
+        """Construye la sesion con referencias ya creadas a las entidades espaciales."""
         self.file = file
         self.project = project
         self.site = site
@@ -92,6 +93,7 @@ class IfcSession:
         return cls(file, project, site, building, storey, body_context)
 
     def save(self, path: Path) -> None:
+        """Serializa la sesion a ``path`` como texto ISO 10303-21 (``.ifc``)."""
         path.parent.mkdir(parents=True, exist_ok=True)
         self.file.write(str(path))
         _log.info("IFC guardado en %s (%d bytes)", path, path.stat().st_size)

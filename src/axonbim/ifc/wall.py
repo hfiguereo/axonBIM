@@ -51,7 +51,8 @@ def create_wall(
 
     Args:
         session: sesion IFC activa.
-        p1, p2: extremos del muro en planta (metros).
+        p1: extremo inicial en planta (metros).
+        p2: extremo final en planta (metros).
         height: altura en metros (> 0).
         thickness: grosor en metros (> 0).
         name: nombre opcional. Si es ``None`` se autogenera ``Wall-<N>``.

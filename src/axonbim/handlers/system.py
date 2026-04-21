@@ -15,10 +15,12 @@ from axonbim.rpc.models import PROTOCOL_VERSION
 
 
 async def ping(_params: dict[str, Any]) -> dict[str, Any]:
+    """Handler de ``system.ping``. Devuelve ``{pong, ts}`` para medir RTT."""
     return {"pong": True, "ts": int(time.time() * 1000)}
 
 
 async def version(_params: dict[str, Any]) -> dict[str, Any]:
+    """Handler de ``system.version``. Devuelve version de protocolo y de backend."""
     return {"protocol": PROTOCOL_VERSION, "backend": __version__}
 
 

@@ -85,14 +85,30 @@ select = [
     "ERA",  # eradicate (commented-out code)
     "PL",   # pylint
     "RUF",  # ruff-specific
+    "D",    # pydocstyle (docstrings, Google convention)
 ]
 ignore = [
-    "E501",   # line too long (handled by formatter)
+    "E501",    # line too long (handled by formatter)
     "PLR0913", # too many arguments (arch decision)
+    "D203",    # conflicto con D211 (no blank line before class)
+    "D212",    # conflicto con D213 (multi-line summary second line)
+    "D107",    # __init__ docstring opcional si la clase ya documenta
+    "D105",    # docstring en dunder methods opcional
+    "D104",    # docstring en paquetes opcional cuando el paquete agrupa
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["PLR2004", "S101", "ARG"]  # magic values, asserts, unused args in tests
+"tests/**/*.py" = [
+    "PLR2004",
+    "S101",
+    "ARG",
+    "D",       # tests: el nombre del test es la documentacion
+]
+"**/__init__.py" = ["D"]  # paquetes que solo agrupan no requieren docstring
+"src/axonbim/__main__.py" = ["D"]  # CLI entrypoint: argparse es autodescriptivo
 
 [tool.ruff.format]
 quote-style = "double"

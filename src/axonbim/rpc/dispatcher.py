@@ -35,6 +35,7 @@ class RpcError(Exception):
     """Excepcion que un handler puede lanzar para producir un error tipado."""
 
     def __init__(self, code: int, message: str, data: dict[str, Any] | None = None) -> None:
+        """Crea el error con ``code`` JSON-RPC, mensaje y ``data`` opcional."""
         super().__init__(message)
         self.code = code
         self.message = message
@@ -45,6 +46,7 @@ class Dispatcher:
     """Registro de handlers + parser/encoder del protocolo JSON-RPC 2.0."""
 
     def __init__(self) -> None:
+        """Crea un dispatcher vacio, sin handlers y con ``shutdown_event`` no activado."""
         self._handlers: dict[str, Handler] = {}
         self._shutdown_event: asyncio.Event = asyncio.Event()
 
@@ -54,12 +56,14 @@ class Dispatcher:
         return self._shutdown_event
 
     def register(self, method: str, handler: Handler) -> None:
+        """Registra ``handler`` bajo el nombre RPC ``method`` (debe ser unico)."""
         if method in self._handlers:
             raise ValueError(f"Metodo RPC ya registrado: {method!r}")
         self._handlers[method] = handler
         _log.debug("Handler registrado: %s", method)
 
     def registered_methods(self) -> list[str]:
+        """Lista ordenada de nombres de metodos RPC actualmente registrados."""
         return sorted(self._handlers)
 
     async def dispatch_bytes(self, raw: bytes) -> bytes | None:

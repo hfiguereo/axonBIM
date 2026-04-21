@@ -1,0 +1,129 @@
+---
+description: Protección de derechos de autor y licencias de terceros. Prohibido pegar texto literal de normas ISO/MOPC/CCRD, código con licencia incompatible, assets sin licencia verificada o contenido generado por IA sin revisión. Cargar en cualquier tarea que transcriba normativa, integre dependencias externas, copie snippets o importe assets.
+globs: ["**/*.py", "**/*.gd", "**/normativa/**", "**/assets/**", "**/docs/**", "pyproject.toml", "frontend/project.godot"]
+alwaysApply: true
+---
+
+# Protección de derechos de autor y licencias — AxonBIM
+
+AxonBIM es software libre bajo **GPL-3.0-or-later**. Esta licencia obliga a respetar rigurosamente los derechos de autor ajenos: ni un archivo de este repositorio puede contener material protegido sin autorización expresa del titular. Una violación expone al proyecto a takedowns, anula la publicación de releases y, en algunos países, al autor.
+
+Esta regla **siempre aplica** y **generaliza** la protección que [`30-bim-normativa.mdc`](30-bim-normativa.mdc) ya da a la ISO 19650.
+
+---
+
+## 1. Normativa técnica (ISO, MOPC, CCRD/MIVED, INDOCAL, ASTM, etc.)
+
+1. **Prohibido** descargar, transcribir, copiar o pegar texto literal de cualquier norma protegida.
+2. Permitido: **extractos operativos en lenguaje propio** — paráfrasis técnica, tablas de valores (los datos numéricos puros *no* son objeto de copyright) y referencias citables (`ISO 19650-1:2018 §5.2`).
+3. Permitido: **normas de dominio público** (ej. textos legales oficiales publicados en gaceta dominicana, reglamentos MOPC en su versión gratuita publicada por el Estado). Al incluirlas, citar origen, fecha de acceso y versión.
+4. Los PDFs oficiales **nunca** se commitean al repo salvo que sean de descarga pública y gratuita y el Estado dominicano los publique así. Para archivos permitidos pero pesados: Git LFS.
+5. Las capturas de pantalla de documentos normativos están prohibidas — equivalen a copia.
+
+Ver detalle operativo en [`30-bim-normativa.mdc`](30-bim-normativa.mdc).
+
+---
+
+## 2. Código de terceros
+
+### 2.1. Compatibilidad con GPLv3
+
+**Compatibles (pueden vivir en `src/` y ser distribuidos con AxonBIM):**
+
+- GPL-3.0, LGPL-3.0, LGPL-2.1+ (con conversión), AGPL-3.0.
+- MIT, BSD 2/3/4-cláusulas, ISC, Apache-2.0 (únicamente vía GPLv3, no GPLv2).
+- MPL-2.0 (con cuidado).
+- Public domain / CC0.
+
+**Incompatibles:**
+
+- GPL-2.0-only (sin la cláusula *or later*).
+- BSD con cláusula publicitaria no corregida.
+- Licencias *source-available* no-libres (BUSL, SSPL, Commons Clause).
+- Cualquier licencia propietaria.
+
+### 2.2. Reglas operativas
+
+1. **Dependencias runtime** (en `pyproject.toml`, `project.godot` addons): verificar licencia **antes** de añadirlas. Si la licencia no es obvia, documentarla en el PR.
+2. **Copiar código de internet** (Stack Overflow, blogs, otros repos): solo si la licencia es compatible. Pegar literalmente 30+ líneas requiere:
+   - atribución en comentario (`# Adaptado de <URL>, licencia <LIC>`);
+   - el archivo `LICENSES/<paquete>.txt` con el texto de la licencia original;
+   - justificación en el mensaje del commit.
+3. **Addons de Godot**: solo `MIT`, `BSD`, `Apache-2.0`, `MPL-2.0` o `GPL*` compatibles. Revisar `LICENSE` del addon antes de mergear.
+4. **Fragmentos cortos idiomáticos** (4-5 líneas de código trivial tipo "abrir archivo", "iterar dict") no requieren atribución — no alcanzan el umbral de originalidad.
+
+### 2.3. Stack Overflow y foros
+
+Contenido de Stack Overflow: CC BY-SA 4.0 (posts desde 2018). Reutilizable bajo GPLv3 con atribución. Si se usa: comentario con URL de la respuesta y autor.
+
+---
+
+## 3. Assets (texturas, modelos 3D, iconos, fuentes)
+
+| Asset | Licencias aceptadas | Dónde vive |
+|-------|--------------------|-----------|
+| Iconos UI | `CC0`, `CC BY 4.0`, `MIT`, `Apache-2.0` | `frontend/assets/icons/` |
+| Texturas demo | `CC0`, `CC BY 4.0` | `frontend/assets/textures/` |
+| Modelos 3D demo | `CC0`, `CC BY 4.0` | `samples/` o `frontend/assets/models/` |
+| Fuentes | `SIL OFL 1.1`, `Apache-2.0`, `GPL+FE` | `frontend/assets/fonts/` |
+| Screenshots docs | Propios del proyecto o `CC BY-SA 4.0` con autor | `docs/assets/` |
+
+**Obligatorio:** archivo `ATTRIBUTIONS.md` en la carpeta de assets con una fila por asset (nombre, autor, fuente URL, licencia, fecha). Assets `CC BY` sin línea en `ATTRIBUTIONS.md` incumplen la licencia.
+
+---
+
+## 4. Contenido generado por IA
+
+1. **El código generado por el agente IA** (Cursor, Copilot, etc.) debe ser **revisado por el humano antes de commitearse**. El autor humano asume la responsabilidad legal y firma el commit.
+2. **Prohibido aceptar sugerencias largas que repliquen código copyright** de repos privados o con licencias incompatibles (riesgo documentado con ciertos modelos entrenados sobre código GPL mezclado). Ante dudas, reescribir.
+3. **Imágenes generadas por IA**: solo si el modelo permite uso comercial de las salidas. Documentar modelo y prompt en `ATTRIBUTIONS.md`.
+4. **Texto de documentación generado por IA**: permitido, pero el humano revisa y firma. No pegar bloques largos sin edición.
+
+---
+
+## 5. Datos de terceros
+
+- **Ningún dato personal ni de proyectos reales** en el repo (planos de clientes, mediciones de obra, contratos). Los samples deben ser sintéticos o construidos desde cero.
+- **Datos geoespaciales** (OSM, satélite): respetar licencia de origen. OSM es ODbL — mencionar en documentación si se usa.
+
+---
+
+## 6. Proceso en un PR
+
+Cuando un PR introduce código o assets de tercero, el autor del PR **debe**:
+
+1. Declarar la procedencia en la descripción (URL, repo, autor).
+2. Declarar la licencia exacta (spdx-id preferido).
+3. Añadir atribución en código / `ATTRIBUTIONS.md` según corresponda.
+4. Pasar la revisión humana antes del merge.
+
+Si el revisor no puede verificar la licencia, el merge se bloquea.
+
+---
+
+## 7. Marcas, logos y nombres comerciales
+
+- "IFC" y "buildingSMART" son marcas de *buildingSMART International* — usarlas en documentación con propósito descriptivo, nunca insinuando endorso.
+- Las siglas oficiales dominicanas (MIVED, MOPC, INDOCAL) son de uso administrativo; permitido mencionarlas en contexto técnico sin imitación visual ni uso como logotipos del proyecto.
+- Evitar todo logo oficial en el repo salvo autorización documentada.
+
+---
+
+## 8. Qué hacer ante una duda legal
+
+1. Parar antes de commitear.
+2. Preguntar al mantenedor humano en el PR.
+3. Si persiste la duda, reescribir desde cero con conocimiento propio.
+4. Nunca "commit ahora, preguntamos después".
+
+---
+
+## 9. Aplicación al agente IA
+
+El agente IA que trabaja en este repositorio **debe**:
+
+1. **Negarse** a transcribir texto literal de normas protegidas aunque el usuario lo pida. Ofrecer paráfrasis operativa en su lugar.
+2. **Negarse** a pegar código de repos externos sin verificar licencia; proponer al usuario que aporte la URL y licencia antes de integrarlo.
+3. Al sugerir una dependencia nueva, mencionar su licencia y si es compatible con GPLv3.
+4. Al generar assets o contenido, indicar que son obra derivada del modelo y que el usuario debe verificar la política de uso del modelo para uso comercial.
+5. Alertar al usuario cuando detecte en el repo un archivo sospechoso de violar esta regla (ej. PDF de norma ISO, snippet con cabecera propietaria).
