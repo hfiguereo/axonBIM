@@ -93,12 +93,10 @@ La demo levanta el backend Python en TCP loopback, abre Godot apuntando a ese
 puerto y permite crear un muro IFC desde la UI.
 
 ```bash
-# 1. Terminal A: lanzar el backend escuchando en TCP 5799
-python -m axonbim \
-    --socket-path /tmp/axonbim-dev.sock \
-    --tcp-host 127.0.0.1 \
-    --tcp-port 5799 \
-    --log-level INFO
+# 1. Terminal A: lanzar el backend escuchando en TCP (puerto default 5799)
+uv run python -m axonbim --tcp --log-level INFO
+# Equivalente explicito:
+#   uv run python -m axonbim --tcp-port 5799 --tcp-host 127.0.0.1 --log-level INFO
 
 # 2. Terminal B: abrir Godot indicandole el puerto
 AXONBIM_RPC_PORT=5799 godot --path frontend

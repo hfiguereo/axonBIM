@@ -4,8 +4,9 @@
 Arranca el servidor JSON-RPC. Flags:
 
 * ``--socket-path PATH`` override del socket Unix (default ``$XDG_RUNTIME_DIR/axonbim.sock``).
+* ``--tcp`` atajo: habilita TCP en el puerto default (``5799``) si no se da ``--tcp-port``.
 * ``--tcp-host HOST`` direccion TCP (default ``127.0.0.1``).
-* ``--tcp-port PORT`` puerto TCP (default: deshabilitado). Godot debe pasar este flag.
+* ``--tcp-port PORT`` puerto TCP. Implica ``--tcp``. Default: TCP deshabilitado.
 * ``--log-level LEVEL`` ``DEBUG`` | ``INFO`` | ``WARNING`` | ``ERROR``.
 """
 
@@ -27,14 +28,28 @@ from axonbim.rpc.server import default_socket_path, serve
 
 _log = logging.getLogger(__name__)
 
+DEFAULT_TCP_PORT: int = 5799
+
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="axonbim", description="AxonBIM backend RPC server.")
+    parser = argparse.ArgumentParser(
+        prog="axonbim",
+        description="AxonBIM backend RPC server.",
+        allow_abbrev=False,
+    )
     parser.add_argument(
         "--socket-path",
         type=Path,
         default=None,
         help="Ruta del socket Unix (default: $XDG_RUNTIME_DIR/axonbim.sock).",
+    )
+    parser.add_argument(
+        "--tcp",
+        action="store_true",
+        help=(
+            f"Habilita TCP en el puerto default ({DEFAULT_TCP_PORT}). "
+            "Use --tcp-port para sobreescribir."
+        ),
     )
     parser.add_argument(
         "--tcp-host",
@@ -45,7 +60,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--tcp-port",
         type=int,
         default=None,
-        help="Puerto TCP. Si se omite, solo se habilita Unix socket.",
+        help=(
+            "Puerto TCP. Implica --tcp. Si se omite y --tcp tampoco, solo se habilita Unix socket."
+        ),
     )
     parser.add_argument(
         "--log-level",
@@ -54,6 +71,21 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"axonbim {__version__}")
     return parser
+
+
+def _resolve_tcp_port(*, tcp_flag: bool, tcp_port: int | None) -> int | None:
+    """Resuelve el puerto TCP final segun los flags pasados.
+
+    Reglas:
+        - ``--tcp-port`` siempre gana.
+        - ``--tcp`` solo activa el puerto default ``DEFAULT_TCP_PORT``.
+        - Sin nada: devuelve ``None`` (TCP deshabilitado).
+    """
+    if tcp_port is not None:
+        return tcp_port
+    if tcp_flag:
+        return DEFAULT_TCP_PORT
+    return None
 
 
 def _build_dispatcher() -> Dispatcher:
@@ -71,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
 
     dispatcher = _build_dispatcher()
     socket_path = args.socket_path or default_socket_path()
+    tcp_port = _resolve_tcp_port(tcp_flag=args.tcp, tcp_port=args.tcp_port)
 
     _log.info(
         "AxonBIM backend %s, metodos: %s",
@@ -84,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
                 dispatcher,
                 socket_path,
                 tcp_host=args.tcp_host,
-                tcp_port=args.tcp_port,
+                tcp_port=tcp_port,
             )
         )
     except KeyboardInterrupt:
