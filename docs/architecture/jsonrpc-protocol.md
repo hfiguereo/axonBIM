@@ -165,6 +165,14 @@ Solo del backend al frontend. Eventos asíncronos:
 | `geom.boolean` | `{ "op": "union\|difference\|intersection", "a_guid": "...", "b_guid": "..." }` | `{ "mesh": {...}, "result_guid": "..." }` |
 | `geom.fillet_edge` | `{ "topo_id": "...", "radius": <m> }` | `{ "mesh": {...}, "topo_map": {...} }` |
 
+**Estado de implementación en backend (2026-04):**
+
+| Método | Estado |
+|--------|--------|
+| `geom.extrude_face` | Registrado. Respuesta **stub**: valida `topo_id` y `vector`, devuelve malla caja placeholder y `topo_map` derivado (`<topo_id>` → `<topo_id>:extruded`) hasta booleanas OCP + actualización IFC. |
+| `geom.boolean` | No registrado en el dispatcher. |
+| `geom.fillet_edge` | No registrado en el dispatcher. |
+
 ### 5.4 `draw.*`
 
 | Método | Params | Result |

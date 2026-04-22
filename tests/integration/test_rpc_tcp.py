@@ -12,7 +12,6 @@ import contextlib
 import json
 import socket
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -21,6 +20,7 @@ from axonbim.handlers import system as system_handlers
 from axonbim.rpc.dispatcher import Dispatcher
 from axonbim.rpc.framing import read_message, write_message
 from axonbim.rpc.server import serve
+from tests.unix_socket_path import short_unix_socket_path
 
 
 def _free_tcp_port() -> int:
@@ -30,9 +30,9 @@ def _free_tcp_port() -> int:
 
 
 @pytest_asyncio.fixture
-async def tcp_server(tmp_path: Path) -> AsyncIterator[int]:
+async def tcp_server() -> AsyncIterator[int]:
     port = _free_tcp_port()
-    unix_sock = tmp_path / "axonbim-tcp-test.sock"
+    unix_sock = short_unix_socket_path("tcp-dual")
 
     dispatcher = Dispatcher()
     system_handlers.register(dispatcher)

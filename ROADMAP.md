@@ -43,6 +43,15 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 
 **Objetivo:** Manipulación geométrica directa y sincronización bidireccional.
 
+**Directrices UI/UX (alcance de Fase 2):**
+
+- [ ] Toolbar minimalista orientada a iconos (texto visible minimo).
+- [ ] Tooltip al pasar el cursor por cada herramienta (nombre corto + accion).
+- [ ] Iconografia procedimental generada por codigo en el **frontend (Godot)** para evitar assets manuales.
+- [ ] Iconos de tamaño legible en monitor de laptop/escritorio (no miniatura).
+- [ ] Layout de texto secundario adaptable para no saturar la interfaz.
+- [ ] Paneles laterales flotantes y autoajustables (dock/undock, resize y colapso).
+
 **Hitos:**
 
 - [ ] Herramienta gráfica Push/Pull en Godot (selección de cara + arrastre).

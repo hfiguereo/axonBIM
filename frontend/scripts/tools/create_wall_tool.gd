@@ -1,6 +1,8 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
 extends Node
 
+const AxonLogger := preload("res://scripts/utils/axon_logger.gd")
+
 ## Herramienta "crear muro": captura 2 clicks sobre el plano Z=0 del viewport
 ## y llama `ifc.create_wall` en el backend. Sprint 1.4.
 
@@ -28,7 +30,7 @@ func setup(camera: Camera3D, project_view: Node3D) -> void:
 func activate() -> void:
 	_active = true
 	_has_first = false
-	Logger.info("Herramienta crear muro: activada. Clickea el primer punto.")
+	AxonLogger.info("Herramienta crear muro: activada. Clickea el primer punto.")
 
 
 func deactivate() -> void:
@@ -52,7 +54,7 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 	if not _has_first:
 		_first_point = point
 		_has_first = true
-		Logger.info("Primer punto del muro: %s" % str(_first_point))
+		AxonLogger.info("Primer punto del muro: %s" % str(_first_point))
 		return
 
 	var second_point: Vector3 = point
@@ -86,7 +88,7 @@ func _submit_wall(p1: Vector3, p2: Vector3) -> void:
 		wall_submit_finished.emit()
 		return
 	if not resp.get("ok"):
-		Logger.error("create_wall fallo: %s" % str(resp.get("error")))
+		AxonLogger.error("create_wall fallo: %s" % str(resp.get("error")))
 		wall_submit_finished.emit()
 		return
 
@@ -94,5 +96,5 @@ func _submit_wall(p1: Vector3, p2: Vector3) -> void:
 	var mesh_dict: Dictionary = resp["result"]["mesh"]
 	_project_view.add_entity(guid, mesh_dict)
 	wall_created.emit(guid)
-	Logger.info("Muro creado: %s" % guid)
+	AxonLogger.info("Muro creado: %s" % guid)
 	wall_submit_finished.emit()

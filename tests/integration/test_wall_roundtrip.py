@@ -23,6 +23,7 @@ from axonbim.rpc.dispatcher import Dispatcher
 from axonbim.rpc.framing import read_message, write_message
 from axonbim.rpc.models import ErrorCode
 from axonbim.rpc.server import serve
+from tests.unix_socket_path import short_unix_socket_path
 
 pytestmark = pytest.mark.skipif(
     not hasattr(asyncio, "start_unix_server"),
@@ -31,9 +32,9 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest_asyncio.fixture
-async def running_server(tmp_path: Path) -> AsyncIterator[Path]:
+async def running_server() -> AsyncIterator[Path]:
     reset_session()
-    sock = tmp_path / "axonbim.sock"
+    sock = short_unix_socket_path("wall-roundtrip")
     dispatcher = Dispatcher()
     system_handlers.register(dispatcher)
     ifc_handlers.register(dispatcher)

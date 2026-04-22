@@ -1,0 +1,30 @@
+---
+description: Obliga simulacion/pruebas funcionales antes de cerrar microtareas.
+alwaysApply: true
+---
+
+# Cierre de microtareas con simulacion
+
+Antes de marcar una microtarea como completada, el agente debe ejecutar al menos
+una verificacion funcional que simule el comportamiento del elemento tocado.
+
+## Regla obligatoria
+
+1. No cerrar microtarea sin evidencia de prueba/simulacion.
+2. Si el cambio es UI Godot: validar carga/parse de escena o flujo equivalente.
+3. Si el cambio es backend/RPC: ejecutar test puntual o llamada smoke.
+4. Reportar resultado exacto (comando + salida resumida + estado pass/fail).
+5. Si falla, la microtarea queda abierta y se corrige en el mismo bloque.
+
+## Evidencia minima por tipo
+
+- **UI/frontend:** `godot --headless --path frontend --quit` o test GUT dirigido.
+- **Backend Python:** `uv run pytest <archivo_o_test> -q`.
+- **Integracion RPC:** request real o test de integracion asociado.
+
+## Definition of done reforzada
+
+Una microtarea solo termina cuando:
+
+- el objetivo tecnico esta implementado, y
+- existe evidencia de simulacion funcional en la salida del agente.

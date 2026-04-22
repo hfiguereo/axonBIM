@@ -12,6 +12,8 @@ extends Node
 ##     if resp.get("ok"):
 ##         print(resp["result"])
 
+const AxonLogger := preload("res://scripts/utils/axon_logger.gd")
+
 signal connected
 signal disconnected
 signal notification_received(method: String, params: Dictionary)
@@ -49,7 +51,7 @@ func _ready() -> void:
 	if _port > 0:
 		_connect_to_backend()
 	else:
-		Logger.warn(
+		AxonLogger.warn(
 			(
 				"RpcClient: no hay puerto TCP configurado (env AXONBIM_RPC_PORT). "
 				+ "Pasale --tcp-port al backend y reinicia."
@@ -126,7 +128,7 @@ func notify_rpc(method: String, params: Dictionary = {}) -> void:
 	if not _is_connected:
 		await _wait_until_connected(CONNECT_WAIT_MS)
 	if not _is_connected:
-		Logger.warn("RpcClient.notify_rpc('%s') sin conexion activa" % method)
+		AxonLogger.warn("RpcClient.notify_rpc('%s') sin conexion activa" % method)
 		return
 	var payload: Dictionary = {"jsonrpc": "2.0", "method": method, "params": params}
 	_send_framed(JSON.stringify(payload))
@@ -140,14 +142,14 @@ func _process(_delta: float) -> void:
 		if not _is_connected:
 			_is_connected = true
 			_reconnect_delay_ms = RECONNECT_INITIAL_DELAY_MS
-			Logger.info("RpcClient conectado a %s:%d" % [_host, _port])
+			AxonLogger.info("RpcClient conectado a %s:%d" % [_host, _port])
 			connected.emit()
 		_drain_available_bytes()
 		_consume_buffer()
 	elif status == StreamPeerTCP.STATUS_ERROR or status == StreamPeerTCP.STATUS_NONE:
 		if _is_connected:
 			_is_connected = false
-			Logger.warn("RpcClient: conexion con backend perdida")
+			AxonLogger.warn("RpcClient: conexion con backend perdida")
 			disconnected.emit()
 		_try_reconnect()
 
@@ -175,7 +177,7 @@ func _drain_available_bytes() -> void:
 	var got: Array = _stream.get_data(available)
 	var err: int = got[0]
 	if err != OK:
-		Logger.error("RpcClient: get_data fallo con codigo %d" % err)
+		AxonLogger.error("RpcClient: get_data fallo con codigo %d" % err)
 		return
 	_buffer.append_array(got[1])
 
@@ -188,11 +190,11 @@ func _consume_buffer() -> void:
 		var header_text: String = _buffer.slice(0, header_end).get_string_from_ascii()
 		var content_length: int = _parse_content_length(header_text)
 		if content_length < 0:
-			Logger.error("RpcClient: header sin Content-Length valido")
+			AxonLogger.error("RpcClient: header sin Content-Length valido")
 			_buffer = PackedByteArray()
 			return
 		if content_length > MAX_BODY_BYTES:
-			Logger.error("RpcClient: Content-Length excesivo (%d)" % content_length)
+			AxonLogger.error("RpcClient: Content-Length excesivo (%d)" % content_length)
 			_buffer = PackedByteArray()
 			return
 
@@ -210,17 +212,17 @@ func _handle_body(text: String) -> void:
 	var parser: JSON = JSON.new()
 	var err: int = parser.parse(text)
 	if err != OK:
-		Logger.error("RpcClient: JSON del backend invalido en linea %d" % parser.get_error_line())
+		AxonLogger.error("RpcClient: JSON del backend invalido en linea %d" % parser.get_error_line())
 		return
 	var payload = parser.data
 	if typeof(payload) != TYPE_DICTIONARY:
-		Logger.error("RpcClient: respuesta no-objeto del backend")
+		AxonLogger.error("RpcClient: respuesta no-objeto del backend")
 		return
 	var dict: Dictionary = payload
 	if dict.has("id") and dict["id"] != null:
 		var id_val: Variant = dict["id"]
 		if typeof(id_val) != TYPE_INT and typeof(id_val) != TYPE_FLOAT:
-			Logger.error("RpcClient: id no numerico en respuesta")
+			AxonLogger.error("RpcClient: id no numerico en respuesta")
 			return
 		response_arrived.emit(int(id_val), dict)
 	else:
@@ -232,9 +234,9 @@ func _handle_body(text: String) -> void:
 
 func _handle_builtin_notification(method: String, params: Dictionary) -> void:
 	if method == "system.warning":
-		Logger.warn("backend: %s" % str(params.get("message", params)))
+		AxonLogger.warn("backend: %s" % str(params.get("message", params)))
 	elif method == "system.info":
-		Logger.info("backend: %s" % str(params.get("message", params)))
+		AxonLogger.info("backend: %s" % str(params.get("message", params)))
 
 
 func _send_framed(text: String) -> void:
@@ -258,7 +260,7 @@ func _wait_until_connected(max_wait_ms: int) -> void:
 func _connect_to_backend() -> void:
 	var err: int = _stream.connect_to_host(_host, _port)
 	if err != OK:
-		Logger.error("RpcClient: connect_to_host %s:%d fallo (%d)" % [_host, _port, err])
+		AxonLogger.error("RpcClient: connect_to_host %s:%d fallo (%d)" % [_host, _port, err])
 
 
 func _resolve_host() -> String:

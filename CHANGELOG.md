@@ -35,6 +35,23 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
   junto con **desinstalar Flatpak** (`flatpak uninstall org.godotengine.Godot`)
   cuando Vulkan/SIGABRT molesta.
 - `Makefile`: `run-godot` prefije `~/.local/bin/godot` si existe.
+- CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
+  `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
+  funciona; antes argparse rechazaba `--tcp` por ambigüedad con
+  `--tcp-host`/`--tcp-port`.
+- Backend: handler RPC `geom.extrude_face` (stub Fase 2: validación Pydantic,
+  malla placeholder, `topo_map`) registrado en `python -m axonbim`; tests en
+  `tests/unit/test_handlers_geom.py`.
+- Godot: herramienta base **Push/Pull** (selección/arrastre simulado, llamada
+  RPC al soltar), iconos procedurales en toolbar, entidades transitorias en
+  `ProjectView` para preview de resultado.
+- Godot: `AxonLogger` (`frontend/scripts/utils/axon_logger.gd`) para logging
+  sin colisión con la clase nativa `Logger` en Godot 4.6+.
+- Scripts de simulación headless (`frontend/scripts/dev/*.gd`) y registro de
+  fallos de simulación en `docs/phase-reports/simulation-failures.md`.
+- Cursor: reglas `65-microtareas-roadmap.mdc` y `66-microtask-simulation-checks.mdc`.
+- ROADMAP: directrices UI/UX para Fase 2 (toolbar minimalista, tooltips,
+  iconos procedurales, paneles flotantes).
 
 ### Cambiado
 
@@ -49,6 +66,9 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Backend (Windows): ruta por defecto del socket Unix sin ``os.getuid`` y
   servidor RPC **solo TCP** cuando ``asyncio.start_unix_server`` no existe;
   tests de integración Unix se omiten en esa plataforma.
+- Tests integracion RPC: en macOS los ``tmp_path`` de pytest generan rutas
+  Unix demasiado largas (``AF_UNIX path too long``). Los fixtures usan ahora
+  sockets bajo ``tempfile.gettempdir()`` via ``tests/unix_socket_path.py``.
 - Godot: la herramienta **Crear muro** no recibia clics: con
   ``SubViewport.handle_input_locally = false`` los eventos van al viewport 3D,
   no al ``gui_input`` del ``SubViewportContainer``. Los clics se capturan ahora
@@ -67,13 +87,6 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
   unifica el puerto a `5799` (alineado con el README).
 - Documentación: se restaura `docs/architecture/app-gui-viewport-patterns.md`,
   citada desde `project_view.gd` y ausente en el árbol tras limpieza de ramas.
-
-### Añadido
-
-- CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
-  `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
-  funciona; antes argparse rechazaba `--tcp` por ambigüedad con
-  `--tcp-host`/`--tcp-port`.
 
 ## [0.1.0-alpha.1] — 2026-04-20
 

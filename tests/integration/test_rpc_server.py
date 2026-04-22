@@ -19,6 +19,7 @@ from axonbim.rpc.dispatcher import Dispatcher
 from axonbim.rpc.framing import read_message, write_message
 from axonbim.rpc.models import PROTOCOL_VERSION, ErrorCode
 from axonbim.rpc.server import serve
+from tests.unix_socket_path import short_unix_socket_path
 
 pytestmark = pytest.mark.skipif(
     not hasattr(asyncio, "start_unix_server"),
@@ -70,8 +71,8 @@ class RpcClient:
 
 
 @pytest_asyncio.fixture
-async def running_server(tmp_path: Path) -> AsyncIterator[Path]:
-    sock = tmp_path / "axonbim-test.sock"
+async def running_server() -> AsyncIterator[Path]:
+    sock = short_unix_socket_path("rpc-server")
     dispatcher = Dispatcher()
     system_handlers.register(dispatcher)
 
@@ -172,8 +173,8 @@ async def test_multiple_sequential_calls_share_connection(running_server: Path) 
         await client.close()
 
 
-async def test_shutdown_stops_server(tmp_path: Path) -> None:
-    sock = tmp_path / "axonbim-shutdown.sock"
+async def test_shutdown_stops_server() -> None:
+    sock = short_unix_socket_path("shutdown")
     dispatcher = Dispatcher()
     system_handlers.register(dispatcher)
 
