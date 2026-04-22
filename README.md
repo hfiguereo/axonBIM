@@ -110,30 +110,41 @@ make lint             # ruff check + gdlint
 make typecheck        # mypy --strict src/
 make test             # pytest -q
 make test-cov         # pytest con cobertura (falla < 80%)
-make run-backend      # python -m axonbim (servidor RPC)
-make run-godot        # abre el proyecto Godot
+make run              # backend TCP + Godot (un solo comando; recomendado)
+make run-backend      # solo servidor RPC (--tcp, puerto 5799)
+make run-godot        # solo Godot (AXONBIM_RPC_PORT=5799)
 ```
 
 Ver `make help` para la lista completa.
 
 ### Ejecutar la demo end-to-end desde fuente (Sprint 1.4)
 
-La demo levanta el backend Python en TCP loopback, abre Godot apuntando a ese
-puerto y permite crear un muro IFC desde la UI.
+**Recomendado — un solo comando** (levanta el backend en TCP y abre Godot; al cerrar la ventana de Godot se detiene el backend):
 
 ```bash
-# 1. Terminal A: lanzar el backend escuchando en TCP (puerto default 5799)
-uv run python -m axonbim --tcp --log-level INFO
-# Equivalente explicito:
-#   uv run python -m axonbim --tcp-port 5799 --tcp-host 127.0.0.1 --log-level INFO
+cd AxonBIM
+make run
+# Equivalente: ./scripts/dev/run_dev.sh
+```
 
-# 2. Terminal B: abrir Godot (el cliente ya intenta 127.0.0.1:5799 por defecto)
-godot --path frontend
-# Si usas otro puerto en el backend, fuerza la variable:
-#   AXONBIM_RPC_PORT=9000 godot --path frontend
-#
-# Flatpak (la variable del shell NO siempre entra al sandbox; usa --env):
-#   flatpak run --env=AXONBIM_RPC_PORT=5799 org.godotengine.Godot --path "$PWD/frontend"
+Siguen existiendo dos procesos en el SO (Python + Godot), pero **un único punto de entrada** para el desarrollador.
+
+**Alternativa — dos terminales** (depuración manual):
+
+```bash
+# 1. Terminal A: backend en TCP (puerto default 5799)
+uv run python -m axonbim --tcp --log-level INFO
+
+# 2. Terminal B: Godot
+AXONBIM_RPC_PORT=5799 godot --path frontend
+```
+
+Si usas otro puerto: `AXONBIM_RPC_PORT=9000` en ambos lados o `AXONBIM_RPC_PORT=9000 make run` con el script ajustado vía variable.
+
+**Flatpak** (la variable del shell no siempre entra al sandbox; usa `--env`):
+
+```bash
+flatpak run --env=AXONBIM_RPC_PORT=5799 org.godotengine.Godot --path "$PWD/frontend"
 ```
 
 Flujo en la UI:

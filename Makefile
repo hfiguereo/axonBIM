@@ -1,5 +1,5 @@
 .PHONY: help install sync lint format typecheck test test-unit test-integration test-cov \
-        run-backend run-godot gdlint gdformat clean distclean
+        run run-dev run-backend run-godot gdlint gdformat clean distclean
 
 UV ?= uv
 # Binario oficial en ~/.local/bin/godot (ver scripts/dev/install_godot_official.sh); si no existe, usa `godot` del PATH.
@@ -16,8 +16,9 @@ help:
 	@echo "  test-unit       - pytest tests/unit -q"
 	@echo "  test-integration- pytest tests/integration -q"
 	@echo "  test-cov        - pytest con cobertura (falla si < 80%)"
-	@echo "  run-backend     - python -m axonbim"
-	@echo "  run-godot       - abre el proyecto Godot (GODOT= ruta al binario)"
+	@echo "  run / run-dev   - backend TCP + Godot en un solo comando (recomendado)"
+	@echo "  run-backend     - solo servidor RPC (--tcp, puerto 5799)"
+	@echo "  run-godot       - solo Godot (AXONBIM_RPC_PORT=5799)"
 	@echo "  gdlint          - gdtoolkit lint sobre frontend/"
 	@echo "  gdformat        - gdtoolkit format sobre frontend/"
 	@echo "  clean           - limpia artefactos de build"
@@ -51,11 +52,14 @@ test-integration:
 test-cov:
 	$(UV) run pytest -q --cov=src/axonbim --cov-report=term-missing --cov-fail-under=80
 
+run run-dev:
+	bash scripts/dev/run_dev.sh
+
 run-backend:
-	$(UV) run python -m axonbim
+	$(UV) run python -m axonbim --tcp
 
 run-godot:
-	$(GODOT) --path frontend
+	AXONBIM_RPC_PORT=5799 $(GODOT) --path frontend
 
 gdlint:
 	@command -v gdlint >/dev/null 2>&1 && gdlint frontend/ || (echo "instala: pipx install gdtoolkit" && exit 1)
