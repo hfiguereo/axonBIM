@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 
 from axonbim import __version__
+from axonbim.handlers import geom as geom_handlers
+from axonbim.handlers import history as history_handlers
 from axonbim.handlers import ifc as ifc_handlers
 from axonbim.handlers import project as project_handlers
 from axonbim.handlers import system as system_handlers
@@ -61,7 +63,8 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Puerto TCP. Implica --tcp. Si se omite y --tcp tampoco, solo se habilita Unix socket."
+            "Puerto TCP. Implica --tcp. "
+            "Si se omite y --tcp tampoco, solo se habilita Unix socket."
         ),
     )
     parser.add_argument(
@@ -93,6 +96,8 @@ def _build_dispatcher() -> Dispatcher:
     system_handlers.register(dispatcher)
     ifc_handlers.register(dispatcher)
     project_handlers.register(dispatcher)
+    geom_handlers.register(dispatcher)
+    history_handlers.register(dispatcher)
     return dispatcher
 
 
