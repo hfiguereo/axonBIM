@@ -45,6 +45,8 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Godot: herramienta base **Push/Pull** (selección/arrastre simulado, llamada
   RPC al soltar), iconos procedurales en toolbar, entidades transitorias en
   `ProjectView` para preview de resultado.
+- Godot: camara **orbit** en viewport (boton medio + arrastre, rueda zoom)
+  via ``orbit_camera_3d.gd`` en la escena principal.
 - Godot: `AxonLogger` (`frontend/scripts/utils/axon_logger.gd`) para logging
   sin colisión con la clase nativa `Logger` en Godot 4.6+.
 - Scripts de simulación headless (`frontend/scripts/dev/*.gd`) y registro de
@@ -52,6 +54,12 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Cursor: reglas `65-microtareas-roadmap.mdc` y `66-microtask-simulation-checks.mdc`.
 - ROADMAP: directrices UI/UX para Fase 2 (toolbar minimalista, tooltips,
   iconos procedurales, paneles flotantes).
+
+### Documentación
+
+- README y ROADMAP: politica **Flatpak al minimo** en Fedora para desarrollo;
+  plan **incremental** para volver a probar **Forward+ / Vulkan** sin bloquear
+  el nucleo BIM; Compatibility como fallback hasta aislar el entorno grafico.
 
 ### Cambiado
 

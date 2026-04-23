@@ -2,6 +2,9 @@
 extends Node
 
 ## Escena raiz de AxonBIM (Fase 2 — UI cinta + Push/Pull + undo RPC).
+##
+## Integra viewport 3D con camara orbital (MMB + rueda), ribbon inicial,
+## arbol de proyecto, panel de propiedades y herramientas de modelado.
 
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
 const PushPullTool := preload("res://scripts/tools/push_pull_tool.gd")

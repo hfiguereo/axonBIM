@@ -52,6 +52,14 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 - [ ] Layout de texto secundario adaptable para no saturar la interfaz.
 - [ ] Paneles laterales flotantes y autoajustables (dock/undock, resize y colapso).
 
+**Desarrollo en Fedora (Godot / Flatpak / render):**
+
+- [ ] Flatpak solo al minimo necesario; Godot de trabajo con **binario oficial**
+  (u otra via sin sandbox) como norma.
+- [ ] Revalidar **Forward+ / Vulkan** por **micro-bloques** en la maquina Fedora
+  de referencia; mantener **GL Compatibility** como fallback documentado hasta
+  aislar el entorno grafico. No bloquea el nucleo BIM del roadmap.
+
 **Hitos:**
 
 - [ ] Herramienta gráfica Push/Pull en Godot (selección de cara + arrastre).

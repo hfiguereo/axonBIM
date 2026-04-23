@@ -98,6 +98,27 @@ prioridad si PATH está bien ordenado.
 página de descargas, o extraer el `.zip` a mano desde
 [releases](https://github.com/godotengine/godot/releases) (misma URL que el script).
 
+### Fedora: Flatpak al minimo y plan Forward+ / Vulkan
+
+**Politica de desarrollo (maquina Fedora de referencia):** limitar **Flatpak**
+solo a lo imprescindible en el flujo de trabajo. Para **Godot del dia a dia**
+se prefiere **binario oficial**, AppImage o paquete de distro; asi se reduce la
+superficie de fallos por sandbox o stack Vulkan que **no son bugs de AxonBIM**.
+
+**Renderer del proyecto:** hoy el repo usa **GL Compatibility** por defecto en
+`frontend/project.godot` como **red de seguridad** frente a cierres con
+**Vulkan / Forward+** en combinaciones problematicas (p. ej. Flatpak + NVIDIA).
+Eso **no** es la decision grafica final: el plan es **revalidar Forward+ en
+bloques cortos** (binario oficial, drivers al dia, anotar resultado en este
+README o en un reporte de fase). El nucleo BIM (RPC, IFC, herramientas) puede
+seguir avanzando **sin depender** de tener Vulkan estable en cada laptop.
+
+**Criterio de prioridad:** primero **aislar** el problema (origen del binario,
+Flatpak vs no Flatpak, driver, Wayland/X11); despues recuperar **Forward+**
+donde el hardware lo permita. No hay prisa artificial: arreglar aceleracion
+grafica *hoy* no desbloquea por si solo el siguiente hito de modelo; si evita
+friccion innecesaria en el camino.
+
 ### Setup inicial
 
 ```bash
