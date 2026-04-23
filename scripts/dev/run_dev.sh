@@ -47,17 +47,24 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Esperar a que el puerto acepte conexiones (hasta ~5 s)
+# Esperar a que el puerto este en LISTEN (sin abrir TCP al RPC: un probe con
+# /dev/tcp o echo envia bytes y provoca FramingError "Mensaje sin Content-Length").
 _ready=0
 for _ in $(seq 1 50); do
-	if bash -c "echo >/dev/tcp/127.0.0.1/${PORT}" 2>/dev/null; then
+	if command -v ss >/dev/null 2>&1; then
+		if ss -ltn 2>/dev/null | grep -qE ":${PORT}\\s"; then
+			_ready=1
+			break
+		fi
+	else
+		sleep 0.5
 		_ready=1
 		break
 	fi
 	sleep 0.1
 done
 if [[ "${_ready}" -eq 0 ]]; then
-	echo "Advertencia: no se detecto el puerto ${PORT} a tiempo; Godot puede fallar el RPC hasta que el backend termine de arrancar." >&2
+	echo "Advertencia: no se detecto el puerto ${PORT} en ss; esperando 0.3s..." >&2
 	sleep 0.3
 fi
 
