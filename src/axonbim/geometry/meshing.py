@@ -55,6 +55,16 @@ class Mesh:
             "topo_ids": list(self.topo_ids),
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Mesh:
+        """Deserializa desde RPC o historial SQLite."""
+        return cls(
+            vertices=[float(x) for x in data.get("vertices", [])],
+            indices=[int(x) for x in data.get("indices", [])],
+            normals=[float(x) for x in data.get("normals", [])],
+            topo_ids=[str(x) for x in data.get("topo_ids", [])],
+        )
+
 
 def wall_box_mesh(
     p1: Vec3,
