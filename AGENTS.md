@@ -38,7 +38,7 @@ uv run pytest -q                 # tests
 uv run ruff check . && uv run mypy --strict src/
 
 # App (Godot + backend RPC en un solo comando)
-make run                         # scripts/dev/run_dev.sh
+./start                          # uv sync + backend TCP + Godot (un comando)
 
 # Frontend — tests GUT headless (requiere godot 4.x)
 godot --headless --path frontend -s addons/gut/gut_cmdln.gd -gtest=res://tests/

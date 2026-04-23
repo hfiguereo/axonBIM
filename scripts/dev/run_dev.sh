@@ -4,9 +4,10 @@
 # Arranque unificado: levanta el backend RPC (TCP) y abre Godot en un solo comando.
 # Al cerrar Godot, el backend se detiene.
 #
-# Uso:
-#   ./scripts/dev/run_dev.sh
-#   make run
+# Uso (preferido: un solo comando desde la raíz del repo):
+#   ./start
+#   make start
+#   bash scripts/dev/run_dev.sh
 #
 # Variables opcionales:
 #   AXONBIM_RPC_PORT   Puerto TCP (default 5799)

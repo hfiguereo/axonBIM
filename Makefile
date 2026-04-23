@@ -1,5 +1,5 @@
 .PHONY: help install sync lint format typecheck test test-unit test-integration test-cov \
-        run run-dev run-backend run-godot gdlint gdformat clean distclean
+        start run run-dev run-backend run-godot gdlint gdformat clean distclean
 
 UV ?= uv
 # Binario oficial en ~/.local/bin/godot (ver scripts/dev/install_godot_official.sh); si no existe, usa `godot` del PATH.
@@ -16,7 +16,7 @@ help:
 	@echo "  test-unit       - pytest tests/unit -q"
 	@echo "  test-integration- pytest tests/integration -q"
 	@echo "  test-cov        - pytest con cobertura (falla si < 80%)"
-	@echo "  run / run-dev   - backend TCP + Godot en un solo comando (recomendado)"
+	@echo "  start / run     - un comando: uv sync + backend + Godot (recomendado)"
 	@echo "  run-backend     - solo Python RPC (sin Godot; puerto TCP 5799)"
 	@echo "  run-godot       - solo Godot (en otra terminal con backend ya en marcha)"
 	@echo "  gdlint          - gdtoolkit lint sobre frontend/"
@@ -52,8 +52,8 @@ test-integration:
 test-cov:
 	$(UV) run pytest -q --cov=src/axonbim --cov-report=term-missing --cov-fail-under=80
 
-run run-dev:
-	bash scripts/dev/run_dev.sh
+start run run-dev:
+	bash start
 
 run-backend:
 	@echo ""

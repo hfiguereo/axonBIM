@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
+#
+# Un solo comando: dependencias (uv sync) + backend RPC + Godot.
+# Uso: ./start   (desde la raíz del repo; chmod +x si hace falta)
+#
+# Variables opcionales: AXONBIM_RPC_PORT, AXONBIM_LOG_LEVEL, GODOT (ver scripts/dev/run_dev.sh)
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+if ! command -v uv >/dev/null 2>&1; then
+	echo "Falta uv en PATH. Instalación: https://docs.astral.sh/uv/" >&2
+	exit 1
+fi
+
+echo "AxonBIM: sincronizando dependencias (uv sync)…"
+uv sync --all-extras
+
+echo "AxonBIM: arrancando interfaz y backend…"
+exec bash scripts/dev/run_dev.sh

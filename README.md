@@ -110,7 +110,8 @@ make lint             # ruff check + gdlint
 make typecheck        # mypy --strict src/
 make test             # pytest -q
 make test-cov         # pytest con cobertura (falla < 80%)
-make run              # backend TCP + Godot (un solo comando; recomendado)
+./start               # dependencias + backend + Godot (un solo comando; recomendado)
+make start            # equivalente al anterior
 make run-backend      # solo Python RPC (sin ventana Godot; TCP 5799)
 make run-godot        # solo Godot (levantar antes make run-backend en otra terminal)
 ```
@@ -119,13 +120,14 @@ Ver `make help` para la lista completa.
 
 ### Ejecutar la demo end-to-end desde fuente (Sprint 1.4)
 
-**Recomendado — un solo comando** (levanta el backend en TCP y abre Godot; al cerrar la ventana de Godot se detiene el backend):
+**Recomendado — un solo comando** (instala/actualiza dependencias con `uv sync`, levanta el backend en TCP y abre Godot; al cerrar Godot se detiene el backend):
 
 ```bash
 cd AxonBIM
-make run
-# Equivalente: ./scripts/dev/run_dev.sh
+./start
 ```
+
+Equivalente: `make start` (o `make run`, mismo objetivo).
 
 Siguen existiendo dos procesos en el SO (Python + Godot), pero **un único punto de entrada** para el desarrollador.
 
