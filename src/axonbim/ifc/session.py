@@ -17,6 +17,9 @@ from typing import TYPE_CHECKING, Any
 import ifcopenshell
 import ifcopenshell.api
 
+from axonbim.geometry import topo_registry
+from axonbim.history import sqlite_store as history_store
+
 if TYPE_CHECKING:
     from ifcopenshell import entity_instance
     from ifcopenshell import file as ifc_file_type
@@ -113,3 +116,5 @@ def reset_session() -> None:
     global _SESSION  # noqa: PLW0603
     with _SESSION_LOCK:
         _SESSION = None
+    topo_registry.clear()
+    history_store.clear()

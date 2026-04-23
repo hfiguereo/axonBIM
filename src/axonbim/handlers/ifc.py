@@ -10,7 +10,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from axonbim.geometry import topo_registry
 from axonbim.geometry.topology import Vec3
+from axonbim.geometry.wall_spec import WallSpec
 from axonbim.ifc import wall as wall_module
 from axonbim.ifc.session import get_session
 from axonbim.rpc.dispatcher import Dispatcher, RpcError
@@ -64,6 +66,16 @@ async def create_wall(params: dict[str, Any]) -> dict[str, Any]:
     except ValueError as exc:
         raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
 
+    topo_registry.register_mesh(result.guid, result.mesh)
+    topo_registry.register_wall_spec(
+        result.guid,
+        WallSpec(
+            p1=args.p1.as_tuple(),
+            p2=args.p2.as_tuple(),
+            height=args.height,
+            thickness=args.thickness,
+        ),
+    )
     return {
         "guid": result.guid,
         "mesh": result.mesh.to_dict(),

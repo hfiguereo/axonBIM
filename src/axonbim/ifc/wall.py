@@ -20,6 +20,7 @@ from ifcopenshell.util.shape_builder import ShapeBuilder
 
 from axonbim.geometry.meshing import Mesh, wall_box_mesh
 from axonbim.geometry.topology import Vec3
+from axonbim.geometry.wall_spec import WallSpec
 from axonbim.ifc.session import IfcSession
 
 _log = logging.getLogger(__name__)
@@ -77,6 +78,27 @@ def create_wall(
 
     _log.info("Muro creado: guid=%s, length=%.3f, height=%.3f", wall.GlobalId, length, height)
     return WallResult(guid=str(wall.GlobalId), mesh=mesh)
+
+
+def update_wall_geometry(session: IfcSession, guid: str, spec: WallSpec) -> WallResult:
+    """Regenera representacion IFC y malla Godot para un ``IfcWall`` existente."""
+    wall = _wall_by_guid(session, guid)
+    if wall is None:
+        raise ValueError(f"No existe IfcWall con GlobalId={guid!r}")
+
+    mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
+    length = math.hypot(spec.p2[0] - spec.p1[0], spec.p2[1] - spec.p1[1])
+    _assign_box_representation(session, wall, length=length, thickness=spec.thickness, height=spec.height)
+    _place_wall(session, wall, p1=spec.p1, p2=spec.p2)
+    _log.info("Muro actualizado: guid=%s, length=%.3f, height=%.3f", guid, length, spec.height)
+    return WallResult(guid=guid, mesh=mesh)
+
+
+def _wall_by_guid(session: IfcSession, guid: str) -> Any | None:
+    for w in session.file.by_type("IfcWall"):
+        if str(w.GlobalId) == guid:
+            return w
+    return None
 
 
 def _assign_box_representation(
