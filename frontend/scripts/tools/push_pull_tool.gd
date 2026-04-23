@@ -1,7 +1,8 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
 extends Node
 
-## Push/Pull: dos clics — cara (``topo_id``) y punto en el plano de la cara para definir el vector.
+## Push/Pull: dos clics — cara (``topo_id``) y segundo clic define la profundidad
+## a lo largo de la **normal de la cara elegida en el primer clic** (coincide con el resaltado).
 
 signal status_message(text: String)
 signal push_pull_completed(success: bool, message: String)
@@ -12,7 +13,8 @@ var _active: bool = false
 var _step: int = 0
 var _pending_guid: String = ""
 var _pending_topo: String = ""
-var _face_normal: Vector3 = Vector3.ZERO
+## Normal unitaria de extrusion (fijada en el primer clic; coincide con la cara resaltada).
+var _extrusion_axis: Vector3 = Vector3.ZERO
 var _anchor: Vector3 = Vector3.ZERO
 
 
@@ -26,7 +28,9 @@ func activate() -> void:
 	_step = 0
 	_pending_guid = ""
 	_pending_topo = ""
-	Logger.info("Push/Pull: clic en una cara del muro; segundo clic define la extrusion.")
+	_extrusion_axis = Vector3.ZERO
+	_project_view.clear_face_hover()
+	Logger.info("Push/Pull: pasa el raton sobre la cara; clic para fijarla; segundo clic = profundidad.")
 
 
 func deactivate() -> void:
@@ -34,10 +38,16 @@ func deactivate() -> void:
 	_step = 0
 	_pending_guid = ""
 	_pending_topo = ""
+	_extrusion_axis = Vector3.ZERO
+	_project_view.clear_face_hover()
 
 
 func is_active() -> bool:
 	return _active
+
+
+func is_selecting_face() -> bool:
+	return _active and _step == 0
 
 
 func handle_viewport_click(screen_pos: Vector2) -> void:
@@ -46,14 +56,20 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 	if _step == 0:
 		var hit: Dictionary = _project_view.pick_face_at_screen(_camera, screen_pos)
 		if not bool(hit.get("ok", false)):
+			_project_view.clear_face_hover()
 			push_pull_completed.emit(false, "Selecciona una cara de muro.")
 			return
 		_pending_guid = str(hit["guid"])
 		_pending_topo = str(hit["topo_id"])
-		_face_normal = hit["normal"] as Vector3
+		_extrusion_axis = (hit["normal"] as Vector3).normalized()
+		if _extrusion_axis.length_squared() < 1e-12:
+			_project_view.clear_face_hover()
+			push_pull_completed.emit(false, "Normal de cara invalida.")
+			return
 		_anchor = hit["position"] as Vector3
+		_project_view.lock_face_hover_from_hit(hit)
 		_step = 1
-		status_message.emit("Push/Pull: segundo clic para definir la profundidad.")
+		status_message.emit("Push/Pull: segundo clic en la vista (profundidad a lo largo de la normal).")
 		return
 
 	var vec: Vector3 = _extrusion_vector_from_click(screen_pos)
@@ -66,13 +82,13 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 func _extrusion_vector_from_click(screen_pos: Vector2) -> Vector3:
 	var O: Vector3 = _camera.project_ray_origin(screen_pos)
 	var D: Vector3 = _camera.project_ray_normal(screen_pos)
-	var denom: float = D.dot(_face_normal)
+	var denom: float = D.dot(_extrusion_axis)
 	if abs(denom) < 1e-7:
 		return Vector3.ZERO
-	var t: float = (_anchor - O).dot(_face_normal) / denom
+	var t: float = (_anchor - O).dot(_extrusion_axis) / denom
 	var pt: Vector3 = O + D * t
 	var raw: Vector3 = pt - _anchor
-	return _face_normal * raw.dot(_face_normal)
+	return _extrusion_axis * raw.dot(_extrusion_axis)
 
 
 func _submit(vec: Vector3) -> void:
@@ -85,8 +101,9 @@ func _submit(vec: Vector3) -> void:
 		return
 	if not resp.get("ok"):
 		var err: Variant = resp.get("error", {})
-		push_pull_completed.emit(false, "geom.extrude_face: %s" % str(err))
+		_project_view.clear_face_hover()
 		_step = 0
+		push_pull_completed.emit(false, "geom.extrude_face: %s" % str(err))
 		return
 	var result: Dictionary = resp["result"]
 	var guid: String = str(result.get("guid", _pending_guid))
@@ -95,4 +112,5 @@ func _submit(vec: Vector3) -> void:
 	_project_view.set_selection(guid)
 	_active = false
 	_step = 0
+	_extrusion_axis = Vector3.ZERO
 	push_pull_completed.emit(true, "Extrusion aplicada.")

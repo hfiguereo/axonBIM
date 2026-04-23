@@ -216,7 +216,7 @@ func _on_push_pull_pressed() -> void:
 	_project_view.clear_selection()
 	_refresh_properties_panel()
 	_push_pull_tool.activate()
-	_log_label.text = "Push/Pull: clic en cara del muro."
+	_log_label.text = "Push/Pull: pasa el raton sobre la cara; clic para fijarla."
 
 
 func _on_save_pressed() -> void:
@@ -244,6 +244,10 @@ func _save_to_path(path: String, dialog: FileDialog) -> void:
 
 
 func _on_viewport_container_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		if _push_pull_tool.is_active() and _push_pull_tool.is_selecting_face():
+			var pos_m: Vector2 = _subviewport.get_mouse_position()
+			_project_view.update_face_hover_at_screen(_camera, pos_m)
 	if event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
