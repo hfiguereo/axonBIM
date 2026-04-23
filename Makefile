@@ -17,8 +17,8 @@ help:
 	@echo "  test-integration- pytest tests/integration -q"
 	@echo "  test-cov        - pytest con cobertura (falla si < 80%)"
 	@echo "  run / run-dev   - backend TCP + Godot en un solo comando (recomendado)"
-	@echo "  run-backend     - solo servidor RPC (--tcp, puerto 5799)"
-	@echo "  run-godot       - solo Godot (AXONBIM_RPC_PORT=5799)"
+	@echo "  run-backend     - solo Python RPC (sin Godot; puerto TCP 5799)"
+	@echo "  run-godot       - solo Godot (en otra terminal con backend ya en marcha)"
 	@echo "  gdlint          - gdtoolkit lint sobre frontend/"
 	@echo "  gdformat        - gdtoolkit format sobre frontend/"
 	@echo "  clean           - limpia artefactos de build"
@@ -56,9 +56,17 @@ run run-dev:
 	bash scripts/dev/run_dev.sh
 
 run-backend:
-	$(UV) run python -m axonbim --tcp
+	@echo ""
+	@echo "=== AxonBIM: solo backend (no abre ventana de Godot) ==="
+	@echo "    RPC TCP 127.0.0.1:5799 + socket Unix. Detener: Ctrl+C."
+	@echo "    App completa: make run    |    Frontend aparte: make run-godot"
+	@echo ""
+	$(UV) run python -u -m axonbim --tcp
 
 run-godot:
+	@echo ""
+	@echo "=== AxonBIM: solo Godot (necesita backend en otra terminal salvo que ya este corriendo) ==="
+	@echo ""
 	AXONBIM_RPC_PORT=5799 $(GODOT) --path frontend
 
 gdlint:

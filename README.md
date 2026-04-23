@@ -111,8 +111,8 @@ make typecheck        # mypy --strict src/
 make test             # pytest -q
 make test-cov         # pytest con cobertura (falla < 80%)
 make run              # backend TCP + Godot (un solo comando; recomendado)
-make run-backend      # solo servidor RPC (--tcp, puerto 5799)
-make run-godot        # solo Godot (AXONBIM_RPC_PORT=5799)
+make run-backend      # solo Python RPC (sin ventana Godot; TCP 5799)
+make run-godot        # solo Godot (levantar antes make run-backend en otra terminal)
 ```
 
 Ver `make help` para la lista completa.
@@ -129,14 +129,16 @@ make run
 
 Siguen existiendo dos procesos en el SO (Python + Godot), pero **un único punto de entrada** para el desarrollador.
 
-**Alternativa — dos terminales** (depuración manual):
+**Alternativa — dos terminales** (depuración manual). `make run-backend` **no abre la aplicación gráfica**: solo deja escuchando el servidor RPC hasta que pulses Ctrl+C.
 
 ```bash
 # 1. Terminal A: backend en TCP (puerto default 5799)
-uv run python -m axonbim --tcp --log-level INFO
+make run-backend
+# Equivalente: uv run python -m axonbim --tcp --log-level INFO
 
 # 2. Terminal B: Godot
-AXONBIM_RPC_PORT=5799 godot --path frontend
+make run-godot
+# Equivalente: AXONBIM_RPC_PORT=5799 godot --path frontend
 ```
 
 Si usas otro puerto: `AXONBIM_RPC_PORT=9000` en ambos lados o `AXONBIM_RPC_PORT=9000 make run` con el script ajustado vía variable.
