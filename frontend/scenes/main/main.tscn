@@ -1,7 +1,13 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/main_scene.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/project_view.gd" id="2"]
+
+[sub_resource type="Environment" id="Environment_3d"]
+background_mode = 1
+background_color = Color(0.18, 0.2, 0.24, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.65, 0.68, 0.72, 1)
 
 [sub_resource type="PlaneMesh" id="1"]
 size = Vector2(20, 20)
@@ -13,73 +19,253 @@ script = ExtResource("1")
 
 [node name="UI" type="CanvasLayer" parent="."]
 
-[node name="Root" type="HBoxContainer" parent="UI"]
+[node name="Root" type="VBoxContainer" parent="UI"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 0
 
-[node name="Sidebar" type="VBoxContainer" parent="UI/Root"]
-custom_minimum_size = Vector2(280, 0)
+[node name="Ribbon" type="VBoxContainer" parent="UI/Root"]
+custom_minimum_size = Vector2(0, 118)
+theme_override_constants/separation = 2
 
-[node name="Title" type="Label" parent="UI/Root/Sidebar"]
-text = "AxonBIM - Sprint 1.4"
-horizontal_alignment = 1
+[node name="TitleBar" type="HBoxContainer" parent="UI/Root/Ribbon"]
+custom_minimum_size = Vector2(0, 26)
 
-[node name="StatusLabel" type="Label" parent="UI/Root/Sidebar"]
+[node name="AppTitle" type="Label" parent="UI/Root/Ribbon/TitleBar"]
+theme_override_font_sizes/font_size = 15
+text = "AxonBIM · Fase 2"
+
+[node name="TitleSpacer" type="Control" parent="UI/Root/Ribbon/TitleBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StatusLabel" type="Label" parent="UI/Root/Ribbon/TitleBar"]
 unique_name_in_owner = true
+layout_mode = 2
 text = "Backend: ..."
 
-[node name="PingButton" type="Button" parent="UI/Root/Sidebar"]
+[node name="RibbonTabs" type="TabBar" parent="UI/Root/Ribbon"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 28)
+tab_count = 3
+clip_tabs = false
+scroll_to_selected = false
+
+[node name="RibbonBody" type="MarginContainer" parent="UI/Root/Ribbon"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="RibbonStack" type="VBoxContainer" parent="UI/Root/Ribbon/RibbonBody"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RibbonToolsInicio" type="HBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="PanelSistema" type="PanelContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio"]
+layout_mode = 2
+
+[node name="VBoxSistema" type="VBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelSistema"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LblSistema" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelSistema/VBoxSistema"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Sistema"
+
+[node name="PingButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelSistema/VBoxSistema"]
+unique_name_in_owner = true
+layout_mode = 2
 text = "Ping backend"
 
-[node name="RttLabel" type="Label" parent="UI/Root/Sidebar"]
+[node name="RttLabel" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelSistema/VBoxSistema"]
 unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
 text = "RTT: -"
 
-[node name="Separator" type="HSeparator" parent="UI/Root/Sidebar"]
+[node name="PanelModelado" type="PanelContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio"]
+layout_mode = 2
 
-[node name="CreateWallButton" type="Button" parent="UI/Root/Sidebar"]
+[node name="VBoxModelado" type="VBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LblModelado" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado/VBoxModelado"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Modelado"
+
+[node name="CreateWallButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado/VBoxModelado"]
 unique_name_in_owner = true
+layout_mode = 2
 text = "Crear muro"
 
-[node name="SaveButton" type="Button" parent="UI/Root/Sidebar"]
+[node name="PushPullButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado/VBoxModelado"]
 unique_name_in_owner = true
+layout_mode = 2
+text = "Push / Pull"
+
+[node name="PanelArchivo" type="PanelContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio"]
+layout_mode = 2
+
+[node name="VBoxArchivo" type="VBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LblArchivo" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Proyecto"
+
+[node name="SaveButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
+unique_name_in_owner = true
+layout_mode = 2
 text = "Guardar IFC..."
 
-[node name="LogLabel" type="Label" parent="UI/Root/Sidebar"]
+[node name="RibbonToolsPlaceholder" type="CenterContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack"]
 unique_name_in_owner = true
-text = "Log: -"
-autowrap_mode = 2
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
 
-[node name="ViewportContainer" type="SubViewportContainer" parent="UI/Root"]
+[node name="PlaceholderLabel" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPlaceholder"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.52, 0.55, 1)
+text = "Contenido de cinta: próximamente en esta pestaña."
+
+[node name="Workspace" type="VBoxContainer" parent="UI/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MainSplit" type="HSplitContainer" parent="UI/Root/Workspace"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 252
+
+[node name="LeftDock" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit"]
+layout_mode = 2
+custom_minimum_size = Vector2(220, 0)
+theme_override_constants/separation = 6
+
+[node name="LeftDockHeader" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/LeftDock"]
+layout_mode = 2
+
+[node name="LeftDockTitle" type="Label" parent="UI/Root/Workspace/MainSplit/LeftDock/LeftDockHeader"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Navegador de proyecto"
+
+[node name="ProjectTree" type="Tree" parent="UI/Root/Workspace/MainSplit/LeftDock"]
 unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+hide_root = true
+scroll_horizontal_enabled = false
+
+[node name="InnerSplit" type="HSplitContainer" parent="UI/Root/Workspace/MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+split_offset = 720
+
+[node name="ViewportContainer" type="SubViewportContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit"]
+unique_name_in_owner = true
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 stretch = true
 mouse_filter = 0
 
-[node name="SubViewport" type="SubViewport" parent="UI/Root/ViewportContainer"]
-handle_input_locally = false
+[node name="SubViewport" type="SubViewport" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer"]
+unique_name_in_owner = true
+handle_input_locally = true
 size = Vector2i(1000, 720)
 render_target_update_mode = 4
 
-[node name="World" type="Node3D" parent="UI/Root/ViewportContainer/SubViewport"]
+[node name="World" type="Node3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport"]
 
-[node name="Camera3D" type="Camera3D" parent="UI/Root/ViewportContainer/SubViewport/World"]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
+environment = SubResource("Environment_3d")
+
+[node name="Camera3D" type="Camera3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
 unique_name_in_owner = true
+current = true
 transform = Transform3D(0.707, -0.408, 0.577, 0, 0.816, 0.577, -0.707, -0.408, 0.577, 8, 8, 8)
 
-[node name="Light" type="DirectionalLight3D" parent="UI/Root/ViewportContainer/SubViewport/World"]
+[node name="Light" type="DirectionalLight3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
 transform = Transform3D(0.707, -0.5, 0.5, 0, 0.707, 0.707, -0.707, -0.5, 0.5, 0, 10, 0)
 shadow_enabled = true
 
-[node name="Grid" type="MeshInstance3D" parent="UI/Root/ViewportContainer/SubViewport/World"]
+[node name="Grid" type="MeshInstance3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
 mesh = SubResource("1")
 
-[node name="ProjectView" type="Node3D" parent="UI/Root/ViewportContainer/SubViewport/World"]
+[node name="ProjectView" type="Node3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
 unique_name_in_owner = true
 script = ExtResource("2")
+
+[node name="RightDock" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit"]
+layout_mode = 2
+custom_minimum_size = Vector2(260, 0)
+theme_override_constants/separation = 6
+
+[node name="RightDockHeader" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock"]
+layout_mode = 2
+
+[node name="RightDockTitle" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/RightDockHeader"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Propiedades"
+
+[node name="PropsScroll" type="ScrollContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="PropsVBox" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="PropGuidLabel" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = "GlobalId: —"
+
+[node name="PropTypeLabel" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Tipo: —"
+
+[node name="PropDimsLabel" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = "Geometría: (pendiente RPC en Fase 2)"
+
+[node name="StatusBar" type="PanelContainer" parent="UI/Root"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 30)
+
+[node name="LogLabel" type="Label" parent="UI/Root/StatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Listo."
+autowrap_mode = 3
