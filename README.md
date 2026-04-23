@@ -22,6 +22,7 @@ La industria BIM en Linux está dominada por herramientas pesadas, propietarias 
 - **Rigor paramétrico de nivel Revit** — geometría sólida B-Rep, IFC nativo, normativa estricta.
 - **Cumplimiento normativo dominicano (MIVED)** — exportación de planos lista para entrega oficial.
 - **Cero fricción de instalación** — un único Flatpak con todo el entorno Python congelado dentro.
+- **Principios de modelado** — equilibrio gesto / IFC / historial; [texto operativo en `ROADMAP.md`](ROADMAP.md#principios-de-modelado).
 
 ## Filosofía: Director de Orquesta
 

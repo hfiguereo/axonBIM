@@ -6,6 +6,22 @@ Hoja de ruta estratégica. Asume una dedicación promedio de **10 horas semanale
 
 ---
 
+## Principios de modelado
+
+AxonBIM busca **una sola metodología** que combine lo útil de herramientas conocidas —rapidez de gesto (SketchUp), precisión y trazabilidad (Revit), fluidez espacial (Blender)— sin repetir sus defectos sistémicos. Principios operativos:
+
+1. **Semántica primero.** Toda edición que importa al edificio pasa por **entidades IFC u objetos trazables**; no se fomenta geometría “suelta” sin dueño en el modelo.
+2. **Backend como autoridad.** Validación, topología mutable, historial y persistencia viven en **Python**; el cliente **Godot** prioriza claridad, feedback y comandos breves.
+3. **Topología estable.** Los gestos preservan o **mapean identidad** (`topo_id`, mapas cara→cara) para que el modelo siga siendo mantenible; se evita el caos de modelado directo sin estructura.
+4. **Deshacer con sentido.** Las operaciones mutantes son **reversibles en dominio** (p. ej. historial de extrusiones), no un deshacer opaco desconectado del IFC.
+5. **Flujo principal único.** Se minimizan **modos y wizards** para cambios de volumen habituales; pasos extra solo cuando el edificio, la seguridad de datos o la **norma** lo exijan.
+6. **Rapidez sin caos.** La facilidad de uso no sacrifica **agrupación lógica implícita** (muros como productos con parámetros, no primitivas anónimas acumuladas).
+7. **Evolución por fases.** La **precisión normativa y el rigor 2D** se endurecen al acercarse a entrega; el modelado exploratorio inicial no queda bloqueado por el ritual de cada detalle documental.
+
+Estos principios **orientan** prioridades de producto; el detalle técnico sigue en `docs/architecture/` y en el protocolo JSON-RPC.
+
+---
+
 ## Fase 1 — El puente de comunicación  *(Mes 1–3)*
 
 **Objetivo:** Lograr que Godot y Python hablen entre sí de forma estable.
