@@ -1,0 +1,35 @@
+---
+description: Evita divergencias largas entre clones del mismo autor (varias PCs o sesiones).
+alwaysApply: false
+---
+
+# Git — sincronización cuando el autor es único
+
+## Objetivo
+
+Mantener **una sola línea de verdad** en `origin/develop` y evitar semanas de WIP sin publicar o dos historiales que divergen sin necesidad.
+
+## Inicio de sesión de trabajo
+
+1. `git fetch origin`
+2. `git pull` en la rama de integración (`develop`), salvo que el flujo explícito sea una `feature/*` recién creada desde `develop` actualizado.
+
+## Fin de sesión o cambio de máquina
+
+1. Commits pequeños con mensaje convencional (ver [50-git-commits.mdc](50-git-commits.mdc)).
+2. `git push origin develop` (o `origin/<rama>` activa). **No** usar `git push --force` a `main` ni `develop`.
+
+## WIP
+
+- No acumular cambios sin commit durante periodos largos; si el bloque no está listo, usar `git stash` con mensaje o una rama `feature/*` publicable.
+- Trabajo local sin push **no** está compartido ni respaldado en el remoto.
+
+## Varias PCs, mismo usuario
+
+- Tratar el remoto como canónico: antes de seguir en otra máquina, **pull** y solo entonces continuar.
+- Si hubo experimentación local no deseada, preferir ramas temporales o reset selectivo antes de mezclar con `develop`.
+
+## Para el agente
+
+- Al iniciar tareas que toquen muchos archivos, recordar al usuario si `develop` local puede estar desactualizada respecto a `origin/develop`.
+- No proponer force-push a ramas compartidas protegidas.

@@ -59,6 +59,10 @@ uv run pre-commit install
 
 `<scope>` es el dominio: `rpc`, `geom`, `ifc`, `draw`, `ui`, `iso19650`, `mived`, `ci`, `pkg`.
 
+### Varias máquinas / mismo autor
+
+Trata `origin/develop` como fuente de verdad: `git pull` al empezar en un clone y, antes de cambiar de PC, commits pequeños verificados y `git push`. Convención detallada (incluida para agentes) en [`.cursor/rules/66-git-sincronizacion-solo-autor.mdc`](.cursor/rules/66-git-sincronizacion-solo-autor.mdc).
+
 ### Commits
 
 Formato convencional, en **español imperativo**, ≤72 caracteres en la primera línea:

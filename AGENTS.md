@@ -13,6 +13,7 @@ Punto de entrada estándar para agentes de IA (Cursor, Codex, Claude Code, otros
    - `30-bim-normativa.mdc` — al trabajar en planos / estados de proyecto.
    - `40-testing.mdc` — al escribir o modificar tests.
    - `50-git-commits.mdc` — al proponer commits o PRs.
+   - `66-git-sincronizacion-solo-autor.mdc` — mismo autor / varias PCs; evitar divergencias.
 
 2. **Documentación de referencia** (no son reglas, son specs):
    - `docs/architecture/jsonrpc-protocol.md` — esquema completo del puente.
