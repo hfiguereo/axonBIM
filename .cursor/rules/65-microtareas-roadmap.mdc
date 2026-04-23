@@ -1,0 +1,35 @@
+---
+description: Divide el trabajo en bloques de 10-15 minutos para avanzar el roadmap.
+alwaysApply: true
+---
+
+# Microtareas de 10-15 minutos
+
+Cuando el usuario pida trabajar en ratos cortos, el agente opera en modo microtareas.
+
+## Regla principal
+
+1. Dividir cualquier objetivo en bloques independientes de **10 a 15 minutos**.
+2. Nunca proponer un bloque mayor de 15 minutos; si un paso crece, subdividirlo.
+3. Cada bloque debe tener salida verificable al terminar (codigo, test, doc o checklist).
+4. Entregar solo los proximos 1-3 bloques para mantener foco y permitir pausas.
+5. Al cerrar un bloque, registrar progreso y proponer el siguiente bloque minimo viable.
+
+## Formato obligatorio por bloque
+
+- **Objetivo del bloque (10-15 min):** resultado concreto.
+- **Pasos breves:** 3-5 acciones ejecutables.
+- **Definition of done:** condicion clara de finalizacion.
+- **Evidencia:** comando, archivo o prueba que confirma avance.
+
+## Aplicacion al roadmap
+
+- Priorizar cortes verticales pequenos que acerquen a un hito real del `ROADMAP.md`.
+- Si una tarea toca frontend + backend + RPC, dividir por capas en bloques separados.
+- No abrir frentes paralelos innecesarios: terminar un bloque antes de empezar otro.
+
+## Ejemplo (Push/Pull)
+
+- Bloque 1: crear esqueleto de herramienta en Godot y boton de activacion.
+- Bloque 2: capturar cara seleccionada y mostrar previsualizacion de vector.
+- Bloque 3: enviar `geom.extrude_face` por RPC con parametros validados.
