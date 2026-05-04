@@ -1,0 +1,40 @@
+---
+description: Secretos, logs, TLS razonable, rutas portables y firma de artefactos de release.
+alwaysApply: true
+---
+
+# Seguridad — repositorio y despliegue (transversal)
+
+Norma genérica para el código y la cadena de release. Detalle de empaquetado:
+`docs/packaging/flatpak-pyinstaller.md` y políticas del proyecto.
+
+## 1. Secretos y credenciales
+
+- **No versionar** claves API, tokens, contraseñas, certificados privados ni
+  archivos `.env` con valores reales. Usar plantillas o variables de entorno en
+  máquinas de desarrollo/CI.
+- **No loguear** secretos ni URIs con credenciales en claro. Si hace falta
+  diagnosticar conexión, enmascarar o usar metadatos no sensibles.
+
+## 2. Conexiones remotas (cuando aplique)
+
+- Si el backend usa **PostgreSQL u otro servicio por red**, usar **TLS** de forma
+  coherente con la política del proyecto (p. ej. no `sslmode=disable` en
+  producción). Si la URI permite parámetros de SSL, respetarlos y documentar el
+  modo esperado.
+- Rutas a **certificados / CA** en código versionado: resolver con `pathlib` /
+  `os.path.join` relativas al proyecto o recursos empaquetados; **no** hardcodear
+  rutas absolutas típicas de un solo sistema operativo.
+
+## 3. Artefactos de distribución
+
+- Los binarios o bundles destinados a usuarios finales deben seguir el proceso de
+  **firma / confianza** acordado en el proyecto (p. ej. Flatpak firmado, firma de
+  código en plataformas donde aplique). No introducir pipelines que “salten”
+  verificaciones de integridad acordadas sin decisión explícita documentada.
+
+## 4. Integridad del repositorio
+
+- **No** eliminar ni debilitar por iniciativa propia: scripts de empaquetado
+  canónicos, configuración de calidad (`ruff`, `mypy`, pre-commit) ni contratos
+  documentados del puente RPC, salvo orden explícita del responsable del proyecto.

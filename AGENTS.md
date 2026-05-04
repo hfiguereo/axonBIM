@@ -7,6 +7,10 @@ Punto de entrada estándar para agentes de IA (Cursor, Codex, Claude Code, otros
 1. **Lee primero las reglas activas** en `.cursor/rules/`. Están organizadas por dominio:
    - `00-architecture.mdc` — núcleo de la arquitectura (siempre cargado).
    - `10-anti-patterns.mdc` — comportamiento esperado del agente (siempre cargado).
+   - `11-validacion-previa-reglas.mdc` — meta-regla: validar reglas aplicables antes de cualquier cambio material.
+   - `12-protocolo-cambios-riesgo.mdc` — alcance, confirmación y sin cambios destructivos por iniciativa propia.
+   - `13-diagnostico-evidencia-runtime.mdc` — incidentes: evidencia antes de “arreglar”; sin inventar causa.
+   - `14-seguridad-repositorio-y-despliegue.mdc` — secretos, logs, TLS razonable, firma de artefactos.
    - `20-backend-python.mdc` — al editar Python.
    - `21-frontend-godot.mdc` — al editar GDScript / escenas.
    - `22-jsonrpc-bridge.mdc` — al tocar el puente RPC.
@@ -48,5 +52,9 @@ godot --headless --path frontend -s addons/gut/gut_cmdln.gd -gtest=res://tests/
 
 - Sobre arquitectura → `.cursor/rules/00-architecture.mdc`.
 - Sobre cómo se comporta el agente → `.cursor/rules/10-anti-patterns.mdc`.
+- Sobre qué reglas aplican antes de tocar archivos → `.cursor/rules/11-validacion-previa-reglas.mdc`.
+- Sobre cambios delicados o ambiguos → `.cursor/rules/12-protocolo-cambios-riesgo.mdc`.
+- Sobre fallos en ejecución sin contexto → `.cursor/rules/13-diagnostico-evidencia-runtime.mdc`.
+- Sobre secretos, logs o release → `.cursor/rules/14-seguridad-repositorio-y-despliegue.mdc`.
 - Sobre normativa → pregunta antes de inventar.
 - Sobre el roadmap → `ROADMAP.md`, no es información de codificación.

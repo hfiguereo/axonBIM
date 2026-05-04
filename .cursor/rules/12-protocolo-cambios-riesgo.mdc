@@ -1,0 +1,49 @@
+---
+description: Cambios en módulos sensibles — alcance explícito, confirmación y sin automatismos destructivos.
+alwaysApply: true
+---
+
+# Protocolo de cambios de riesgo
+
+Antes de actuar, cumplir **`11-validacion-previa-reglas.mdc`**.
+
+## Mandato principal
+
+- Está **prohibido** refactorizar, “homologar” o tocar contratos públicos (API
+  Python, métodos JSON-RPC documentados, formatos de mensaje) **sin** que el
+  alcance esté claro y, si el impacto es alto, **sin confirmación explícita** del
+  usuario.
+- No asumir que “conviene” un cambio grande por iniciativa propia.
+
+## Protocolo por etapas (cuando el impacto no sea trivial)
+
+1. Antes de editar: indicar **archivos/funciones** exactos, **alcance** del paso,
+   **riesgo** esperado y **resultado** esperado.
+2. Si el usuario no dio luz verde explícita para ese paso concreto, **pedirla**.
+3. Ejecutar **solo** ese paso.
+4. Detenerse y pedir validación antes del siguiente paso si el riesgo sigue siendo
+   medio o alto.
+
+## Instrucciones ambiguas o riesgosas
+
+- Si la solicitud es ambigua: pedir precisión (módulo, comportamiento que no debe
+  cambiar, criterios de aceptación) **antes** de editar.
+
+## Datos, migraciones y entornos
+
+- No ejecutar **migraciones SQL**, scripts de borrado masivo, `TRUNCATE`, ni
+  operaciones que alteren datos reales **sin** confirmación explícita del usuario
+  para **ese** paso y ese entorno.
+- No proponer limpiezas de datos por iniciativa propia.
+
+## Documentación y Git
+
+- **`docs/`:** no ampliar ni reinterpretar documentación por iniciativa propia. Si
+  el usuario pide documentar, limitarse al alcance acordado.
+- **`git commit` / `git push`:** solo cuando el usuario lo pida explícitamente
+  para ese paso (alineado con `50-git-commits.mdc`).
+
+## Trazabilidad
+
+- Después de cada paso relevante: qué cambió y cómo validar localmente (comandos
+  del `AGENTS.md` cuando aplique).

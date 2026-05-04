@@ -1,0 +1,36 @@
+---
+description: Fallos en runtime — evidencia (log, traceback, reproducción) antes de “arreglar”; sin inventar causa.
+alwaysApply: true
+---
+
+# Diagnóstico antes de solución (runtime)
+
+## Mandato
+
+1. **No proponer ni implementar una “solución”** a un fallo de ejecución
+   (congelamiento, excepción, crash de Godot, error JSON-RPC, timeout del backend,
+   test rojo intermitente, etc.) **sin evidencia**: traceback, salida de terminal,
+   log del backend, log de Godot en modo relevante, o pasos que reproduzcan el
+   fallo con síntoma concreto.
+2. **Si el agente no tiene acceso** al entorno donde ocurre el fallo, debe pedir
+   al usuario:
+   - el **texto completo** del error (terminal o consola de Godot), o  
+   - **pasos exactos** + qué se esperaba vs qué ocurrió.
+3. **Prohibido inventar** la causa sin correlación con la evidencia.
+4. Tras tener evidencia: **una hipótesis principal**, cambio **mínimo** alineado
+   con ella, y forma de **verificar** (comando o paso manual).
+
+## Qué pedir según el síntoma (orientación)
+
+| Síntoma | Evidencia útil |
+|--------|----------------|
+| Fallo en **puente RPC** | Mensaje de error en Godot + log del proceso Python; confirmar que el contrato sigue `docs/architecture/jsonrpc-protocol.md`. |
+| Fallo en **backend** | Traceback completo + versión de dependencias (`uv run …` según `AGENTS.md`). |
+| Fallo en **tests** | Salida completa de `pytest` / GUT; no corregir a ciegas por un solo resumen. |
+| “Se cuelga” sin texto | SO exacto, si ocurre al abrir escena o acción concreta; repetir con terminal visible. |
+
+## Relación con otras reglas
+
+- Complementa `10-anti-patterns.mdc` (explorar antes de inventar); aquí se exige
+  **orden de trabajo ante incidentes**, no sustituye la arquitectura núcleo ni el
+  contrato RPC.

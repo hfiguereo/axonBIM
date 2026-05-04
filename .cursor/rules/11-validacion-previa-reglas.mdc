@@ -1,0 +1,33 @@
+---
+description: Meta-regla — antes de cualquier cambio material, revisar AGENTS.md y las reglas .mdc aplicables.
+alwaysApply: true
+---
+
+# Validación previa obligatoria (meta-regla)
+
+## Alcance
+
+Antes de **cualquier** operación que modifique el proyecto (código, reglas, scripts,
+configuración, CI, empaquetado, etc.) —sin importar si el cambio parece pequeño— el
+agente debe **revisar y aplicar** lo siguiente:
+
+- **`AGENTS.md`** (entrada e índice de reglas y docs de referencia).
+- **`.cursor/rules/*.mdc` pertinentes** al tipo de cambio (backend, Godot, puente
+  RPC, normativa, tests, Git, seguridad, protocolo de riesgo, diagnóstico, etc.).
+
+**No hay excepción** por “solo una línea”, “solo un comentario” o “solo
+documentación”: el umbral es **cualquier** cambio material.
+
+## Qué significa “validar”
+
+- Identificar qué reglas tocan el alcance y **no contradecirlas**.
+- Si una petición del usuario choca con arquitectura núcleo (`00-architecture.mdc`)
+  o con reglas de integridad, **detenerse** y pedir aclaración antes de implementar.
+
+## Permanencia
+
+- Esta norma aplica **siempre**; no depende de que el usuario la repita en cada
+  mensaje.
+- **No** eliminar ni vaciar este archivo ni desactivar `alwaysApply: true` por
+  iniciativa del agente o herramientas automáticas. Solo el responsable del
+  proyecto puede alterarlo con decisión explícita y revisión humana.
