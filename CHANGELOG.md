@@ -61,6 +61,8 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Documentación: `docs/phase-reports/phase-1-report.md` referenciaba el flag
   inexistente `--tcp --port 7878`. Sustituido por el atajo nuevo `--tcp` y se
   unifica el puerto a `5799` (alineado con el README).
+- Documentación: se restaura `docs/architecture/app-gui-viewport-patterns.md`,
+  citada desde `project_view.gd` y ausente en el árbol tras limpieza de ramas.
 
 ### Añadido
 
