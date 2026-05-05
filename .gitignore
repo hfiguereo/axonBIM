@@ -70,6 +70,8 @@ axon_catalog.db-journal
 
 # Snapshots ISO 19650 generados localmente
 snapshots/
+!tests/fixtures/geometry/snapshots/
+!tests/fixtures/geometry/snapshots/*.json
 
 # Runtime socket (se crea en $XDG_RUNTIME_DIR, pero por si acaso)
 *.sock
