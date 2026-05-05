@@ -73,13 +73,14 @@ async def extrude_face(params: dict[str, Any]) -> dict[str, Any]:
     except ValueError as exc:
         raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
 
-    history_store.push(
+    history_store.push_undo(
         "extrude_face",
         {
             "guid": guid,
             "wall_spec": old_spec.to_dict(),
             "mesh": old_mesh.to_dict(),
         },
+        clear_redo=True,
     )
 
     session = get_session()

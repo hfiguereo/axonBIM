@@ -86,6 +86,12 @@ def mesh_for_topo_id(topo_id: str) -> Mesh | None:
         return _BY_GUID.get(guid)
 
 
+def mesh_for_guid(guid: str) -> Mesh | None:
+    """Devuelve la malla registrada para ``guid``, o ``None``."""
+    with _LOCK:
+        return _BY_GUID.get(guid)
+
+
 def has_topo_id(topo_id: str) -> bool:
     """True si ``topo_id`` esta registrado en la sesion actual."""
     with _LOCK:

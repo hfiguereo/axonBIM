@@ -172,13 +172,13 @@ Solo del backend al frontend. Eventos asíncronos:
 | `draw.export_plan` | `{ "level": "<storey_guid>", "format": "dxf\|pdf", "out_path": "...", "norma": "MIVED" }` | `{ "ok": true, "path": "..." }` |
 | `draw.export_section` | `{ "plane": {...}, "format": "...", "out_path": "..." }` | `{ "ok": true, "path": "..." }` |
 
-### 5.5 `project.*`
+### 5.5 `project.*` / `history.*`
 
 | Método | Params | Result |
 |--------|--------|--------|
 | `project.save` | `{ "path": "..." }` | `{ "ok": true }` |
-| `project.undo` | `{}` | `{ "ok": true, "delta": {...} }` |
-| `project.redo` | `{}` | `{ "ok": true, "delta": {...} }` |
+| `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...}, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" }` |
+| `history.redo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...}, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" }` |
 | `project.set_state` | `{ "state": "WIP\|Shared\|Published", "comment": "..." }` | `{ "ok": true, "snapshot_path": "..." }` |
 
 ### 5.6 Notificaciones del backend

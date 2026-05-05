@@ -165,6 +165,41 @@ async def test_extrude_face_and_undo_over_rpc(running_server: Path) -> None:
     assert undo_mesh["topo_ids"][2] == top_face_topo_id
 
 
+async def test_extrude_undo_redo_over_rpc(running_server: Path) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    guid = wall_resp["result"]["guid"]
+    top_face_topo_id = wall_resp["result"]["mesh"]["topo_ids"][2]
+
+    extrude_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "result" in extrude_resp, extrude_resp
+
+    undo_resp = await _call(running_server, "history.undo", {})
+    assert undo_resp["result"]["applied"] is True
+    assert max(undo_resp["result"]["mesh"]["vertices"][2::3]) == pytest.approx(3.0)
+
+    redo_resp = await _call(running_server, "history.redo", {})
+    assert "result" in redo_resp, redo_resp
+    assert redo_resp["result"]["applied"] is True
+    assert redo_resp["result"]["guid"] == guid
+    redo_mesh = redo_resp["result"]["mesh"]
+    assert max(redo_mesh["vertices"][2::3]) == pytest.approx(3.5)
+    assert redo_resp["result"]["topo_map"][top_face_topo_id] == redo_mesh["topo_ids"][2]
+
+
 async def test_extrude_face_topo_map_translates_logical_faces(running_server: Path) -> None:
     wall_resp = await _call(
         running_server,
@@ -277,6 +312,45 @@ async def test_undo_after_extrude_save_reopens_with_original_body(
     wall = reopened.by_guid(guid)
     assert wall is not None
     assert _body_extrusion_depths(wall) == pytest.approx([3.0])
+
+
+async def test_redo_after_undo_save_reopens_with_redone_body(
+    running_server: Path, tmp_path: Path
+) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    guid = wall_resp["result"]["guid"]
+    top_face_topo_id = wall_resp["result"]["mesh"]["topo_ids"][2]
+
+    extrude_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "result" in extrude_resp, extrude_resp
+
+    undo_resp = await _call(running_server, "history.undo", {})
+    assert undo_resp["result"]["applied"] is True
+    redo_resp = await _call(running_server, "history.redo", {})
+    assert redo_resp["result"]["applied"] is True
+
+    out = tmp_path / "redo_extruded_wall.ifc"
+    save_resp = await _call(running_server, "project.save", {"path": str(out)})
+    assert save_resp["result"]["bytes"] > 0
+
+    reopened = ifcopenshell.open(str(out))
+    wall = reopened.by_guid(guid)
+    assert wall is not None
+    assert _body_extrusion_depths(wall) == pytest.approx([3.5])
 
 
 async def test_two_extrusions_then_one_undo_persists_lifo_body(

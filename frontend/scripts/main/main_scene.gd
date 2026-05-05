@@ -230,7 +230,9 @@ func _grid_material() -> StandardMaterial3D:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k: InputEventKey = event as InputEventKey
-		if k.pressed and k.keycode == KEY_Z and k.ctrl_pressed and not k.shift_pressed:
+		if k.pressed and k.keycode == KEY_Z and k.ctrl_pressed and k.shift_pressed:
+			_do_redo_async()
+		elif k.pressed and k.keycode == KEY_Z and k.ctrl_pressed:
 			_do_undo_async()
 		elif k.pressed and k.keycode == KEY_ESCAPE and _is_edit_mode_active():
 			_exit_edit_mode("Modo edición: cerrado")
@@ -238,14 +240,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _do_undo_async() -> void:
 	var resp: Dictionary = await RpcClient.call_rpc("history.undo", {})
+	_apply_history_response(resp, "Undo")
+
+
+func _do_redo_async() -> void:
+	var resp: Dictionary = await RpcClient.call_rpc("history.redo", {})
+	_apply_history_response(resp, "Redo")
+
+
+func _apply_history_response(resp: Dictionary, label: String) -> void:
 	if not is_inside_tree():
 		return
 	if not resp.get("ok"):
-		_log_label.text = "Undo: %s" % str(resp.get("error"))
+		_log_label.text = "%s: %s" % [label, str(resp.get("error"))]
 		return
 	var r: Dictionary = resp["result"] as Dictionary
 	if not bool(r.get("applied", false)):
-		_log_label.text = "Undo: %s" % str(r.get("reason", "nada"))
+		_log_label.text = "%s: %s" % [label, str(r.get("reason", "nada"))]
 		return
 	var guid: String = str(r.get("guid", ""))
 	var mesh_dict: Dictionary = r.get("mesh", {}) as Dictionary
@@ -253,7 +264,7 @@ func _do_undo_async() -> void:
 		_project_view.replace_entity_mesh(guid, mesh_dict)
 		_project_view.set_selection(guid)
 		_refresh_properties_panel()
-	_log_label.text = "Undo aplicado."
+	_log_label.text = "%s aplicado." % label
 
 
 func _on_push_pull_status(text: String) -> void:

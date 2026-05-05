@@ -33,18 +33,23 @@ def _conn() -> sqlite3.Connection:
         if _CONN is None:
             path = _db_path()
             _CONN = sqlite3.connect(str(path), check_same_thread=False)
-            _CONN.execute(
-                """
-                CREATE TABLE IF NOT EXISTS undo_stack (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    op_kind TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    created_at REAL NOT NULL
-                )
-                """
-            )
+            _ensure_stack_table(_CONN, "undo_stack")
+            _ensure_stack_table(_CONN, "redo_stack")
             _CONN.commit()
         return _CONN
+
+
+def _ensure_stack_table(conn: sqlite3.Connection, table_name: str) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            op_kind TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            created_at REAL NOT NULL
+        )
+        """
+    )
 
 
 def clear() -> None:
@@ -52,30 +57,66 @@ def clear() -> None:
     c = _conn()
     with _LOCK:
         c.execute("DELETE FROM undo_stack")
+        c.execute("DELETE FROM redo_stack")
         c.commit()
 
 
-def push(kind: str, payload: dict[str, Any]) -> None:
+def push(kind: str, payload: dict[str, Any], *, clear_redo: bool = True) -> None:
     """Apila una operacion reversible."""
+    push_undo(kind, payload, clear_redo=clear_redo)
+
+
+def push_undo(kind: str, payload: dict[str, Any], *, clear_redo: bool) -> None:
+    """Apila una operación en undo y opcionalmente invalida redo."""
     c = _conn()
     with _LOCK:
-        c.execute(
-            "INSERT INTO undo_stack (op_kind, payload_json, created_at) VALUES (?, ?, ?)",
-            (kind, json.dumps(payload, separators=(",", ":")), time.time()),
-        )
+        _push_locked(c, "undo_stack", kind, payload)
+        if clear_redo:
+            c.execute("DELETE FROM redo_stack")
         c.commit()
+
+
+def push_redo(kind: str, payload: dict[str, Any]) -> None:
+    """Apila una operación deshecha para permitir rehacerla."""
+    c = _conn()
+    with _LOCK:
+        _push_locked(c, "redo_stack", kind, payload)
+        c.commit()
+
+
+def _push_locked(
+    conn: sqlite3.Connection,
+    table_name: str,
+    kind: str,
+    payload: dict[str, Any],
+) -> None:
+    conn.execute(
+        f"INSERT INTO {table_name} (op_kind, payload_json, created_at) VALUES (?, ?, ?)",
+        (kind, json.dumps(payload, separators=(",", ":")), time.time()),
+    )
 
 
 def pop_undo() -> tuple[str, dict[str, Any]] | None:
     """Extrae la ultima entrada LIFO. Devuelve ``(kind, payload)`` o ``None``."""
+    return _pop_stack("undo_stack")
+
+
+def pop_redo() -> tuple[str, dict[str, Any]] | None:
+    """Extrae la ultima entrada de rehacer. Devuelve ``(kind, payload)`` o ``None``."""
+    return _pop_stack("redo_stack")
+
+
+def _pop_stack(table_name: str) -> tuple[str, dict[str, Any]] | None:
     c = _conn()
     with _LOCK:
-        cur = c.execute("SELECT id, op_kind, payload_json FROM undo_stack ORDER BY id DESC LIMIT 1")
+        cur = c.execute(
+            f"SELECT id, op_kind, payload_json FROM {table_name} ORDER BY id DESC LIMIT 1"
+        )
         row = cur.fetchone()
         if row is None:
             return None
         row_id, kind, raw = row
-        c.execute("DELETE FROM undo_stack WHERE id = ?", (row_id,))
+        c.execute(f"DELETE FROM {table_name} WHERE id = ?", (row_id,))
         c.commit()
         return kind, json.loads(raw)
 
