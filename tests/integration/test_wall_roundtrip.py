@@ -155,6 +155,11 @@ async def test_extrude_face_and_undo_over_rpc(running_server: Path) -> None:
     extruded_mesh = extrude_resp["result"]["mesh"]
     assert max(extruded_mesh["vertices"][2::3]) == pytest.approx(3.5)
     assert extrude_resp["result"]["topo_map"][top_face_topo_id] == extruded_mesh["topo_ids"][2]
+    assert extrude_resp["result"]["debug_ocp_mesh_stats"] == {
+        "vertices": 36,
+        "triangles": 12,
+        "faces": 6,
+    }
 
     undo_resp = await _call(running_server, "history.undo", {})
     assert "result" in undo_resp, undo_resp

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from axonbim.geometry import topo_registry
 from axonbim.geometry.meshing import Mesh
+from axonbim.geometry.ocp_brep import wall_box_mesh_ocp
 from axonbim.geometry.wall_extrude import extrude_wall_face
 from axonbim.geometry.wall_spec import WallSpec
 from axonbim.history import sqlite_store as history_store
@@ -87,11 +88,21 @@ async def extrude_face(params: dict[str, Any]) -> dict[str, Any]:
     wall_module.update_wall_geometry(session, guid, new_spec)
     topo_registry.replace_mesh(guid, new_mesh)
     topo_registry.update_wall_spec(guid, new_spec)
+    ocp_mesh = wall_box_mesh_ocp(
+        new_spec,
+        parent_guid=guid,
+        op_signature="geom.extrude_face:ocp_probe:v1",
+    )
 
     return {
         "guid": guid,
         "mesh": new_mesh.to_dict(),
         "topo_map": topo_map,
+        "debug_ocp_mesh_stats": {
+            "vertices": ocp_mesh.vertex_count,
+            "triangles": ocp_mesh.triangle_count,
+            "faces": len(set(ocp_mesh.topo_ids)),
+        },
     }
 
 
