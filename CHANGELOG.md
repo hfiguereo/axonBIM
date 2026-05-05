@@ -9,6 +9,13 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Backend: `geom.extrude_face` ahora sondea la malla equivalente generada con
+  OCP/OpenCASCADE y reporta métricas `debug_ocp_mesh_stats` para validar la
+  ruta B-Rep de Fase 2 sin romper la malla analítica existente.
+- Tests: snapshots geométricos versionados para muro caja y extrusión superior
+  con tolerancia `1e-6`, más regresión RPC de 52 muros editados y guardados.
+- Geometría: `topo_id` migra al formato Fase 2 de 16 hex sobre firma canónica
+  con tipo de entidad, GUID padre y firma de operación.
 - Backend/UI: `history.redo` rehace la última extrusión deshecha y Godot lo
   invoca con `Ctrl+Shift+Z`, manteniendo malla, IFC y topología sincronizadas.
 - Godot: entrada numérica de distancia para Push/Pull en el panel Propiedades,

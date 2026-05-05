@@ -161,7 +161,7 @@ Solo del backend al frontend. Eventos asíncronos:
 
 | Método | Params | Result |
 |--------|--------|--------|
-| `geom.extrude_face` | `{ "topo_id": "...", "vector": [x,y,z] }` | `{ "mesh": {...}, "topo_map": {...} }` |
+| `geom.extrude_face` | `{ "topo_id": "...", "vector": [x,y,z] }` | `{ "guid": "...", "mesh": {...}, "topo_map": {...}, "debug_ocp_mesh_stats": {"vertices": 36, "triangles": 12, "faces": 6} }` |
 | `geom.boolean` | `{ "op": "union\|difference\|intersection", "a_guid": "...", "b_guid": "..." }` | `{ "mesh": {...}, "result_guid": "..." }` |
 | `geom.fillet_edge` | `{ "topo_id": "...", "radius": <m> }` | `{ "mesh": {...}, "topo_map": {...} }` |
 
