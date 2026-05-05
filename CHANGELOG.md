@@ -9,6 +9,9 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Godot: modo edición por elemento para Fase 2. Se entra con doble clic sobre
+  un elemento seleccionado o desde el botón `Editar elemento` en Propiedades; `Esc`
+  o el mismo botón salen del modo. Push/Pull queda limitado al elemento en edición.
 - `scripts/dev/install_godot_official.sh`: descarga Godot **4.3-stable** Linux
   oficial a `~/.local/bin/godot` (misma version que CI). Documentado en README
   junto con **desinstalar Flatpak** (`flatpak uninstall org.godotengine.Godot`)

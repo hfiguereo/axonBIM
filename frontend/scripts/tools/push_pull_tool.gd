@@ -14,6 +14,7 @@ var _camera: Camera3D
 var _project_view: Node3D
 var _active: bool = false
 var _step: int = 0
+var _editable_guid: String = ""
 var _pending_guid: String = ""
 var _pending_topo: String = ""
 ## Normal unitaria de extrusion (fijada en el primer clic; coincide con la cara resaltada).
@@ -26,9 +27,10 @@ func setup(camera: Camera3D, project_view: Node3D) -> void:
 	_project_view = project_view
 
 
-func activate() -> void:
+func activate(editable_guid: String = "") -> void:
 	_active = true
 	_step = 0
+	_editable_guid = editable_guid
 	_pending_guid = ""
 	_pending_topo = ""
 	_extrusion_axis = Vector3.ZERO
@@ -41,6 +43,7 @@ func activate() -> void:
 func deactivate() -> void:
 	_active = false
 	_step = 0
+	_editable_guid = ""
 	_pending_guid = ""
 	_pending_topo = ""
 	_extrusion_axis = Vector3.ZERO
@@ -64,6 +67,10 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 			_project_view.clear_face_hover()
 			push_pull_completed.emit(false, "Selecciona una cara de muro.")
 			return
+		if _editable_guid != "" and str(hit["guid"]) != _editable_guid:
+			_project_view.clear_face_hover()
+			push_pull_completed.emit(false, "Edita solo el elemento activo.")
+			return
 		_pending_guid = str(hit["guid"])
 		_pending_topo = str(hit["topo_id"])
 		_extrusion_axis = (hit["normal"] as Vector3).normalized()
@@ -74,7 +81,9 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 		_anchor = hit["position"] as Vector3
 		_project_view.lock_face_hover_from_hit(hit)
 		_step = 1
-		status_message.emit("Push/Pull: segundo clic en la vista (profundidad a lo largo de la normal).")
+		status_message.emit(
+			"Push/Pull: segundo clic en la vista (profundidad a lo largo de la normal)."
+		)
 		return
 
 	var vec: Vector3 = _extrusion_vector_from_click(screen_pos)

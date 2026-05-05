@@ -20,9 +20,11 @@ var _entities: Dictionary = {}  # String guid -> MeshInstance3D
 var _triangle_topo: Dictionary = {}  # guid -> Array[String] (una por triángulo)
 var _material: StandardMaterial3D = _default_material()
 var _highlight: StandardMaterial3D = _highlight_material()
+var _edit_highlight: StandardMaterial3D = _edit_highlight_material()
 var _hover_preview_mat: StandardMaterial3D = _face_hover_preview_material()
 var _hover_locked_mat: StandardMaterial3D = _face_hover_locked_material()
 var _selected_guid: String = ""
+var _edit_guid: String = ""
 var _face_hover_mi: MeshInstance3D
 var _face_hover_locked: bool = false
 
@@ -52,6 +54,7 @@ func replace_entity_mesh(guid: String, mesh_dict: Dictionary) -> void:
 	mi.mesh = MeshBuilder.build_array_mesh(mesh_dict)
 	_store_topo_ids(guid, mesh_dict)
 	mi.create_trimesh_collision()
+	_refresh_entity_overlay(guid)
 
 
 func remove_entity(guid: String) -> void:
@@ -59,6 +62,8 @@ func remove_entity(guid: String) -> void:
 		return
 	if _selected_guid == guid:
 		_selected_guid = ""
+	if _edit_guid == guid:
+		_edit_guid = ""
 	_triangle_topo.erase(guid)
 	var node: MeshInstance3D = _entities[guid]
 	node.queue_free()
@@ -70,13 +75,25 @@ func clear_selection() -> void:
 
 
 func set_selection(guid: String) -> void:
-	if _selected_guid != "" and _entities.has(_selected_guid):
-		var prev: MeshInstance3D = _entities[_selected_guid]
-		prev.material_overlay = null
+	var previous_guid: String = _selected_guid
 	_selected_guid = guid
-	if guid != "" and _entities.has(guid):
-		var mi: MeshInstance3D = _entities[guid]
-		mi.material_overlay = _highlight
+	_refresh_entity_overlay(previous_guid)
+	_refresh_entity_overlay(guid)
+
+
+func set_edit_target(guid: String) -> void:
+	"""Define el elemento editable; vacío sale del modo edición."""
+	var previous_guid: String = _edit_guid
+	_edit_guid = guid if guid != "" and _entities.has(guid) else ""
+	if _edit_guid != "":
+		_selected_guid = _edit_guid
+	_refresh_entity_overlay(previous_guid)
+	_refresh_entity_overlay(_selected_guid)
+	clear_face_hover()
+
+
+func clear_edit_target() -> void:
+	set_edit_target("")
 
 
 func pick_entity_at_screen(camera: Camera3D, screen_pos: Vector2) -> String:
@@ -96,6 +113,8 @@ func pick_face_at_screen(camera: Camera3D, screen_pos: Vector2) -> Dictionary:
 		return {"ok": false}
 	var guid: String = _guid_from_collider(hit.get("collider"))
 	if guid == "":
+		return {"ok": false}
+	if _edit_guid != "" and guid != _edit_guid:
 		return {"ok": false}
 	var fi: int = int(hit.get("face_index", -1))
 	if fi < 0:
@@ -183,7 +202,9 @@ func _show_face_hover_mesh(hit: Dictionary, mat: StandardMaterial3D) -> void:
 	_face_hover_mi.visible = true
 
 
-func _triangle_hover_mesh(mi: MeshInstance3D, face_idx: int, hit_normal_world: Vector3) -> ArrayMesh:
+func _triangle_hover_mesh(
+	mi: MeshInstance3D, face_idx: int, hit_normal_world: Vector3
+) -> ArrayMesh:
 	var src: Mesh = mi.mesh
 	if src == null or src.get_surface_count() < 1:
 		return null
@@ -258,6 +279,22 @@ func selected_guid() -> String:
 	return _selected_guid
 
 
+func edit_target_guid() -> String:
+	return _edit_guid
+
+
+func _refresh_entity_overlay(guid: String) -> void:
+	if guid == "" or not _entities.has(guid):
+		return
+	var mi: MeshInstance3D = _entities[guid]
+	if guid == _edit_guid:
+		mi.material_overlay = _edit_highlight
+	elif guid == _selected_guid:
+		mi.material_overlay = _highlight
+	else:
+		mi.material_overlay = null
+
+
 func _store_topo_ids(guid: String, mesh_dict: Dictionary) -> void:
 	var raw: Variant = mesh_dict.get("topo_ids", [])
 	var arr: Array = []
@@ -319,6 +356,17 @@ func _highlight_material() -> StandardMaterial3D:
 	mat.emission = Color(1.0, 0.75, 0.05)
 	mat.emission_energy_multiplier = 0.35
 	mat.roughness = 0.5
+	return mat
+
+
+func _edit_highlight_material() -> StandardMaterial3D:
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.15, 0.62, 1.0, 0.42)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(0.1, 0.5, 1.0)
+	mat.emission_energy_multiplier = 0.6
+	mat.roughness = 0.45
 	return mat
 
 

@@ -10,6 +10,7 @@ var _wall_tool: Node
 var _push_pull_tool: Node
 var _muros_tree_parent: TreeItem
 var _wall_tree_items: Dictionary = {}  # guid -> TreeItem
+var _edit_mode_guid: String = ""
 
 @onready var _ribbon_tabs: TabBar = $%RibbonTabs
 @onready var _ribbon_tools_inicio: Control = $%RibbonToolsInicio
@@ -25,10 +26,9 @@ var _wall_tree_items: Dictionary = {}  # guid -> TreeItem
 @onready var _prop_guid_label: Label = $%PropGuidLabel
 @onready var _prop_type_label: Label = $%PropTypeLabel
 @onready var _prop_dims_label: Label = $%PropDimsLabel
-@onready var _camera: Camera3D = $UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World/Camera3D
-@onready var _project_view: Node3D = (
-	$UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World/ProjectView
-)
+@onready var _edit_mode_button: Button = $%EditModeButton
+@onready var _camera: Camera3D = %Camera3D
+@onready var _project_view: Node3D = %ProjectView
 @onready var _viewport_container: SubViewportContainer = $%ViewportContainer
 @onready var _subviewport: SubViewport = $%SubViewport
 
@@ -59,6 +59,7 @@ func _ready() -> void:
 	_wall_button.pressed.connect(_on_create_wall_pressed)
 	_push_pull_button.pressed.connect(_on_push_pull_pressed)
 	_save_button.pressed.connect(_on_save_pressed)
+	_edit_mode_button.pressed.connect(_on_edit_mode_button_pressed)
 	_viewport_container.gui_input.connect(_on_viewport_container_gui_input)
 	_project_tree.item_selected.connect(_on_project_tree_item_selected)
 
@@ -72,6 +73,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var k: InputEventKey = event as InputEventKey
 		if k.pressed and k.keycode == KEY_Z and k.ctrl_pressed and not k.shift_pressed:
 			_do_undo_async()
+		elif k.pressed and k.keycode == KEY_ESCAPE and _is_edit_mode_active():
+			_exit_edit_mode("Modo edición: cerrado")
 
 
 func _do_undo_async() -> void:
@@ -135,6 +138,8 @@ func _on_project_tree_item_selected() -> void:
 	var md: Variant = item.get_metadata(0)
 	if md is String and _is_wall_guid(md):
 		_project_view.set_selection(md)
+		if _is_edit_mode_active() and md != _edit_mode_guid:
+			_exit_edit_mode("")
 		_refresh_properties_panel()
 		_log_label.text = "Selección (árbol): %s" % md
 
@@ -159,10 +164,14 @@ func _refresh_properties_panel() -> void:
 		_prop_guid_label.text = "GlobalId: —"
 		_prop_type_label.text = "Tipo: —"
 		_prop_dims_label.text = "Geometría: —"
+		_edit_mode_button.text = "Editar elemento"
+		_edit_mode_button.disabled = true
 		return
 	_prop_guid_label.text = "GlobalId: %s" % guid
 	_prop_type_label.text = "Tipo: IfcWall"
 	_prop_dims_label.text = "Geometría: (detalle vía RPC en Fase 2)"
+	_edit_mode_button.disabled = false
+	_edit_mode_button.text = "Salir de edición" if _edit_mode_guid == guid else "Editar elemento"
 
 
 func _refresh_status() -> void:
@@ -197,11 +206,13 @@ func _on_create_wall_pressed() -> void:
 	if _wall_tool.is_active():
 		_wall_tool.deactivate()
 		_project_view.clear_selection()
+		_exit_edit_mode("")
 		_refresh_properties_panel()
 		_log_label.text = "Crear muro: cancelado"
 		return
 	_push_pull_tool.deactivate()
 	_project_view.clear_selection()
+	_exit_edit_mode("")
 	_refresh_properties_panel()
 	_wall_tool.activate()
 	_log_label.text = "Crea muro: clickea P1 luego P2 en el viewport"
@@ -212,11 +223,14 @@ func _on_push_pull_pressed() -> void:
 		_push_pull_tool.deactivate()
 		_log_label.text = "Push/Pull: cancelado"
 		return
+	if not _is_edit_mode_active():
+		_log_label.text = "Entra en modo edición para usar Push/Pull."
+		return
 	_wall_tool.deactivate()
-	_project_view.clear_selection()
+	_project_view.set_selection(_edit_mode_guid)
 	_refresh_properties_panel()
-	_push_pull_tool.activate()
-	_log_label.text = "Push/Pull: pasa el raton sobre la cara; clic para fijarla."
+	_push_pull_tool.activate(_edit_mode_guid)
+	_log_label.text = "Push/Pull: elige una cara del elemento en edición."
 
 
 func _on_save_pressed() -> void:
@@ -258,9 +272,14 @@ func _on_viewport_container_gui_input(event: InputEvent) -> void:
 				_push_pull_tool.handle_viewport_click(pos)
 			else:
 				var picked: String = _project_view.pick_entity_at_screen(_camera, pos)
+				var is_double_click: bool = mb.double_click and picked != ""
 				_sync_tree_selection(picked)
+				if _is_edit_mode_active() and picked != _edit_mode_guid:
+					_exit_edit_mode("")
 				_refresh_properties_panel()
-				if picked != "":
+				if is_double_click:
+					_enter_edit_mode(picked)
+				elif picked != "":
 					_log_label.text = "Seleccionado: %s" % picked
 				else:
 					_log_label.text = "Sin selección (clic en vacío)"
@@ -277,3 +296,39 @@ func _on_wall_created(guid: String) -> void:
 	_project_view.set_selection(guid)
 	_refresh_properties_panel()
 	_log_label.text = "Muro creado: %s (total=%d)" % [guid, _project_view.entity_count()]
+
+
+func _on_edit_mode_button_pressed() -> void:
+	var guid: String = _project_view.selected_guid()
+	if _is_edit_mode_active():
+		_exit_edit_mode("Modo edición: cerrado")
+	elif guid != "":
+		_enter_edit_mode(guid)
+
+
+func _enter_edit_mode(guid: String) -> void:
+	if guid == "" or not _project_view.has_entity(guid):
+		return
+	_wall_tool.deactivate()
+	_push_pull_tool.deactivate()
+	_edit_mode_guid = guid
+	_project_view.set_selection(guid)
+	_project_view.set_edit_target(guid)
+	_sync_tree_selection(guid)
+	_refresh_properties_panel()
+	_log_label.text = "Modo edición: %s. Usa Push/Pull o Esc para salir." % guid
+
+
+func _exit_edit_mode(message: String) -> void:
+	if _edit_mode_guid == "":
+		return
+	_edit_mode_guid = ""
+	_push_pull_tool.deactivate()
+	_project_view.clear_edit_target()
+	_refresh_properties_panel()
+	if message != "":
+		_log_label.text = message
+
+
+func _is_edit_mode_active() -> bool:
+	return _edit_mode_guid != ""

@@ -259,6 +259,12 @@ layout_mode = 2
 autowrap_mode = 2
 text = "Geometría: (pendiente RPC en Fase 2)"
 
+[node name="EditModeButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Editar elemento"
+disabled = true
+
 [node name="StatusBar" type="PanelContainer" parent="UI/Root"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 30)
