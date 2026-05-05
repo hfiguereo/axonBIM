@@ -9,6 +9,10 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Godot: paquete inicial de iconos SVG propios para acciones de Fase 2
+  (Crear muro, Push/Pull, Editar elemento, Guardar IFC, Ping backend, Undo,
+  estados de backend y selección), con guía visual y atribuciones bajo
+  `frontend/assets/`.
 - Godot: modo edición por elemento para Fase 2. Se entra con doble clic sobre
   un elemento seleccionado o desde el botón `Editar elemento` en Propiedades; `Esc`
   o el mismo botón salen del modo. Push/Pull queda limitado al elemento en edición.

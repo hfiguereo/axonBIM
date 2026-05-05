@@ -1,7 +1,12 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/main_scene.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/project_view.gd" id="2"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_ping_backend.svg" id="3"]
+[ext_resource type="Texture2D" path="res://assets/icons/tools/tool_create_wall.svg" id="4"]
+[ext_resource type="Texture2D" path="res://assets/icons/tools/tool_push_pull.svg" id="5"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_save_ifc.svg" id="6"]
+[ext_resource type="Texture2D" path="res://assets/icons/tools/tool_edit_element.svg" id="7"]
 
 [sub_resource type="Environment" id="Environment_3d"]
 background_mode = 1
@@ -89,6 +94,7 @@ text = "Sistema"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Ping backend"
+icon = ExtResource("3")
 
 [node name="RttLabel" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelSistema/VBoxSistema"]
 unique_name_in_owner = true
@@ -113,11 +119,13 @@ text = "Modelado"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Crear muro"
+icon = ExtResource("4")
 
 [node name="PushPullButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado/VBoxModelado"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Push / Pull"
+icon = ExtResource("5")
 
 [node name="PanelArchivo" type="PanelContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio"]
 layout_mode = 2
@@ -136,6 +144,7 @@ text = "Proyecto"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Guardar IFC..."
+icon = ExtResource("6")
 
 [node name="RibbonToolsPlaceholder" type="CenterContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack"]
 unique_name_in_owner = true
@@ -263,6 +272,7 @@ text = "Geometría: (pendiente RPC en Fase 2)"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Editar elemento"
+icon = ExtResource("7")
 disabled = true
 
 [node name="StatusBar" type="PanelContainer" parent="UI/Root"]
