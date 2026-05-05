@@ -122,7 +122,10 @@ func _submit(vec: Vector3) -> void:
 	var result: Dictionary = resp["result"]
 	var guid: String = str(result.get("guid", _pending_guid))
 	var mesh_dict: Dictionary = result["mesh"] as Dictionary
+	var topo_map: Dictionary = result.get("topo_map", {}) as Dictionary
 	_project_view.replace_entity_mesh(guid, mesh_dict)
+	if guid == _pending_guid:
+		_project_view.remap_active_face_topo(_pending_topo, topo_map)
 	_project_view.set_selection(guid)
 	_active = false
 	_step = 0

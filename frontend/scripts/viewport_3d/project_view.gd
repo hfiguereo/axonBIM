@@ -25,6 +25,7 @@ var _hover_preview_mat: StandardMaterial3D = _face_hover_preview_material()
 var _hover_locked_mat: StandardMaterial3D = _face_hover_locked_material()
 var _selected_guid: String = ""
 var _edit_guid: String = ""
+var _active_face_topo: Dictionary = {}  # guid -> topo_id de la última cara editada.
 var _face_hover_mi: MeshInstance3D
 var _face_hover_locked: bool = false
 
@@ -64,6 +65,7 @@ func remove_entity(guid: String) -> void:
 		_selected_guid = ""
 	if _edit_guid == guid:
 		_edit_guid = ""
+	_active_face_topo.erase(guid)
 	_triangle_topo.erase(guid)
 	var node: MeshInstance3D = _entities[guid]
 	node.queue_free()
@@ -281,6 +283,31 @@ func selected_guid() -> String:
 
 func edit_target_guid() -> String:
 	return _edit_guid
+
+
+func set_active_face_topo(guid: String, topo_id: String) -> void:
+	if guid == "" or topo_id == "" or not has_topo_id(guid, topo_id):
+		_active_face_topo.erase(guid)
+		return
+	_active_face_topo[guid] = topo_id
+
+
+func active_face_topo(guid: String) -> String:
+	return str(_active_face_topo.get(guid, ""))
+
+
+func remap_active_face_topo(guid: String, old_topo_id: String, topo_map: Dictionary) -> void:
+	var current_topo_id: String = active_face_topo(guid)
+	if current_topo_id == "":
+		current_topo_id = old_topo_id
+	if current_topo_id == "" or not topo_map.has(current_topo_id):
+		return
+	set_active_face_topo(guid, str(topo_map[current_topo_id]))
+
+
+func has_topo_id(guid: String, topo_id: String) -> bool:
+	var topos: Array = _triangle_topo.get(guid, []) as Array
+	return topo_id in topos
 
 
 func _refresh_entity_overlay(guid: String) -> void:
