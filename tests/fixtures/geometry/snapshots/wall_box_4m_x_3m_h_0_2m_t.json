@@ -113,18 +113,18 @@
       0.0
     ],
     "topo_ids": [
-      "a4ae85ec9d60ba5b0ab41c7f060e18c9872b406c",
-      "a4ae85ec9d60ba5b0ab41c7f060e18c9872b406c",
-      "05f1ac1ec7fb7df9bf76b32ec9de4694a7fb66f8",
-      "05f1ac1ec7fb7df9bf76b32ec9de4694a7fb66f8",
-      "bcd81682d9695e5476b12ea5e4ee79af907c1b42",
-      "bcd81682d9695e5476b12ea5e4ee79af907c1b42",
-      "7d91a2be9e03d6baef9f169f238bcb41d155ece2",
-      "7d91a2be9e03d6baef9f169f238bcb41d155ece2",
-      "5a9c8dfa7409e6482b7da75c1c6dfa8723cf062e",
-      "5a9c8dfa7409e6482b7da75c1c6dfa8723cf062e",
-      "fef1a1c833d712c96549091b15fe2051a959c38d",
-      "fef1a1c833d712c96549091b15fe2051a959c38d"
+      "a1c26096325f6785",
+      "a1c26096325f6785",
+      "ac4b83a6dfd9800b",
+      "ac4b83a6dfd9800b",
+      "1a9c2fda2402b163",
+      "1a9c2fda2402b163",
+      "36ae5862c440cb2b",
+      "36ae5862c440cb2b",
+      "6653b8981c430d54",
+      "6653b8981c430d54",
+      "98a41b478e0f986b",
+      "98a41b478e0f986b"
     ],
     "vertices": [
       0.0,
@@ -202,6 +202,6 @@
     ]
   },
   "note": "Muro caja base: p1=(0,0,0), p2=(4,0,0), h=3, t=0.2.",
-  "schema": 1,
+  "schema": 2,
   "tolerance_m": 1e-06
 }

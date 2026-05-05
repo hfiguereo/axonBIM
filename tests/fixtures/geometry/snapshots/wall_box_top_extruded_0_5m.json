@@ -113,18 +113,18 @@
       0.0
     ],
     "topo_ids": [
-      "a4ae85ec9d60ba5b0ab41c7f060e18c9872b406c",
-      "a4ae85ec9d60ba5b0ab41c7f060e18c9872b406c",
-      "18e7891270a498b93e0917dbcc5f0306e7978025",
-      "18e7891270a498b93e0917dbcc5f0306e7978025",
-      "38cf94af3697075e0a6a7c9af2a8f19b4d3ce10d",
-      "38cf94af3697075e0a6a7c9af2a8f19b4d3ce10d",
-      "3874b06c2823198b35fd5e05738b0a2da4e37de8",
-      "3874b06c2823198b35fd5e05738b0a2da4e37de8",
-      "62b07a5b9f36978d6a6b549d80bed87719cf074a",
-      "62b07a5b9f36978d6a6b549d80bed87719cf074a",
-      "1e93bf2f84f71424da6f517665f619c5f20cd52e",
-      "1e93bf2f84f71424da6f517665f619c5f20cd52e"
+      "a1c26096325f6785",
+      "a1c26096325f6785",
+      "7ac6a4a73fb27164",
+      "7ac6a4a73fb27164",
+      "da01da7bd589880e",
+      "da01da7bd589880e",
+      "d83e8f8c40fdb10f",
+      "d83e8f8c40fdb10f",
+      "f48386b342f7d17a",
+      "f48386b342f7d17a",
+      "9b3e4108e87c02b8",
+      "9b3e4108e87c02b8"
     ],
     "vertices": [
       0.0,
@@ -202,13 +202,13 @@
     ]
   },
   "note": "Muro tras extruir cara superior +0.5 m.",
-  "schema": 1,
+  "schema": 2,
   "tolerance_m": 1e-06,
   "topo_map": {
-    "05f1ac1ec7fb7df9bf76b32ec9de4694a7fb66f8": "18e7891270a498b93e0917dbcc5f0306e7978025",
-    "5a9c8dfa7409e6482b7da75c1c6dfa8723cf062e": "62b07a5b9f36978d6a6b549d80bed87719cf074a",
-    "7d91a2be9e03d6baef9f169f238bcb41d155ece2": "3874b06c2823198b35fd5e05738b0a2da4e37de8",
-    "bcd81682d9695e5476b12ea5e4ee79af907c1b42": "38cf94af3697075e0a6a7c9af2a8f19b4d3ce10d",
-    "fef1a1c833d712c96549091b15fe2051a959c38d": "1e93bf2f84f71424da6f517665f619c5f20cd52e"
+    "1a9c2fda2402b163": "da01da7bd589880e",
+    "36ae5862c440cb2b": "d83e8f8c40fdb10f",
+    "6653b8981c430d54": "f48386b342f7d17a",
+    "98a41b478e0f986b": "9b3e4108e87c02b8",
+    "ac4b83a6dfd9800b": "7ac6a4a73fb27164"
   }
 }

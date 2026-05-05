@@ -71,6 +71,9 @@ def wall_box_mesh(
     p2: Vec3,
     height: float,
     thickness: float,
+    *,
+    parent_guid: str = "",
+    op_signature: str = "wall_box_mesh",
 ) -> Mesh:
     """Genera la mesh de un muro recto entre ``p1`` y ``p2``.
 
@@ -114,8 +117,8 @@ def wall_box_mesh(
     ]
 
     mesh = Mesh()
-    for v0, v1, v2, v3, normal in faces:
-        _append_quad(mesh, v0, v1, v2, v3, normal)
+    for face_index, (v0, v1, v2, v3, normal) in enumerate(faces):
+        _append_quad(mesh, v0, v1, v2, v3, normal, parent_guid, f"{op_signature}:face:{face_index}")
     return mesh
 
 
@@ -126,6 +129,8 @@ def _append_quad(
     v2: Vec3,
     v3: Vec3,
     normal: Vec3,
+    parent_guid: str,
+    op_signature: str,
 ) -> None:
     base_index = mesh.vertex_count
     for v in (v0, v1, v2, v3):
@@ -148,7 +153,14 @@ def _append_quad(
         (v0[2] + v1[2] + v2[2] + v3[2]) / 4.0,
     )
     area = _quad_area(v0, v1, v2, v3)
-    topo_id = compute_topo_id(centroid, area, normal)
+    topo_id = compute_topo_id(
+        centroid,
+        area,
+        normal,
+        entity_type="FACE",
+        parent_guid=parent_guid,
+        op_signature=op_signature,
+    )
     mesh.topo_ids.extend([topo_id, topo_id])
 
 
