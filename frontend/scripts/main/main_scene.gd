@@ -6,6 +6,22 @@ extends Node
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
 const PushPullTool := preload("res://scripts/tools/push_pull_tool.gd")
 
+const UI_SHELL: Color = Color(0.055, 0.071, 0.096, 1.0)
+const UI_PANEL: Color = Color(0.078, 0.102, 0.137, 1.0)
+const UI_PANEL_ELEVATED: Color = Color(0.102, 0.133, 0.176, 1.0)
+const UI_BUTTON: Color = Color(0.118, 0.157, 0.208, 1.0)
+const UI_BUTTON_HOVER: Color = Color(0.150, 0.207, 0.278, 1.0)
+const UI_BUTTON_PRESSED: Color = Color(0.070, 0.183, 0.255, 1.0)
+const UI_ACCENT_BLUE: Color = Color(0.219, 0.741, 0.973, 1.0)
+const UI_ACCENT_AMBER: Color = Color(0.961, 0.620, 0.043, 1.0)
+const UI_BORDER: Color = Color(0.169, 0.227, 0.298, 1.0)
+const UI_TEXT: Color = Color(0.898, 0.945, 1.0, 1.0)
+const UI_MUTED: Color = Color(0.580, 0.647, 0.725, 1.0)
+const VIEWPORT_SKY_TOP: Color = Color(0.012, 0.039, 0.090, 1.0)
+const VIEWPORT_SKY_HORIZON: Color = Color(0.055, 0.137, 0.210, 1.0)
+const VIEWPORT_GROUND_HORIZON: Color = Color(0.045, 0.071, 0.094, 1.0)
+const VIEWPORT_GROUND_BOTTOM: Color = Color(0.015, 0.019, 0.027, 1.0)
+
 var _wall_tool: Node
 var _push_pull_tool: Node
 var _muros_tree_parent: TreeItem
@@ -31,10 +47,14 @@ var _edit_mode_guid: String = ""
 @onready var _project_view: Node3D = %ProjectView
 @onready var _viewport_container: SubViewportContainer = $%ViewportContainer
 @onready var _subviewport: SubViewport = $%SubViewport
+@onready var _world_environment: WorldEnvironment = %WorldEnvironment
+@onready var _grid: MeshInstance3D = %Grid
+@onready var _light: DirectionalLight3D = %Light
 
 
 func _ready() -> void:
 	Logger.info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
+	_apply_visual_polish()
 
 	_ribbon_tabs.set_tab_title(0, "Inicio")
 	_ribbon_tabs.set_tab_title(1, "Insertar")
@@ -66,6 +86,145 @@ func _ready() -> void:
 	_build_project_tree()
 	_refresh_status()
 	_refresh_properties_panel()
+
+
+func _apply_visual_polish() -> void:
+	_apply_ui_polish()
+	_apply_viewport_polish()
+
+
+func _apply_ui_polish() -> void:
+	_apply_panel_style($UI/Root/Ribbon/TitleBar, UI_SHELL, UI_BORDER, 0)
+	_apply_panel_style($UI/Root/StatusBar, UI_PANEL_ELEVATED, UI_ACCENT_BLUE, 0)
+	_apply_panel_style(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelSistema,
+		UI_PANEL,
+		UI_BORDER,
+		10
+	)
+	_apply_panel_style(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado,
+		UI_PANEL,
+		UI_BORDER,
+		10
+	)
+	_apply_panel_style(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo,
+		UI_PANEL,
+		UI_BORDER,
+		10
+	)
+	_apply_panel_style($UI/Root/Workspace/MainSplit/LeftDock/LeftDockHeader, UI_PANEL, UI_BORDER, 8)
+	_apply_panel_style(
+		$UI/Root/Workspace/MainSplit/InnerSplit/RightDock/RightDockHeader, UI_PANEL, UI_BORDER, 8
+	)
+	_apply_panel_style(_project_tree, UI_PANEL, UI_BORDER, 8)
+	_apply_panel_style(
+		$UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll, UI_PANEL, UI_BORDER, 8
+	)
+	_apply_panel_style(_viewport_container, Color(0.020, 0.035, 0.055, 1.0), UI_ACCENT_BLUE, 10)
+	_apply_button_style(_ping_button, UI_ACCENT_BLUE)
+	_apply_button_style(_wall_button, UI_ACCENT_BLUE)
+	_apply_button_style(_push_pull_button, UI_ACCENT_AMBER)
+	_apply_button_style(_save_button, UI_ACCENT_BLUE)
+	_apply_button_style(_edit_mode_button, UI_ACCENT_AMBER)
+	_style_label($UI/Root/Ribbon/TitleBar/AppTitle, UI_TEXT)
+	_style_label(_status_label, UI_TEXT)
+	_style_label(_rtt_label, UI_MUTED)
+	_style_label(_log_label, UI_TEXT)
+	_style_label($UI/Root/Workspace/MainSplit/LeftDock/LeftDockHeader/LeftDockTitle, UI_TEXT)
+	_style_label(
+		$UI/Root/Workspace/MainSplit/InnerSplit/RightDock/RightDockHeader/RightDockTitle, UI_TEXT
+	)
+	_style_project_tree()
+
+
+func _apply_viewport_polish() -> void:
+	var env: Environment = _world_environment.environment
+	if env == null:
+		env = Environment.new()
+		_world_environment.environment = env
+	var sky_material: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = VIEWPORT_SKY_TOP
+	sky_material.sky_horizon_color = VIEWPORT_SKY_HORIZON
+	sky_material.ground_horizon_color = VIEWPORT_GROUND_HORIZON
+	sky_material.ground_bottom_color = VIEWPORT_GROUND_BOTTOM
+	sky_material.sun_angle_max = 12.0
+	sky_material.sun_curve = 0.08
+	sky_material.sun_energy_multiplier = 0.35
+	var sky: Sky = Sky.new()
+	sky.sky_material = sky_material
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_energy = 0.65
+	_light.light_color = Color(0.780, 0.880, 1.0, 1.0)
+	_light.light_energy = 1.35
+	_grid.material_override = _grid_material()
+
+
+func _apply_panel_style(control: Control, bg: Color, border: Color, radius: int) -> void:
+	control.add_theme_stylebox_override("panel", _stylebox(bg, border, 1, radius))
+
+
+func _apply_button_style(button: Button, accent: Color) -> void:
+	button.add_theme_stylebox_override("normal", _stylebox(UI_BUTTON, UI_BORDER, 1, 8))
+	button.add_theme_stylebox_override("hover", _stylebox(UI_BUTTON_HOVER, accent, 1, 8))
+	button.add_theme_stylebox_override("pressed", _stylebox(UI_BUTTON_PRESSED, accent, 2, 8))
+	button.add_theme_stylebox_override("disabled", _stylebox(UI_PANEL, UI_BORDER, 1, 8))
+	button.add_theme_color_override("font_color", UI_TEXT)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.add_theme_color_override("font_disabled_color", UI_MUTED)
+	button.add_theme_color_override("icon_normal_color", UI_TEXT)
+	button.add_theme_color_override("icon_hover_color", accent)
+	button.add_theme_color_override("icon_pressed_color", accent)
+	button.add_theme_constant_override("h_separation", 8)
+
+
+func _style_label(label: Label, color: Color) -> void:
+	label.add_theme_color_override("font_color", color)
+
+
+func _style_project_tree() -> void:
+	_project_tree.add_theme_color_override("font_color", UI_TEXT)
+	_project_tree.add_theme_color_override("font_selected_color", Color.WHITE)
+	_project_tree.add_theme_color_override("guide_color", Color(0.18, 0.25, 0.33, 1.0))
+	_project_tree.add_theme_color_override("relationship_line_color", Color(0.18, 0.25, 0.33, 1.0))
+	_project_tree.add_theme_color_override("drop_position_color", UI_ACCENT_BLUE)
+	_project_tree.add_theme_stylebox_override(
+		"selected", _stylebox(Color(0.072, 0.216, 0.306, 1.0), UI_ACCENT_BLUE, 1, 6)
+	)
+
+
+func _stylebox(bg: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
+	var box: StyleBoxFlat = StyleBoxFlat.new()
+	box.bg_color = bg
+	box.border_color = border
+	box.border_width_left = border_width
+	box.border_width_top = border_width
+	box.border_width_right = border_width
+	box.border_width_bottom = border_width
+	box.corner_radius_top_left = radius
+	box.corner_radius_top_right = radius
+	box.corner_radius_bottom_right = radius
+	box.corner_radius_bottom_left = radius
+	box.content_margin_left = 10.0
+	box.content_margin_right = 10.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 6.0
+	return box
+
+
+func _grid_material() -> StandardMaterial3D:
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.180, 0.320, 0.410, 0.34)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(0.060, 0.160, 0.230, 1.0)
+	mat.emission_energy_multiplier = 0.28
+	mat.roughness = 0.9
+	return mat
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
