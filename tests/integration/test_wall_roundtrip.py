@@ -183,6 +183,31 @@ async def test_extrude_face_rejects_stale_topo_id_over_rpc(running_server: Path)
     assert stale_resp["error"]["data"]["topo_id"] == old_top_face_topo_id
 
 
+async def test_extrude_face_rejects_degenerate_geometry_over_rpc(running_server: Path) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    positive_y_face_topo_id = wall_resp["result"]["mesh"]["topo_ids"][4]
+
+    resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": positive_y_face_topo_id, "vector": [0.0, -0.11, 0.0]},
+    )
+
+    assert "error" in resp
+    assert resp["error"]["code"] == ErrorCode.INVALID_PARAMS
+    assert "altura o grosor" in resp["error"]["message"]
+
+
 async def test_invalid_params_returns_structured_error(running_server: Path) -> None:
     resp = await _call(
         running_server,

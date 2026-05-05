@@ -65,6 +65,13 @@ def test_apply_extrusion_rejects_degenerate_thickness() -> None:
         apply_extrusion(spec, face_index=2, distance_m=-0.11)
 
 
+def test_apply_extrusion_rejects_degenerate_height() -> None:
+    spec = WallSpec(p1=(0.0, 0.0, 0.0), p2=(4.0, 0.0, 0.0), height=3.0, thickness=0.2)
+
+    with pytest.raises(ValueError, match="altura o grosor"):
+        apply_extrusion(spec, face_index=1, distance_m=-3.1)
+
+
 def test_extrude_wall_face_rejects_unknown_topo_id() -> None:
     spec = WallSpec(p1=(0.0, 0.0, 0.0), p2=(4.0, 0.0, 0.0), height=3.0, thickness=0.2)
     mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)

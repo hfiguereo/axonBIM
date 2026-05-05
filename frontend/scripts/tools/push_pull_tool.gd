@@ -7,6 +7,7 @@ extends Node
 signal status_message(text: String)
 signal push_pull_completed(success: bool, message: String)
 
+const INVALID_PARAMS: int = -32602
 const TOPO_ID_NOT_FOUND: int = -32002
 
 var _camera: Camera3D
@@ -128,4 +129,6 @@ func _format_submit_error(err: Variant) -> String:
 	var message: String = str(error_dict.get("message", "error desconocido"))
 	if code == TOPO_ID_NOT_FOUND:
 		return "La cara seleccionada ya no existe. Vuelve a seleccionar una cara."
+	if code == INVALID_PARAMS:
+		return "Push/Pull no puede aplicar esa distancia: %s" % message
 	return "Push/Pull fallo (%d): %s" % [code, message]
