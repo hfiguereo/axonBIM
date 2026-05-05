@@ -55,6 +55,10 @@ Detalle completo en [`.cursor/rules/00-architecture.mdc`](.cursor/rules/00-archi
 
 Proyecto en **Fase 1** (puente de comunicación). Ver [ROADMAP.md](ROADMAP.md).
 
+## Manual de usuario
+
+Guía de herramientas y flujos en la aplicación: [**Manual de AxonBIM**](docs/manual-de-axonbim.md).
+
 ## Cómo empezar (desarrollo)
 
 ### Prerrequisitos

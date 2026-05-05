@@ -231,6 +231,7 @@ Al cerrar cada fase del [`ROADMAP.md`](../../ROADMAP.md) se **debe** generar un 
 - [`CONTRIBUTING.md`](../../CONTRIBUTING.md) — flujo de trabajo humano (ramas, PRs, commits).
 - [`ROADMAP.md`](../../ROADMAP.md) — visión estratégica. Se actualiza solo al cerrar una fase o al replantear el horizonte.
 - [`docs/normativa/`](../../docs/normativa/) — extractos operativos de normativa BIM (ver regla [`30-bim-normativa.mdc`](30-bim-normativa.mdc)).
+- [`docs/manual-de-axonbim.md`](../../docs/manual-de-axonbim.md) — **Manual de AxonBIM**: ayuda al usuario (herramientas, flujos, enlaces). Criterio de mantenimiento en [`67-manual-de-axonbim.mdc`](67-manual-de-axonbim.mdc).
 
 ---
 
@@ -267,3 +268,4 @@ Cuando el agente genera código nuevo bajo estas reglas, **debe**:
 3. Si un TODO es apropiado, usar el formato rastreable con nombre y fecha.
 4. Si la tarea cierra una fase, recordar al usuario generar el reporte de fase antes del tag.
 5. Si la tarea toca protocolo RPC o decisiones arquitectónicas, proponer las actualizaciones de `jsonrpc-protocol.md` y/o un ADR en el mismo PR.
+6. Si la tarea cambia **comportamiento o textos visibles para el usuario** (herramientas Godot, flujos, atajos), actualizar o proponer actualización de [`docs/manual-de-axonbim.md`](../../docs/manual-de-axonbim.md) según [`67-manual-de-axonbim.mdc`](67-manual-de-axonbim.mdc).

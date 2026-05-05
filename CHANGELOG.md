@@ -9,6 +9,7 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Documentación: **Manual de AxonBIM** (`docs/manual-de-axonbim.md`) como guía de usuario de herramientas y flujos; regla de mantenimiento en `.cursor/rules/67-manual-de-axonbim.mdc` y enlace desde el README.
 - Backend: `geom.extrude_face` ahora sondea la malla equivalente generada con
   OCP/OpenCASCADE y reporta métricas `debug_ocp_mesh_stats` para validar la
   ruta B-Rep de Fase 2 sin romper la malla analítica existente.

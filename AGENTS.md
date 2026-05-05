@@ -17,7 +17,8 @@ Punto de entrada estándar para agentes de IA (Cursor, Codex, Claude Code, otros
    - `30-bim-normativa.mdc` — al trabajar en planos / estados de proyecto.
    - `40-testing.mdc` — al escribir o modificar tests.
    - `50-git-commits.mdc` — al proponer commits o PRs.
-   - `66-git-sincronizacion-solo-autor.mdc` — mismo autor / varias PCs; evitar divergencias.
+   - `66-git-sincronizacion-solo-autor.mdc` — mismo autor / varias PCs; evitar divergencias; ramas remotas múltiples (Cloud Agent, PRs).
+   - `67-manual-de-axonbim.mdc` — mantener `docs/manual-de-axonbim.md` alineado con la UI y flujos de usuario.
 
 2. **Documentación de referencia** (no son reglas, son specs):
    - `docs/architecture/jsonrpc-protocol.md` — esquema completo del puente.
@@ -27,6 +28,7 @@ Punto de entrada estándar para agentes de IA (Cursor, Codex, Claude Code, otros
    - `docs/normativa/mived/ccrd-vol-i.md` — extracto operativo del Código de Construcción RD.
    - `docs/normativa/glosario-organismos.md` — siglas (MIVED, MOPC, CONARTED, CODIA, etc.).
    - `docs/packaging/flatpak-pyinstaller.md` — distribución silenciosa.
+   - `docs/manual-de-axonbim.md` — manual de usuario (herramientas, flujos; debe mantenerse con cambios visibles).
 
 3. **Visión y planificación** (lectura humana, no para generar código):
    - `README.md` — qué es AxonBIM y por qué existe.
@@ -58,3 +60,4 @@ godot --headless --path frontend -s addons/gut/gut_cmdln.gd -gtest=res://tests/
 - Sobre secretos, logs o release → `.cursor/rules/14-seguridad-repositorio-y-despliegue.mdc`.
 - Sobre normativa → pregunta antes de inventar.
 - Sobre el roadmap → `ROADMAP.md`, no es información de codificación.
+- Sobre el manual de usuario → `docs/manual-de-axonbim.md` y `.cursor/rules/67-manual-de-axonbim.mdc`.

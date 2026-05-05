@@ -1,0 +1,39 @@
+---
+description: Mantener actualizado el Manual de AxonBIM (docs/manual-de-axonbim.md) cuando cambie la experiencia de usuario o la documentación de producto visible.
+alwaysApply: false
+---
+
+# Manual de AxonBIM — mantenimiento obligatorio
+
+## Documento canónico
+
+- Ruta: [`docs/manual-de-axonbim.md`](../../docs/manual-de-axonbim.md).
+- Título visible: **Manual de AxonBIM**.
+- Audiencia: usuario del software (no implementación interna salvo lo mínimo para entender flujos).
+
+## Cuándo actualizarlo (siempre que aplique)
+
+En el **mismo PR** que introduce el cambio, o en un PR de documentación **contiguo** que se mergee sin solución de continuidad:
+
+1. **Nueva o renombrada herramienta** en Godot (botón, modo, icono con comportamiento distinto).
+2. **Cambio de flujo** (orden de clics, requisito de modo edición, campos en Propiedades).
+3. **Atajos de teclado** expuestos al usuario o cambio de los existentes documentados.
+4. **Mensajes o estados** que definen expectativa de uso (conexión backend, errores recuperables con acción clara).
+5. **Requisitos de arranque** (puerto, variables de entorno, comandos de inicio) si el usuario final deja de poder inferirlos solo del README.
+
+## Qué no duplicar
+
+- No copiar texto literal de normas protegidas; enlazar a extractos en `docs/normativa/` en lenguaje propio.
+- No duplicar tablas completas del protocolo RPC: resumir en lenguaje de usuario y enlazar a `docs/architecture/jsonrpc-protocol.md`.
+- No sustituir al `README` para instalación detallada: el manual **resume** y **enlaza**.
+
+## Coherencia
+
+- Tras tocar el manual, revisar que `CHANGELOG.md` refleje el cambio de cara al usuario si el PR es `feat`, `fix` o cambio de comportamiento visible (`docs` del manual cuenta como documentación de producto).
+- Si el cambio solo corrige un typo en el manual, no hace falta ampliar el CHANGELOG salvo que mejore una instrucción crítica acordada en el PR.
+
+## Para el agente IA
+
+1. Si el usuario pide una funcionalidad que altera la UI o los flujos descritos en el manual, **proponer** actualización de `docs/manual-de-axonbim.md` en el mismo entregable.
+2. No inventar capacidades que el código o el CHANGELOG no respalden.
+3. Mantener tono **español**, claro, sin marketing (alineado con reportes de fase y regla de documentación).

@@ -9,19 +9,30 @@ alwaysApply: false
 
 Mantener **una sola línea de verdad** en `origin/develop` y evitar semanas de WIP sin publicar o dos historiales que divergen sin necesidad.
 
+## Política: una sola rama de trabajo por el mismo autor
+
+En AxonBIM, cuando el **mismo autor humano** es quien modela el flujo Git:
+
+1. **Rama de trabajo única:** todo el desarrollo que él gestiona va en **`develop`**. No se mantiene en paralelo en `origin` una segunda rama propia del tipo `feature/*`, `fix/*`, `docs/*`, etc., como “línea de trabajo viva” simultánea.
+2. **`main`** no es una segunda rama de trabajo diario: es la rama de **releases** (integración controlada desde `develop`, típicamente vía PR). El autor no alterna el día a día entre `main` y `develop` como dos frentes de desarrollo.
+3. **Ramas puntuales de automatización** (p. ej. `cursor/*` de Cloud Agent, dependabot): el autor **no las “maneja”** como ramas de carrera; las trata como **entregas**: merge a `develop` (o PR equivalente) y **borrado de la rama remota** en cuanto esté integrado, para volver a quedar solo con `develop` como ref de trabajo.
+4. Si hace falta experimentar sin ensuciar `develop`, puede usar **rama local sin push**, **stash** o una rama remota **única** y de vida corta, siempre con cierre explícito (merge a `develop` + borrado) antes de abrir otra.
+
+*Nota técnica:* GitHub puede seguir mostrando varias refs en el remoto por acciones ajenas o históricas; la política anterior define **qué ramas el autor considera activas bajo su control**, no un límite físico del servidor Git.
+
 ## Inicio de sesión de trabajo
 
 1. `git fetch origin`
-2. `git pull` en la rama de integración (`develop`), salvo que el flujo explícito sea una `feature/*` recién creada desde `develop` actualizado.
+2. `git checkout develop` y `git pull origin develop` antes de seguir escribiendo código o documentación versionada.
 
 ## Fin de sesión o cambio de máquina
 
 1. Commits pequeños con mensaje convencional (ver [50-git-commits.mdc](50-git-commits.mdc)).
-2. `git push origin develop` (o `origin/<rama>` activa). **No** usar `git push --force` a `main` ni `develop`.
+2. `git push origin develop`. **No** usar `git push --force` a `main` ni `develop`.
 
 ## WIP
 
-- No acumular cambios sin commit durante periodos largos; si el bloque no está listo, usar `git stash` con mensaje o una rama `feature/*` publicable.
+- No acumular cambios sin commit durante periodos largos; si el bloque no está listo, usar `git stash` con mensaje o **rama local** sin publicar en `origin` (alineado con la política de una sola rama remota de trabajo: `develop`).
 - Trabajo local sin push **no** está compartido ni respaldado en el remoto.
 
 ## Varias PCs, mismo usuario
@@ -29,7 +40,22 @@ Mantener **una sola línea de verdad** en `origin/develop` y evitar semanas de W
 - Tratar el remoto como canónico: antes de seguir en otra máquina, **pull** y solo entonces continuar.
 - Si hubo experimentación local no deseada, preferir ramas temporales o reset selectivo antes de mezclar con `develop`.
 
+## Por qué a veces se ven muchas refs en `origin` (sin romper la política)
+
+GitHub puede listar **varias ramas** aunque el autor **solo gestione `develop`**:
+
+- **`main`:** releases, no trabajo diario del autor (ver política arriba).
+- **`cursor/…` u otras** creadas por **Cloud Agent** u otras automatizaciones: refs temporales hasta merge + borrado.
+- **Restos** de PRs o bots (p. ej. dependabot) si no se borró la rama tras fusionar.
+
+**Reglas prácticas**
+
+1. Tras `git fetch --prune`, revisar `git branch -r`: la ref que debe quedar como **trabajo activo del autor** es `origin/develop`.
+2. Tras integrar una entrega ajena (`cursor/*`, etc.) en `develop`, **borrar** esa rama remota para no acumular ramas “vivas” innecesarias.
+3. Antes de borrar cualquier rama remota, confirmar que **no** contiene commits únicos no fusionados (`git log develop..origin/<rama>`).
+
 ## Para el agente
 
 - Al iniciar tareas que toquen muchos archivos, recordar al usuario si `develop` local puede estar desactualizada respecto a `origin/develop`.
 - No proponer force-push a ramas compartidas protegidas.
+- Si el usuario se sorprende por “muchas ramas”, recordar la **política** (solo `develop` como rama de trabajo del autor) y distinguir refs **históricas o automáticas**; sugerir `git fetch --prune` + inventario de `git branch -r` antes de limpiar.
