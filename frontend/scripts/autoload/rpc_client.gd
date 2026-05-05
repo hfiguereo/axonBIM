@@ -94,7 +94,7 @@ func call_rpc(
 	if not _is_connected:
 		await _wait_until_connected(CONNECT_WAIT_MS)
 	if not _is_connected:
-		Logger.warn("RpcClient: sin conexion al backend (¿arranco con make run?)")
+		AxonLogger.warn("RpcClient: sin conexion al backend (¿arranco con make run?)")
 		return _timeout_like_error(-32099, "backend no conectado")
 
 	_next_id += 1
@@ -123,7 +123,7 @@ func call_rpc(
 ## Envia una notificacion (sin id, sin respuesta esperada).
 func notify_rpc(method: String, params: Dictionary = {}) -> void:
 	if _port <= 0:
-		Logger.warn("RpcClient.notify_rpc('%s') sin TCP" % method)
+		AxonLogger.warn("RpcClient.notify_rpc('%s') sin TCP" % method)
 		return
 	if not _is_connected:
 		await _wait_until_connected(CONNECT_WAIT_MS)

@@ -22,7 +22,6 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-Logger="*res://scripts/autoload/logger.gd"
 RpcClient="*res://scripts/autoload/rpc_client.gd"
 
 [display]

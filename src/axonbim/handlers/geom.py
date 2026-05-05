@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -19,6 +20,8 @@ from axonbim.rpc.dispatcher import Dispatcher, RpcError
 from axonbim.rpc.models import ErrorCode
 
 _VEC3_LEN: Final[int] = 3
+# Umbral alineado con ``wall_extrude._MIN_DIM``: por debajo se considera vector nulo.
+_EXTRUDE_VECTOR_MIN_LEN: Final[float] = 1e-4
 
 
 class ExtrudeFaceParams(BaseModel):
@@ -40,6 +43,14 @@ class ExtrudeFaceParams(BaseModel):
 async def extrude_face(params: dict[str, Any]) -> dict[str, Any]:
     """Extruye una cara identificada por ``topo_id`` a lo largo de la normal exterior."""
     args = ExtrudeFaceParams.model_validate(params)
+
+    v0, v1, v2 = args.vector[0], args.vector[1], args.vector[2]
+    if math.hypot(math.hypot(v0, v1), v2) < _EXTRUDE_VECTOR_MIN_LEN:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            "vector de extrusion casi nulo",
+            data={"vector": list(args.vector)},
+        )
 
     mesh = topo_registry.mesh_for_topo_id(args.topo_id)
     if mesh is None:

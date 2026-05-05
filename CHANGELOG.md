@@ -63,6 +63,10 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Cambiado
 
+- Godot: paleta y ``StyleBoxFlat`` de cinta, docks, árbol y barra de estado
+  alineados a un boceto tipo escritorio BIM (antes en ``UI Ejemplo/``);
+  visor 3D con fondo más claro; anchuras mínimas de navegador y propiedades.
+  Detalle en ``docs/ui/UI-inspiration-notes.md``.
 - Godot: el renderer por defecto del proyecto pasa de **Forward+** (Vulkan) a
   **GL Compatibility** (OpenGL). En Fedora + Flatpak + GPU NVIDIA (p. ej. RTX
   movil) Vulkan suele terminar en ``SIGABRT`` en el binario ``godot-bin`` (ABRT),
@@ -74,6 +78,10 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Backend (Windows): ruta por defecto del socket Unix sin ``os.getuid`` y
   servidor RPC **solo TCP** cuando ``asyncio.start_unix_server`` no existe;
   tests de integración Unix se omiten en esa plataforma.
+- Godot **4.6+**: el autoload ``Logger`` chocaba con la clase nativa ``Logger``
+  del motor (errores de parseo en ``rpc_client.gd``, escena principal y
+  ``project_view.gd``). Se retira ``scripts/autoload/logger.gd`` del proyecto;
+  el frontend usa solo ``AxonLogger`` (`frontend/scripts/utils/axon_logger.gd`).
 - Tests integracion RPC: en macOS los ``tmp_path`` de pytest generan rutas
   Unix demasiado largas (``AF_UNIX path too long``). Los fixtures usan ahora
   sockets bajo ``tempfile.gettempdir()`` via ``tests/unix_socket_path.py``.

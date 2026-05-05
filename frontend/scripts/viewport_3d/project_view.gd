@@ -5,12 +5,14 @@ extends Node3D
 ## para poder actualizar o eliminar entidades en sprints futuros. Sprint 1.4.
 ##
 ## Fase 2: colisión trimesh para ``face_index`` estable; ``pick_face_at_screen`` devuelve
-## ``topo_id`` por triángulo. Resaltado de cara bajo el ratón (Push/Pull) vía ``MeshDataTool``.
+## ``topo_id`` (dos triángulos IFC comparten el mismo id por cara lógica de muro).
+## Resaltado y preview Push/Pull agrupan **todos** los triángulos con ese ``topo_id``.
 ## ``replace_entity_mesh`` refresca tras ``geom.extrude_face``.
 ##
 ## Los clics en el viewport se manejan en ``main_scene.gd`` vía
 ## ``SubViewportContainer.gui_input`` (ver ``docs/architecture/app-gui-viewport-patterns.md``).
 
+const AxonLogger := preload("res://scripts/utils/axon_logger.gd")
 const MeshBuilder := preload("res://scripts/viewport_3d/mesh_builder.gd")
 const ENTITY_NAME_PREFIX: String = "Entity_"
 const PICK_RAY_LENGTH_M: float = 500.0
@@ -28,11 +30,12 @@ var _edit_guid: String = ""
 var _active_face_topo: Dictionary = {}  # guid -> topo_id de la última cara editada.
 var _face_hover_mi: MeshInstance3D
 var _face_hover_locked: bool = false
+var _extr_preview_mi: MeshInstance3D
 
 
 func add_entity(guid: String, mesh_dict: Dictionary) -> void:
 	if _entities.has(guid):
-		Logger.warn("Entidad %s ya existe, se sobrescribe" % guid)
+		AxonLogger.warn("Entidad %s ya existe, se sobrescribe" % guid)
 		remove_entity(guid)
 
 	var instance: MeshInstance3D = MeshInstance3D.new()
@@ -47,7 +50,7 @@ func add_entity(guid: String, mesh_dict: Dictionary) -> void:
 
 func replace_entity_mesh(guid: String, mesh_dict: Dictionary) -> void:
 	if not _entities.has(guid):
-		Logger.warn("replace_entity_mesh: no existe %s" % guid)
+		AxonLogger.warn("replace_entity_mesh: no existe %s" % guid)
 		return
 	clear_face_hover()
 	var mi: MeshInstance3D = _entities[guid]
@@ -142,6 +145,7 @@ func clear_face_hover() -> void:
 	_face_hover_locked = false
 	if _face_hover_mi != null:
 		_face_hover_mi.visible = false
+	clear_extrusion_preview()
 
 
 func _hide_face_hover_preview_only() -> void:
@@ -180,15 +184,15 @@ func _ensure_face_hover_node() -> void:
 
 func _show_face_hover_mesh(hit: Dictionary, mat: StandardMaterial3D) -> void:
 	var guid: String = str(hit.get("guid", ""))
-	var fi: int = int(hit.get("face_index", -1))
-	if guid == "" or not _entities.has(guid) or fi < 0:
+	var topo_id: String = str(hit.get("topo_id", ""))
+	if guid == "" or topo_id == "" or not _entities.has(guid):
 		if _face_hover_locked:
 			clear_face_hover()
 		else:
 			_hide_face_hover_preview_only()
 		return
 	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
-	var tri_mesh: ArrayMesh = _triangle_hover_mesh(mi, fi, hit["normal"] as Vector3)
+	var tri_mesh: ArrayMesh = _logical_face_hover_mesh(mi, guid, topo_id, hit["normal"] as Vector3)
 	if tri_mesh == null:
 		if _face_hover_locked:
 			clear_face_hover()
@@ -204,8 +208,9 @@ func _show_face_hover_mesh(hit: Dictionary, mat: StandardMaterial3D) -> void:
 	_face_hover_mi.visible = true
 
 
-func _triangle_hover_mesh(
-	mi: MeshInstance3D, face_idx: int, hit_normal_world: Vector3
+## Malla de resaltado: todos los triángulos cuyo ``topo_id`` coincide (cara lógica de muro).
+func _logical_face_hover_mesh(
+	mi: MeshInstance3D, guid: String, topo_id: String, hit_normal_world: Vector3
 ) -> ArrayMesh:
 	var src: Mesh = mi.mesh
 	if src == null or src.get_surface_count() < 1:
@@ -213,9 +218,41 @@ func _triangle_hover_mesh(
 	var mdt: MeshDataTool = MeshDataTool.new()
 	if mdt.create_from_surface(src, 0) != OK:
 		return null
+	var topos: Array = _triangle_topo.get(guid, []) as Array
+	var fc: int = mdt.get_face_count()
+	var nt0: int = topos.size()
+	var n_faces: int = fc if fc < nt0 else nt0
+	var verts: PackedVector3Array = PackedVector3Array()
+	var norms: PackedVector3Array = PackedVector3Array()
+	var idx: PackedInt32Array = PackedInt32Array()
+	for fi: int in range(n_faces):
+		if str(topos[fi]) != topo_id:
+			continue
+		_append_oriented_tri_in_project_space(mi, mdt, fi, hit_normal_world, verts, norms, idx)
+	if verts.is_empty():
+		return null
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var out: ArrayMesh = ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return out
+
+
+func _append_oriented_tri_in_project_space(
+	mi: MeshInstance3D,
+	mdt: MeshDataTool,
+	face_idx: int,
+	hit_normal_world: Vector3,
+	verts: PackedVector3Array,
+	norms: PackedVector3Array,
+	idx: PackedInt32Array,
+) -> void:
 	var fc: int = mdt.get_face_count()
 	if face_idx < 0 or face_idx >= fc:
-		return null
+		return
 	var iv0: int = mdt.get_face_vertex(face_idx, 0)
 	var iv1: int = mdt.get_face_vertex(face_idx, 1)
 	var iv2: int = mdt.get_face_vertex(face_idx, 2)
@@ -224,7 +261,7 @@ func _triangle_hover_mesh(
 	var v2: Vector3 = mdt.get_vertex(iv2)
 	var nloc: Vector3 = (v1 - v0).cross(v2 - v0)
 	if nloc.length_squared() < 1e-12:
-		return null
+		return
 	nloc = nloc.normalized()
 	var xf: Transform3D = mi.global_transform
 	var n_world_geom: Vector3 = (xf.basis * nloc).normalized()
@@ -247,26 +284,160 @@ func _triangle_hover_mesh(
 	var ln: Vector3 = inv_pv.basis * gn
 	if ln.length_squared() > 1e-12:
 		ln = ln.normalized()
+	var b: int = verts.size()
+	verts.push_back(l0)
+	verts.push_back(l1)
+	verts.push_back(l2)
+	norms.push_back(ln)
+	norms.push_back(ln)
+	norms.push_back(ln)
+	idx.push_back(b)
+	idx.push_back(b + 1)
+	idx.push_back(b + 2)
+
+
+## Preview Push/Pull: cara lógica duplicada en el espacio desplazado por ``extrusion_world``.
+func clear_extrusion_preview() -> void:
+	if _extr_preview_mi != null:
+		_extr_preview_mi.visible = false
+
+
+func set_extrusion_preview(
+	guid: String, topo_id: String, extrusion_world: Vector3, hit_normal_world: Vector3
+) -> void:
+	if guid == "" or topo_id == "" or not _entities.has(guid):
+		clear_extrusion_preview()
+		return
+	if extrusion_world.length_squared() < 1e-12:
+		clear_extrusion_preview()
+		return
+	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
+	var shell: ArrayMesh = _logical_face_extrusion_preview_mesh(
+		mi, guid, topo_id, hit_normal_world, extrusion_world
+	)
+	if shell == null:
+		clear_extrusion_preview()
+		return
+	_ensure_extr_preview_node()
+	_extr_preview_mi.mesh = shell
+	_extr_preview_mi.material_override = _extrusion_preview_material()
+	_extr_preview_mi.position = Vector3.ZERO
+	_extr_preview_mi.rotation = Vector3.ZERO
+	_extr_preview_mi.scale = Vector3.ONE
+	_extr_preview_mi.visible = true
+
+
+func _ensure_extr_preview_node() -> void:
+	if _extr_preview_mi != null:
+		return
+	_extr_preview_mi = MeshInstance3D.new()
+	_extr_preview_mi.name = "ExtrusionPreview"
+	add_child(_extr_preview_mi)
+
+
+## Base + tapa desplazada (sin costados); suficiente para leer profundidad antes del segundo clic.
+func _logical_face_extrusion_preview_mesh(
+	mi: MeshInstance3D,
+	guid: String,
+	topo_id: String,
+	hit_normal_world: Vector3,
+	extrusion_world: Vector3,
+) -> ArrayMesh:
+	var src: Mesh = mi.mesh
+	if src == null or src.get_surface_count() < 1:
+		return null
+	var mdt: MeshDataTool = MeshDataTool.new()
+	if mdt.create_from_surface(src, 0) != OK:
+		return null
+	var topos: Array = _triangle_topo.get(guid, []) as Array
+	var fc: int = mdt.get_face_count()
+	var nt2: int = topos.size()
+	var n_faces2: int = fc if fc < nt2 else nt2
+	var verts: PackedVector3Array = PackedVector3Array()
+	var norms: PackedVector3Array = PackedVector3Array()
+	var idx: PackedInt32Array = PackedInt32Array()
+	var inv_pv: Transform3D = global_transform.affine_inverse()
+	var xf: Transform3D = mi.global_transform
+	for fi: int in range(n_faces2):
+		if str(topos[fi]) != topo_id:
+			continue
+		var iv0: int = mdt.get_face_vertex(fi, 0)
+		var iv1: int = mdt.get_face_vertex(fi, 1)
+		var iv2: int = mdt.get_face_vertex(fi, 2)
+		var v0: Vector3 = mdt.get_vertex(iv0)
+		var v1: Vector3 = mdt.get_vertex(iv1)
+		var v2: Vector3 = mdt.get_vertex(iv2)
+		var nloc: Vector3 = (v1 - v0).cross(v2 - v0)
+		if nloc.length_squared() < 1e-12:
+			continue
+		nloc = nloc.normalized()
+		var n_world_geom: Vector3 = (xf.basis * nloc).normalized()
+		var hit_n: Vector3 = hit_normal_world.normalized()
+		if hit_n.length_squared() > 1e-12 and n_world_geom.dot(hit_n) < 0.0:
+			nloc = -nloc
+		v0 += nloc * FACE_HOVER_OFFSET_M
+		v1 += nloc * FACE_HOVER_OFFSET_M
+		v2 += nloc * FACE_HOVER_OFFSET_M
+		var g0: Vector3 = xf * v0
+		var g1: Vector3 = xf * v1
+		var g2: Vector3 = xf * v2
+		var gn: Vector3 = xf.basis * nloc
+		if gn.length_squared() > 1e-12:
+			gn = gn.normalized()
+		var l0: Vector3 = inv_pv * g0
+		var l1: Vector3 = inv_pv * g1
+		var l2: Vector3 = inv_pv * g2
+		var ln: Vector3 = inv_pv.basis * gn
+		if ln.length_squared() > 1e-12:
+			ln = ln.normalized()
+		var b: int = verts.size()
+		verts.push_back(l0)
+		verts.push_back(l1)
+		verts.push_back(l2)
+		norms.push_back(ln)
+		norms.push_back(ln)
+		norms.push_back(ln)
+		idx.push_back(b)
+		idx.push_back(b + 1)
+		idx.push_back(b + 2)
+		var g0t: Vector3 = g0 + extrusion_world
+		var g1t: Vector3 = g1 + extrusion_world
+		var g2t: Vector3 = g2 + extrusion_world
+		var l0t: Vector3 = inv_pv * g0t
+		var l1t: Vector3 = inv_pv * g1t
+		var l2t: Vector3 = inv_pv * g2t
+		var bt: int = verts.size()
+		verts.push_back(l0t)
+		verts.push_back(l1t)
+		verts.push_back(l2t)
+		norms.push_back(ln)
+		norms.push_back(ln)
+		norms.push_back(ln)
+		idx.push_back(bt)
+		idx.push_back(bt + 1)
+		idx.push_back(bt + 2)
+	if verts.is_empty():
+		return null
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	var av: PackedVector3Array = PackedVector3Array()
-	av.push_back(l0)
-	av.push_back(l1)
-	av.push_back(l2)
-	var an: PackedVector3Array = PackedVector3Array()
-	an.push_back(ln)
-	an.push_back(ln)
-	an.push_back(ln)
-	var ix: PackedInt32Array = PackedInt32Array()
-	ix.push_back(0)
-	ix.push_back(1)
-	ix.push_back(2)
-	arrays[Mesh.ARRAY_VERTEX] = av
-	arrays[Mesh.ARRAY_NORMAL] = an
-	arrays[Mesh.ARRAY_INDEX] = ix
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_INDEX] = idx
 	var out: ArrayMesh = ArrayMesh.new()
 	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return out
+
+
+func _extrusion_preview_material() -> StandardMaterial3D:
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.35, 0.92, 0.45, 0.42)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.emission_enabled = true
+	mat.emission = Color(0.2, 0.75, 0.35)
+	mat.emission_energy_multiplier = 0.35
+	mat.roughness = 0.5
+	return mat
 
 
 func entity_count() -> int:

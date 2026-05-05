@@ -75,7 +75,7 @@ frontend/
 │   ├── tools/        # Push/Pull, selección, medición
 │   └── ui/           # paneles, menús, navegador de proyecto
 ├── scripts/
-│   ├── autoload/     # RpcClient, ProjectState, Logger
+│   ├── autoload/     # RpcClient (logs vía ``AxonLogger`` preload / class_name)
 │   ├── tools/
 │   └── ui/
 └── assets/

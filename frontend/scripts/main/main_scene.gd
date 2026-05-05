@@ -5,9 +5,14 @@ extends Node
 ##
 ## Integra viewport 3D con camara orbital (MMB + rueda), ribbon inicial,
 ## arbol de proyecto, panel de propiedades y herramientas de modelado.
+## Tema visual BIM (paleta y bordes) vía ``RibbonWorkspaceTheme``; ver
+## ``docs/ui/UI-inspiration-notes.md``.
 
+const AxonLogger := preload("res://scripts/utils/axon_logger.gd")
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
 const PushPullTool := preload("res://scripts/tools/push_pull_tool.gd")
+const ProceduralIcons := preload("res://scripts/ui/procedural_icons.gd")
+const RibbonWorkspaceTheme := preload("res://scripts/ui/ribbon_workspace_theme.gd")
 
 const UI_SHELL: Color = Color(0.055, 0.071, 0.096, 1.0)
 const UI_PANEL: Color = Color(0.078, 0.102, 0.137, 1.0)
@@ -55,10 +60,18 @@ var _edit_mode_guid: String = ""
 @onready var _world_environment: WorldEnvironment = %WorldEnvironment
 @onready var _grid: MeshInstance3D = %Grid
 @onready var _light: DirectionalLight3D = %Light
+@onready var _view_top_button: Button = $%ViewTopButton
+@onready var _view_front_button: Button = $%ViewFrontButton
+@onready var _view_right_button: Button = $%ViewRightButton
+@onready var _view_persp_button: Button = $%ViewPerspButton
+@onready var _view_reset_button: Button = $%ViewResetButton
 
 
 func _ready() -> void:
-	Logger.info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
+	AxonLogger.info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
+
+	RibbonWorkspaceTheme.apply_from_main(self)
+	_configure_toolbar_icons_and_tooltips()
 	_apply_visual_polish()
 
 	_ribbon_tabs.set_tab_title(0, "Inicio")
@@ -88,6 +101,11 @@ func _ready() -> void:
 	_push_pull_apply_distance_button.pressed.connect(_on_push_pull_apply_distance_pressed)
 	_viewport_container.gui_input.connect(_on_viewport_container_gui_input)
 	_project_tree.item_selected.connect(_on_project_tree_item_selected)
+	_view_top_button.pressed.connect(_set_camera_preset.bind("top"))
+	_view_front_button.pressed.connect(_set_camera_preset.bind("front"))
+	_view_right_button.pressed.connect(_set_camera_preset.bind("right"))
+	_view_persp_button.pressed.connect(_set_camera_preset.bind("persp"))
+	_view_reset_button.pressed.connect(_on_view_reset_pressed)
 
 	_build_project_tree()
 	_refresh_status()
@@ -241,15 +259,84 @@ func _grid_material() -> StandardMaterial3D:
 	return mat
 
 
+func _configure_toolbar_icons_and_tooltips() -> void:
+	# Toolbar de Fase 2: iconos procedurales legibles y texto secundario minimizado.
+	_ping_button.icon = ProceduralIcons.build_push_pull_icon()
+	_ping_button.text = ""
+	_ping_button.custom_minimum_size = Vector2(52, 44)
+	_ping_button.tooltip_text = "Ping backend\nVerifica conexión RPC y mide RTT."
+
+	_wall_button.icon = ProceduralIcons.build_wall_icon()
+	_wall_button.text = ""
+	_wall_button.custom_minimum_size = Vector2(52, 44)
+	_wall_button.tooltip_text = "Crear muro\nClic en P1 y P2 en el viewport."
+
+	_push_pull_button.icon = ProceduralIcons.build_push_pull_icon()
+	_push_pull_button.text = ""
+	_push_pull_button.custom_minimum_size = Vector2(52, 44)
+	_push_pull_button.tooltip_text = (
+		"Push/Pull\nSelecciona una cara y arrastra profundidad."
+	)
+
+	_save_button.icon = ProceduralIcons.build_save_icon()
+	_save_button.text = ""
+	_save_button.custom_minimum_size = Vector2(52, 44)
+	_save_button.tooltip_text = "Guardar IFC\nExporta el modelo actual a archivo .ifc."
+
+	_view_top_button.tooltip_text = "Vista superior (tecla 1)"
+	_view_front_button.tooltip_text = "Vista frontal (tecla 2)"
+	_view_right_button.tooltip_text = "Vista derecha (tecla 3)"
+	_view_persp_button.tooltip_text = "Vista perspectiva (tecla 4)"
+	_view_reset_button.tooltip_text = "Reiniciar cámara/pivote (tecla R)"
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		var k: InputEventKey = event as InputEventKey
-		if k.pressed and k.keycode == KEY_Z and k.ctrl_pressed and k.shift_pressed:
-			_do_redo_async()
-		elif k.pressed and k.keycode == KEY_Z and k.ctrl_pressed:
-			_do_undo_async()
-		elif k.pressed and k.keycode == KEY_ESCAPE and _is_edit_mode_active():
-			_exit_edit_mode("Modo edición: cerrado")
+	if not (event is InputEventKey):
+		return
+	var k: InputEventKey = event as InputEventKey
+	if not k.pressed:
+		return
+	if k.keycode == KEY_Z and k.ctrl_pressed and k.shift_pressed:
+		_do_redo_async()
+		return
+	if k.keycode == KEY_Z and k.ctrl_pressed:
+		_do_undo_async()
+		return
+	if k.keycode == KEY_ESCAPE and _is_edit_mode_active():
+		_exit_edit_mode("Modo edición: cerrado")
+		return
+	if _camera != null and _camera.has_method("set_view_preset"):
+		match k.keycode:
+			KEY_1:
+				_set_camera_preset("top")
+			KEY_2:
+				_set_camera_preset("front")
+			KEY_3:
+				_set_camera_preset("right")
+			KEY_4:
+				_set_camera_preset("persp")
+			KEY_R:
+				_on_view_reset_pressed()
+
+
+func _set_camera_preset(name: String) -> void:
+	if _camera != null and _camera.has_method("set_view_preset"):
+		_camera.call("set_view_preset", name)
+		match name:
+			"top":
+				_log_label.text = "Vista: top (1)"
+			"front":
+				_log_label.text = "Vista: frente (2)"
+			"right":
+				_log_label.text = "Vista: derecha (3)"
+			"persp":
+				_log_label.text = "Vista: perspectiva (4)"
+
+
+func _on_view_reset_pressed() -> void:
+	if _camera != null and _camera.has_method("reset_view"):
+		_camera.call("reset_view")
+		_log_label.text = "Cámara reiniciada (R)."
 
 
 func _do_undo_async() -> void:
@@ -459,9 +546,11 @@ func _on_push_pull_apply_distance_pressed() -> void:
 
 func _on_viewport_container_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
+		var pos_m: Vector2 = _subviewport.get_mouse_position()
 		if _push_pull_tool.is_active() and _push_pull_tool.is_selecting_face():
-			var pos_m: Vector2 = _subviewport.get_mouse_position()
 			_project_view.update_face_hover_at_screen(_camera, pos_m)
+		elif _push_pull_tool.is_active() and _push_pull_tool.is_awaiting_depth_click():
+			_push_pull_tool.update_extrusion_preview_at_screen(pos_m)
 	if event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:

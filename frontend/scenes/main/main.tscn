@@ -25,9 +25,9 @@ glow_intensity = 0.18
 glow_strength = 0.45
 
 [sub_resource type="PlaneMesh" id="1"]
-size = Vector2(24, 24)
-subdivide_width = 20
-subdivide_depth = 20
+size = Vector2(200, 200)
+subdivide_width = 100
+subdivide_depth = 100
 
 [node name="Main" type="Node"]
 script = ExtResource("1")
@@ -178,7 +178,7 @@ split_offset = 252
 
 [node name="LeftDock" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit"]
 layout_mode = 2
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(260, 0)
 theme_override_constants/separation = 6
 
 [node name="LeftDockHeader" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/LeftDock"]
@@ -216,6 +216,58 @@ handle_input_locally = true
 size = Vector2i(1000, 720)
 render_target_update_mode = 4
 
+[node name="ViewNavOverlay" type="MarginContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -158.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 170.0
+grow_horizontal = 0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay"]
+layout_mode = 2
+
+[node name="NavVBox" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="NavTitle" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Vistas"
+
+[node name="NavGrid" type="GridContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox"]
+layout_mode = 2
+columns = 2
+
+[node name="ViewTopButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox/NavGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Top"
+
+[node name="ViewFrontButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox/NavGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Front"
+
+[node name="ViewRightButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox/NavGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Right"
+
+[node name="ViewPerspButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox/NavGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Persp"
+
+[node name="ViewResetButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewNavOverlay/Panel/NavVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Reset"
+
 [node name="World" type="Node3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
@@ -244,7 +296,7 @@ script = ExtResource("2")
 
 [node name="RightDock" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit"]
 layout_mode = 2
-custom_minimum_size = Vector2(260, 0)
+custom_minimum_size = Vector2(280, 0)
 theme_override_constants/separation = 6
 
 [node name="RightDockHeader" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock"]

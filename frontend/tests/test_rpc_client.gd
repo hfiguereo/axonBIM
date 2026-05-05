@@ -21,11 +21,10 @@ func test_client_has_expected_api() -> void:
 	assert_true(RpcClient.has_signal("notification_received"))
 
 
-func test_logger_levels_accept_all_severities() -> void:
-	assert_not_null(Logger)
-	Logger.debug("debug test")
-	Logger.info("info test")
-	Logger.warn("warn test")
+func test_axon_logger_levels_accept_all_severities() -> void:
+	AxonLogger.debug("debug test")
+	AxonLogger.info("info test")
+	AxonLogger.warn("warn test")
 	assert_true(true)
 
 
