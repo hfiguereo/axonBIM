@@ -21,6 +21,7 @@ from axonbim.handlers import system as system_handlers
 from axonbim.ifc.session import reset_session
 from axonbim.rpc.dispatcher import Dispatcher
 from axonbim.rpc.framing import read_message, write_message
+from axonbim.rpc.models import ErrorCode
 from axonbim.rpc.server import serve
 
 
@@ -148,6 +149,38 @@ async def test_extrude_face_and_undo_over_rpc(running_server: Path) -> None:
     assert undo_resp["result"]["guid"] == guid
     assert max(undo_mesh["vertices"][2::3]) == pytest.approx(3.0)
     assert undo_mesh["topo_ids"][2] == top_face_topo_id
+
+
+async def test_extrude_face_rejects_stale_topo_id_over_rpc(running_server: Path) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    old_top_face_topo_id = wall_resp["result"]["mesh"]["topo_ids"][2]
+
+    extrude_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": old_top_face_topo_id, "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "result" in extrude_resp, extrude_resp
+    assert old_top_face_topo_id not in extrude_resp["result"]["mesh"]["topo_ids"]
+
+    stale_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": old_top_face_topo_id, "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "error" in stale_resp
+    assert stale_resp["error"]["code"] == ErrorCode.TOPO_ID_NOT_FOUND
+    assert stale_resp["error"]["data"]["topo_id"] == old_top_face_topo_id
 
 
 async def test_invalid_params_returns_structured_error(running_server: Path) -> None:
