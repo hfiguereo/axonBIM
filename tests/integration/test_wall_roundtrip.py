@@ -13,6 +13,8 @@ import ifcopenshell
 import pytest
 import pytest_asyncio
 
+from axonbim.handlers import geom as geom_handlers
+from axonbim.handlers import history as history_handlers
 from axonbim.handlers import ifc as ifc_handlers
 from axonbim.handlers import project as project_handlers
 from axonbim.handlers import system as system_handlers
@@ -30,6 +32,8 @@ async def running_server(tmp_path: Path) -> AsyncIterator[Path]:
     system_handlers.register(dispatcher)
     ifc_handlers.register(dispatcher)
     project_handlers.register(dispatcher)
+    geom_handlers.register(dispatcher)
+    history_handlers.register(dispatcher)
 
     task = asyncio.create_task(serve(dispatcher, sock, install_signal_handlers=False))
     for _ in range(100):
@@ -108,6 +112,42 @@ async def test_two_walls_preserve_both_in_file(running_server: Path, tmp_path: P
 
     reopened = ifcopenshell.open(str(out))
     assert len(reopened.by_type("IfcWall")) == 2
+
+
+async def test_extrude_face_and_undo_over_rpc(running_server: Path) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    guid = wall_resp["result"]["guid"]
+    mesh = wall_resp["result"]["mesh"]
+    top_face_topo_id = mesh["topo_ids"][2]
+
+    extrude_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "result" in extrude_resp, extrude_resp
+    assert extrude_resp["result"]["guid"] == guid
+    extruded_mesh = extrude_resp["result"]["mesh"]
+    assert max(extruded_mesh["vertices"][2::3]) == pytest.approx(3.5)
+    assert extrude_resp["result"]["topo_map"][top_face_topo_id] == extruded_mesh["topo_ids"][2]
+
+    undo_resp = await _call(running_server, "history.undo", {})
+    assert "result" in undo_resp, undo_resp
+    assert undo_resp["result"]["applied"] is True
+    undo_mesh = undo_resp["result"]["mesh"]
+    assert undo_resp["result"]["guid"] == guid
+    assert max(undo_mesh["vertices"][2::3]) == pytest.approx(3.0)
+    assert undo_mesh["topo_ids"][2] == top_face_topo_id
 
 
 async def test_invalid_params_returns_structured_error(running_server: Path) -> None:
