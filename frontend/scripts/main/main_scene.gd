@@ -43,6 +43,8 @@ var _edit_mode_guid: String = ""
 @onready var _prop_type_label: Label = $%PropTypeLabel
 @onready var _prop_dims_label: Label = $%PropDimsLabel
 @onready var _edit_mode_button: Button = $%EditModeButton
+@onready var _push_pull_distance: SpinBox = $%PushPullDistanceSpin
+@onready var _push_pull_apply_distance_button: Button = $%ApplyPushPullDistanceButton
 @onready var _camera: Camera3D = %Camera3D
 @onready var _project_view: Node3D = %ProjectView
 @onready var _viewport_container: SubViewportContainer = $%ViewportContainer
@@ -80,6 +82,7 @@ func _ready() -> void:
 	_push_pull_button.pressed.connect(_on_push_pull_pressed)
 	_save_button.pressed.connect(_on_save_pressed)
 	_edit_mode_button.pressed.connect(_on_edit_mode_button_pressed)
+	_push_pull_apply_distance_button.pressed.connect(_on_push_pull_apply_distance_pressed)
 	_viewport_container.gui_input.connect(_on_viewport_container_gui_input)
 	_project_tree.item_selected.connect(_on_project_tree_item_selected)
 
@@ -128,6 +131,8 @@ func _apply_ui_polish() -> void:
 	_apply_button_style(_push_pull_button, UI_ACCENT_AMBER)
 	_apply_button_style(_save_button, UI_ACCENT_BLUE)
 	_apply_button_style(_edit_mode_button, UI_ACCENT_AMBER)
+	_apply_button_style(_push_pull_apply_distance_button, UI_ACCENT_AMBER)
+	_apply_spinbox_style(_push_pull_distance)
 	_style_label($UI/Root/Ribbon/TitleBar/AppTitle, UI_TEXT)
 	_style_label(_status_label, UI_TEXT)
 	_style_label(_rtt_label, UI_MUTED)
@@ -180,6 +185,13 @@ func _apply_button_style(button: Button, accent: Color) -> void:
 	button.add_theme_color_override("icon_hover_color", accent)
 	button.add_theme_color_override("icon_pressed_color", accent)
 	button.add_theme_constant_override("h_separation", 8)
+
+
+func _apply_spinbox_style(spinbox: SpinBox) -> void:
+	spinbox.add_theme_color_override("font_color", UI_TEXT)
+	spinbox.add_theme_color_override("font_uneditable_color", UI_MUTED)
+	spinbox.add_theme_stylebox_override("normal", _stylebox(UI_BUTTON, UI_BORDER, 1, 8))
+	spinbox.add_theme_stylebox_override("focus", _stylebox(UI_BUTTON_HOVER, UI_ACCENT_BLUE, 1, 8))
 
 
 func _style_label(label: Label, color: Color) -> void:
@@ -336,12 +348,18 @@ func _refresh_properties_panel() -> void:
 		_prop_dims_label.text = "Geometría: —"
 		_edit_mode_button.text = "Editar elemento"
 		_edit_mode_button.disabled = true
+		_push_pull_distance.editable = false
+		_push_pull_apply_distance_button.disabled = true
 		return
 	_prop_guid_label.text = "GlobalId: %s" % guid
 	_prop_type_label.text = "Tipo: IfcWall"
 	_prop_dims_label.text = "Geometría: (detalle vía RPC en Fase 2)"
 	_edit_mode_button.disabled = false
 	_edit_mode_button.text = "Salir de edición" if _edit_mode_guid == guid else "Editar elemento"
+	_push_pull_distance.editable = _is_edit_mode_active()
+	_push_pull_apply_distance_button.disabled = not (
+		_is_edit_mode_active() and _push_pull_tool.is_active()
+	)
 
 
 func _refresh_status() -> void:
@@ -391,6 +409,7 @@ func _on_create_wall_pressed() -> void:
 func _on_push_pull_pressed() -> void:
 	if _push_pull_tool.is_active():
 		_push_pull_tool.deactivate()
+		_refresh_properties_panel()
 		_log_label.text = "Push/Pull: cancelado"
 		return
 	if not _is_edit_mode_active():
@@ -400,6 +419,7 @@ func _on_push_pull_pressed() -> void:
 	_project_view.set_selection(_edit_mode_guid)
 	_refresh_properties_panel()
 	_push_pull_tool.activate(_edit_mode_guid)
+	_refresh_properties_panel()
 	_log_label.text = "Push/Pull: elige una cara del elemento en edición."
 
 
@@ -425,6 +445,14 @@ func _save_to_path(path: String, dialog: FileDialog) -> void:
 		_log_label.text = "Guardado: %s (%d bytes)" % [path, int(resp["result"].get("bytes", 0))]
 	else:
 		_log_label.text = "Error al guardar: %s" % str(resp.get("error"))
+
+
+func _on_push_pull_apply_distance_pressed() -> void:
+	if not _push_pull_tool.is_active():
+		_log_label.text = "Activa Push/Pull y fija una cara antes de aplicar distancia."
+		return
+	await _push_pull_tool.apply_numeric_distance(float(_push_pull_distance.value))
+	_refresh_properties_panel()
 
 
 func _on_viewport_container_gui_input(event: InputEvent) -> void:

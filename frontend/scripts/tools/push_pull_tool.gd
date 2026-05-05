@@ -58,6 +58,20 @@ func is_selecting_face() -> bool:
 	return _active and _step == 0
 
 
+func has_pending_face() -> bool:
+	return _active and _step == 1 and _pending_topo != ""
+
+
+func apply_numeric_distance(distance_m: float) -> void:
+	if not has_pending_face():
+		push_pull_completed.emit(false, "Primero fija una cara para Push/Pull.")
+		return
+	if abs(distance_m) < 1e-5:
+		push_pull_completed.emit(false, "Distancia de extrusion demasiado pequena.")
+		return
+	await _submit(_extrusion_axis * distance_m)
+
+
 func handle_viewport_click(screen_pos: Vector2) -> void:
 	if not _active or _camera == null:
 		return

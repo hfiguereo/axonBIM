@@ -284,6 +284,27 @@ text = "Editar elemento"
 icon = ExtResource("7")
 disabled = true
 
+[node name="PushPullDistanceLabel" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Push/Pull distancia (m)"
+
+[node name="PushPullDistanceSpin" type="SpinBox" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = -10.0
+max_value = 10.0
+step = 0.05
+value = 0.5
+suffix = " m"
+
+[node name="ApplyPushPullDistanceButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Aplicar distancia"
+icon = ExtResource("5")
+disabled = true
+
 [node name="StatusBar" type="PanelContainer" parent="UI/Root"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 30)

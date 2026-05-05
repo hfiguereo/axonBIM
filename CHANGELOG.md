@@ -11,6 +11,8 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 - Backend/UI: `history.redo` rehace la última extrusión deshecha y Godot lo
   invoca con `Ctrl+Shift+Z`, manteniendo malla, IFC y topología sincronizadas.
+- Godot: entrada numérica de distancia para Push/Pull en el panel Propiedades,
+  aplicable tras fijar una cara en modo edición.
 - Godot: paquete inicial de iconos SVG propios para acciones de Fase 2
   (Crear muro, Push/Pull, Editar elemento, Guardar IFC, Ping backend, Undo,
   estados de backend y selección), con guía visual y atribuciones bajo
