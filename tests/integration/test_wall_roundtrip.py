@@ -468,6 +468,56 @@ async def test_extrude_face_rejects_degenerate_geometry_over_rpc(running_server:
     assert "altura o grosor" in resp["error"]["message"]
 
 
+async def test_fifty_two_walls_edit_without_losing_topology(
+    running_server: Path, tmp_path: Path
+) -> None:
+    walls: list[tuple[str, str]] = []
+    for index in range(52):
+        y = float(index) * 0.75
+        wall_resp = await _call(
+            running_server,
+            "ifc.create_wall",
+            {
+                "p1": {"x": 0.0, "y": y},
+                "p2": {"x": 4.0, "y": y},
+                "height": 3.0,
+                "thickness": 0.2,
+            },
+        )
+        assert "result" in wall_resp, wall_resp
+        mesh = wall_resp["result"]["mesh"]
+        walls.append((str(wall_resp["result"]["guid"]), str(mesh["topo_ids"][2])))
+
+    updated_topo_ids: set[str] = set()
+    for guid, top_face_topo_id in walls:
+        extrude_resp = await _call(
+            running_server,
+            "geom.extrude_face",
+            {"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.1]},
+        )
+        assert "result" in extrude_resp, extrude_resp
+        assert extrude_resp["result"]["guid"] == guid
+        updated_mesh = extrude_resp["result"]["mesh"]
+        new_topo_id = str(updated_mesh["topo_ids"][2])
+        assert new_topo_id != top_face_topo_id
+        assert extrude_resp["result"]["topo_map"][top_face_topo_id] == new_topo_id
+        updated_topo_ids.add(new_topo_id)
+
+    assert len(updated_topo_ids) == len(walls)
+
+    out = tmp_path / "fifty_two_edited_walls.ifc"
+    save_resp = await _call(running_server, "project.save", {"path": str(out)})
+    assert save_resp["result"]["bytes"] > 0
+
+    reopened = ifcopenshell.open(str(out))
+    reopened_walls = reopened.by_type("IfcWall")
+    assert len(reopened_walls) == len(walls)
+    for guid, _old_topo_id in walls:
+        wall = reopened.by_guid(guid)
+        assert wall is not None
+        assert _body_extrusion_depths(wall) == pytest.approx([3.1])
+
+
 async def test_invalid_params_returns_structured_error(running_server: Path) -> None:
     resp = await _call(
         running_server,
