@@ -77,6 +77,11 @@ def _body_extrusion_depths(wall: object) -> list[float]:
     return [float(solid.Depth) for solid in solids]
 
 
+def _logical_face_topo_ids(mesh: dict) -> list[str]:  # type: ignore[type-arg]
+    topo_ids = [str(topo_id) for topo_id in mesh["topo_ids"]]
+    return [topo_ids[i] for i in range(0, len(topo_ids), 2)]
+
+
 async def test_create_wall_and_save_roundtrip(running_server: Path, tmp_path: Path) -> None:
     wall_resp = await _call(
         running_server,
@@ -158,6 +163,49 @@ async def test_extrude_face_and_undo_over_rpc(running_server: Path) -> None:
     assert undo_resp["result"]["guid"] == guid
     assert max(undo_mesh["vertices"][2::3]) == pytest.approx(3.0)
     assert undo_mesh["topo_ids"][2] == top_face_topo_id
+
+
+async def test_extrude_face_topo_map_translates_logical_faces(running_server: Path) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    old_faces = _logical_face_topo_ids(wall_resp["result"]["mesh"])
+    assert len(old_faces) == 6
+
+    extrude_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": old_faces[1], "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "result" in extrude_resp, extrude_resp
+    result = extrude_resp["result"]
+    new_faces = _logical_face_topo_ids(result["mesh"])
+    topo_map = result["topo_map"]
+
+    assert len(new_faces) == 6
+    assert set(topo_map.keys()) == {
+        old for old, new in zip(old_faces, new_faces, strict=True) if old != new
+    }
+    for old_topo_id, new_topo_id in topo_map.items():
+        assert old_topo_id not in new_faces
+        assert new_topo_id in new_faces
+        assert old_faces.index(old_topo_id) == new_faces.index(new_topo_id)
+
+    stale_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": old_faces[1], "vector": [0.0, 0.0, 0.1]},
+    )
+    assert "error" in stale_resp
+    assert stale_resp["error"]["code"] == ErrorCode.TOPO_ID_NOT_FOUND
 
 
 async def test_extruded_wall_save_reopens_with_single_updated_body(
