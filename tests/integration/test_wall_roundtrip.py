@@ -151,6 +151,46 @@ async def test_extrude_face_and_undo_over_rpc(running_server: Path) -> None:
     assert undo_mesh["topo_ids"][2] == top_face_topo_id
 
 
+async def test_extruded_wall_save_reopens_with_single_updated_body(
+    running_server: Path, tmp_path: Path
+) -> None:
+    wall_resp = await _call(
+        running_server,
+        "ifc.create_wall",
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        },
+    )
+    assert "result" in wall_resp, wall_resp
+    guid = wall_resp["result"]["guid"]
+    top_face_topo_id = wall_resp["result"]["mesh"]["topo_ids"][2]
+
+    extrude_resp = await _call(
+        running_server,
+        "geom.extrude_face",
+        {"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.5]},
+    )
+    assert "result" in extrude_resp, extrude_resp
+
+    out = tmp_path / "extruded_wall.ifc"
+    save_resp = await _call(running_server, "project.save", {"path": str(out)})
+    assert save_resp["result"]["bytes"] > 0
+
+    reopened = ifcopenshell.open(str(out))
+    wall = reopened.by_guid(guid)
+    assert wall is not None
+    body_reps = [
+        rep for rep in wall.Representation.Representations if rep.RepresentationIdentifier == "Body"
+    ]
+    assert len(body_reps) == 1
+    solids = [item for item in body_reps[0].Items if item.is_a("IfcExtrudedAreaSolid")]
+    assert len(solids) == 1
+    assert solids[0].Depth == pytest.approx(3.5)
+
+
 async def test_extrude_face_rejects_stale_topo_id_over_rpc(running_server: Path) -> None:
     wall_resp = await _call(
         running_server,

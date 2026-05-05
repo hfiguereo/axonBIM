@@ -88,7 +88,9 @@ def update_wall_geometry(session: IfcSession, guid: str, spec: WallSpec) -> Wall
 
     mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
     length = math.hypot(spec.p2[0] - spec.p1[0], spec.p2[1] - spec.p1[1])
-    _assign_box_representation(session, wall, length=length, thickness=spec.thickness, height=spec.height)
+    _assign_box_representation(
+        session, wall, length=length, thickness=spec.thickness, height=spec.height
+    )
     _place_wall(session, wall, p1=spec.p1, p2=spec.p2)
     _log.info("Muro actualizado: guid=%s, length=%.3f, height=%.3f", guid, length, spec.height)
     return WallResult(guid=guid, mesh=mesh)
@@ -109,6 +111,7 @@ def _assign_box_representation(
     thickness: float,
     height: float,
 ) -> None:
+    _remove_body_representations(session, wall)
     sb = ShapeBuilder(session.file)
     rectangle = sb.rectangle(size=np.array([length, thickness]))
     extrusion = sb.extrude(rectangle, magnitude=height)
@@ -119,6 +122,26 @@ def _assign_box_representation(
         product=wall,
         representation=representation,
     )
+
+
+def _remove_body_representations(session: IfcSession, wall: Any) -> None:
+    """Elimina representaciones ``Body`` previas antes de regenerar geometría."""
+    product_representation = getattr(wall, "Representation", None)
+    if product_representation is None:
+        return
+    old_representations = [
+        representation
+        for representation in product_representation.Representations
+        if representation.RepresentationIdentifier == "Body"
+    ]
+    for representation in old_representations:
+        _run(
+            "geometry.unassign_representation",
+            session.file,
+            product=wall,
+            representation=representation,
+        )
+        _run("geometry.remove_representation", session.file, representation=representation)
 
 
 def _place_wall(session: IfcSession, wall: Any, *, p1: Vec3, p2: Vec3) -> None:
