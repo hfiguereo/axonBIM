@@ -7,6 +7,8 @@ extends Node
 signal status_message(text: String)
 signal push_pull_completed(success: bool, message: String)
 
+const TOPO_ID_NOT_FOUND: int = -32002
+
 var _camera: Camera3D
 var _project_view: Node3D
 var _active: bool = false
@@ -30,7 +32,9 @@ func activate() -> void:
 	_pending_topo = ""
 	_extrusion_axis = Vector3.ZERO
 	_project_view.clear_face_hover()
-	Logger.info("Push/Pull: pasa el raton sobre la cara; clic para fijarla; segundo clic = profundidad.")
+	Logger.info(
+		"Push/Pull: pasa el raton sobre la cara; clic para fijarla; segundo clic = profundidad."
+	)
 
 
 func deactivate() -> void:
@@ -80,13 +84,13 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 
 
 func _extrusion_vector_from_click(screen_pos: Vector2) -> Vector3:
-	var O: Vector3 = _camera.project_ray_origin(screen_pos)
-	var D: Vector3 = _camera.project_ray_normal(screen_pos)
-	var denom: float = D.dot(_extrusion_axis)
+	var ray_origin: Vector3 = _camera.project_ray_origin(screen_pos)
+	var ray_direction: Vector3 = _camera.project_ray_normal(screen_pos)
+	var denom: float = ray_direction.dot(_extrusion_axis)
 	if abs(denom) < 1e-7:
 		return Vector3.ZERO
-	var t: float = (_anchor - O).dot(_extrusion_axis) / denom
-	var pt: Vector3 = O + D * t
+	var t: float = (_anchor - ray_origin).dot(_extrusion_axis) / denom
+	var pt: Vector3 = ray_origin + ray_direction * t
 	var raw: Vector3 = pt - _anchor
 	return _extrusion_axis * raw.dot(_extrusion_axis)
 
@@ -103,7 +107,7 @@ func _submit(vec: Vector3) -> void:
 		var err: Variant = resp.get("error", {})
 		_project_view.clear_face_hover()
 		_step = 0
-		push_pull_completed.emit(false, "geom.extrude_face: %s" % str(err))
+		push_pull_completed.emit(false, _format_submit_error(err))
 		return
 	var result: Dictionary = resp["result"]
 	var guid: String = str(result.get("guid", _pending_guid))
@@ -114,3 +118,14 @@ func _submit(vec: Vector3) -> void:
 	_step = 0
 	_extrusion_axis = Vector3.ZERO
 	push_pull_completed.emit(true, "Extrusion aplicada.")
+
+
+func _format_submit_error(err: Variant) -> String:
+	if typeof(err) != TYPE_DICTIONARY:
+		return "Push/Pull fallo: %s" % str(err)
+	var error_dict: Dictionary = err
+	var code: int = int(error_dict.get("code", 0))
+	var message: String = str(error_dict.get("message", "error desconocido"))
+	if code == TOPO_ID_NOT_FOUND:
+		return "La cara seleccionada ya no existe. Vuelve a seleccionar una cara."
+	return "Push/Pull fallo (%d): %s" % [code, message]
