@@ -46,6 +46,9 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Corregido
 
+- Backend (Windows): ruta por defecto del socket Unix sin ``os.getuid`` y
+  servidor RPC **solo TCP** cuando ``asyncio.start_unix_server`` no existe;
+  tests de integración Unix se omiten en esa plataforma.
 - Godot: la herramienta **Crear muro** no recibia clics: con
   ``SubViewport.handle_input_locally = false`` los eventos van al viewport 3D,
   no al ``gui_input`` del ``SubViewportContainer``. Los clics se capturan ahora

@@ -35,11 +35,17 @@ _log = logging.getLogger(__name__)
 
 
 def default_socket_path() -> Path:
-    """Devuelve ``$XDG_RUNTIME_DIR/axonbim.sock`` con fallback a tmpdir."""
+    """Devuelve ``$XDG_RUNTIME_DIR/axonbim.sock`` con fallback a tmpdir.
+
+    En sistemas sin ``XDG_RUNTIME_DIR``, el nombre bajo el directorio temporal
+    incluye un sufijo estable por usuario en Unix (``getuid``) y por proceso en
+    Windows (``getpid``), donde ``getuid`` no existe.
+    """
     runtime = os.environ.get("XDG_RUNTIME_DIR")
     if runtime:
         return Path(runtime) / "axonbim.sock"
-    return Path(tempfile.gettempdir()) / f"axonbim-{os.getuid()}.sock"
+    unique = os.getuid() if hasattr(os, "getuid") else os.getpid()
+    return Path(tempfile.gettempdir()) / f"axonbim-{unique}.sock"
 
 
 async def _handle_connection(
@@ -100,18 +106,27 @@ async def serve(
     tcp_host, tcp_port
         Si ``tcp_port`` se especifica, se abre tambien un listener TCP en
         ``tcp_host:tcp_port`` (default host: ``127.0.0.1``).
+
+    En plataformas sin ``asyncio.start_unix_server`` (p. ej. Windows), solo
+    se arranca TCP; hace falta ``tcp_port`` no nulo.
     """
     servers: list[asyncio.base_events.Server] = []
-    unix_path = socket_path or default_socket_path()
+    unix_capable = hasattr(asyncio, "start_unix_server")
+    unix_path: Path | None = None
+    if unix_capable:
+        candidate = socket_path if socket_path is not None else default_socket_path()
+        if candidate != Path():
+            unix_path = candidate
 
-    _prepare_unix_socket_path(unix_path)
-    servers.append(
-        await asyncio.start_unix_server(
-            lambda r, w: _handle_connection(dispatcher, r, w),
-            path=str(unix_path),
+    if unix_path is not None:
+        _prepare_unix_socket_path(unix_path)
+        servers.append(
+            await asyncio.start_unix_server(
+                lambda r, w: _handle_connection(dispatcher, r, w),
+                path=str(unix_path),
+            )
         )
-    )
-    _log.info("Servidor RPC Unix escuchando en %s", unix_path)
+        _log.info("Servidor RPC Unix escuchando en %s", unix_path)
 
     if tcp_port is not None:
         host = tcp_host or "127.0.0.1"
@@ -124,15 +139,22 @@ async def serve(
         )
         _log.info("Servidor RPC TCP escuchando en %s:%d", host, tcp_port)
 
+    if not servers:
+        raise RuntimeError(
+            "No hay transporte RPC activo: en esta plataforma use TCP "
+            "(p. ej. `python -m axonbim --tcp` o `--tcp-port 5799`)."
+        )
+
     _install_signal_handlers_if_requested(dispatcher, install_signal_handlers)
 
     try:
         await _wait_servers(servers, dispatcher.shutdown_event)
     finally:
-        try:
-            unix_path.unlink(missing_ok=True)
-        except OSError as exc:
-            _log.warning("No pude eliminar socket %s: %s", unix_path, exc)
+        if unix_path is not None:
+            try:
+                unix_path.unlink(missing_ok=True)
+            except OSError as exc:
+                _log.warning("No pude eliminar socket %s: %s", unix_path, exc)
         _log.info("Servidor RPC detenido")
 
 

@@ -20,6 +20,11 @@ from axonbim.rpc.framing import read_message, write_message
 from axonbim.rpc.models import PROTOCOL_VERSION, ErrorCode
 from axonbim.rpc.server import serve
 
+pytestmark = pytest.mark.skipif(
+    not hasattr(asyncio, "start_unix_server"),
+    reason="RPC sobre socket Unix no disponible en esta plataforma.",
+)
+
 
 class RpcClient:
     """Cliente asyncio minimo (equivalente conceptual al que usara Godot)."""
