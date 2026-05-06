@@ -9,6 +9,15 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Godot: **navegación de viewport** — convención **Z arriba** (plano XY), órbita
+  (botón central + arrastre), pan (Mayús + botón central), zoom (rueda y
+  pellizco), trackpad (**Alt+LMB**, **Mayús+LMB**, **Ctrl/Meta+LMB** vertical),
+  atajos **1–4** e **Inicio/R** con el ratón sobre el visor, teclado numérico
+  **7/1/3/0**, y panel **Planta / Frente / Derecha / Persp / Inicio** en la
+  esquina del visor (`OrbitCameraRig`, `NavViewportGizmo`).
+- Godot: hover de **Push/Pull** resalta la **cara lógica** completa (todos los
+  triángulos con el mismo `topo_id`), no solo el triángulo interceptado por el
+  rayo (`project_view.gd`).
 - Documentación: **Manual de AxonBIM** (`docs/manual-de-axonbim.md`) como guía de usuario de herramientas y flujos; regla de mantenimiento en `.cursor/rules/67-manual-de-axonbim.mdc` y enlace desde el README.
 - Backend: `geom.extrude_face` ahora sondea la malla equivalente generada con
   OCP/OpenCASCADE y reporta métricas `debug_ocp_mesh_stats` para validar la

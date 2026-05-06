@@ -51,9 +51,10 @@ Patrón de entrada 3D (SubViewport embebido): ver [`docs/architecture/app-gui-vi
 | Elemento | Uso |
 |----------|-----|
 | **Ping backend** | Comprueba que el frontend llega al servidor JSON-RPC; suele mostrar tiempo de ida y vuelta (RTT). |
+| **Navegación 3D** | Convención **Z arriba** (plano XY). **Rueda:** zoom. **Botón central + arrastre:** órbita. **Mayús + botón central:** pan. **Trackpad:** **Alt + clic izquierdo** órbita; **Mayús + clic izquierdo** pan; **Ctrl o Meta + clic izquierdo** (arrastre vertical) zoom; gesto de **pellizco** también acerca o aleja. **Teclas** (con el ratón sobre el visor): fila **1–4** = planta / frente / derecha / perspectiva de trabajo; **Inicio** o **R** = vista inicial. **Teclado numérico:** **7 / 1 / 3 / 0** = mismas vistas. Esquina del visor: **Planta / Frente / Derecha / Persp / Inicio**. |
 | **Selección** | Elige una entidad en el modelo para inspeccionarla o combinarla con otras acciones. |
 | **Crear muro** | Flujo en dos clics en el suelo (inicio y fin del eje del muro); el backend genera la malla y el IFC. |
-| **Push/Pull** | Modelado directo: tras **fijar una cara** (modo edición), arrastrar o introducir **distancia numérica** en Propiedades para extruir según el vector indicado. |
+| **Push/Pull** | Modelado directo: tras **fijar una cara** (modo edición), arrastrar o introducir **distancia numérica** en Propiedades para extruir según el vector indicado. Con el ratón sobre el modelo, el resaltado de hover agrupa la **cara lógica** (todos los triángulos que comparten el mismo `topo_id`), no solo el triángulo bajo el cursor. |
 | **Editar elemento** | Modo de edición acotado a un elemento (doble clic en un elemento seleccionado o acción equivalente en Propiedades). **Esc** o el mismo control suelen salir del modo. Push/Pull queda limitado a ese elemento mientras dure el modo. |
 | **Guardar IFC…** | Escribe el modelo activo en disco en formato IFC (ruta según el flujo implementado en esa versión). |
 | **Deshacer / Rehacer** | Operaciones mutantes recientes (p. ej. extrusiones) vía historial; atajos habituales **Ctrl+Z** y **Ctrl+Shift+Z** cuando estén cableados en la escena. |

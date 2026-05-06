@@ -3,6 +3,7 @@ extends Node
 
 ## Escena raiz de AxonBIM (Fase 2 — UI cinta + Push/Pull + undo RPC).
 
+const OrbitRig := preload("res://scripts/viewport_3d/orbit_camera_rig.gd")
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
 const PushPullTool := preload("res://scripts/tools/push_pull_tool.gd")
 
@@ -45,6 +46,7 @@ var _edit_mode_guid: String = ""
 @onready var _edit_mode_button: Button = $%EditModeButton
 @onready var _push_pull_distance: SpinBox = $%PushPullDistanceSpin
 @onready var _push_pull_apply_distance_button: Button = $%ApplyPushPullDistanceButton
+@onready var _camera_rig: Node3D = %CameraRig
 @onready var _camera: Camera3D = %Camera3D
 @onready var _project_view: Node3D = %ProjectView
 @onready var _viewport_container: SubViewportContainer = $%ViewportContainer
@@ -56,6 +58,7 @@ var _edit_mode_guid: String = ""
 
 func _ready() -> void:
 	Logger.info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
+	_log_label.text = "Vista: MMB=orbita | Mayus+MMB=pan | rueda=zoom | Alt/Mayus/Ctrl+LMB (trackpad) | 1-4=vistas | Inicio/R=reset | Num 7/1/3/0"
 	_apply_visual_polish()
 
 	_ribbon_tabs.set_tab_title(0, "Inicio")
@@ -454,7 +457,18 @@ func _on_push_pull_apply_distance_pressed() -> void:
 	_refresh_properties_panel()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	var mp := Vector2(DisplayServer.mouse_get_position())
+	if not _viewport_container.get_global_rect().has_point(mp):
+		return
+	if event is InputEventKey and (_camera_rig as OrbitRig).handle_key_view(event as InputEventKey):
+		get_viewport().set_input_as_handled()
+
+
 func _on_viewport_container_gui_input(event: InputEvent) -> void:
+	if (_camera_rig as OrbitRig).handle_viewport_gui_input(event):
+		_viewport_container.get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseMotion:
 		if _push_pull_tool.is_active() and _push_pull_tool.is_selecting_face():
 			var pos_m: Vector2 = _subviewport.get_mouse_position()

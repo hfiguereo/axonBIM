@@ -5,7 +5,8 @@ extends Node3D
 ## para poder actualizar o eliminar entidades en sprints futuros. Sprint 1.4.
 ##
 ## Fase 2: colisión trimesh para ``face_index`` estable; ``pick_face_at_screen`` devuelve
-## ``topo_id`` por triángulo. Resaltado de cara bajo el ratón (Push/Pull) vía ``MeshDataTool``.
+## ``topo_id`` por triángulo. El resaltado de hover agrupa **todos los triángulos** que
+## comparten el mismo ``topo_id`` (cara lógica B-Rep), no solo el triángulo bajo el rayo.
 ## ``replace_entity_mesh`` refresca tras ``geom.extrude_face``.
 ##
 ## Los clics en el viewport se manejan en ``main_scene.gd`` vía
@@ -188,7 +189,12 @@ func _show_face_hover_mesh(hit: Dictionary, mat: StandardMaterial3D) -> void:
 			_hide_face_hover_preview_only()
 		return
 	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
-	var tri_mesh: ArrayMesh = _triangle_hover_mesh(mi, fi, hit["normal"] as Vector3)
+	var topo_id: String = str(hit.get("topo_id", ""))
+	var tri_mesh: ArrayMesh = null
+	if topo_id != "":
+		tri_mesh = _logical_face_hover_mesh(mi, guid, topo_id, hit["normal"] as Vector3)
+	if tri_mesh == null:
+		tri_mesh = _triangle_hover_mesh(mi, fi, hit["normal"] as Vector3)
 	if tri_mesh == null:
 		if _face_hover_locked:
 			clear_face_hover()
@@ -213,9 +219,53 @@ func _triangle_hover_mesh(
 	var mdt: MeshDataTool = MeshDataTool.new()
 	if mdt.create_from_surface(src, 0) != OK:
 		return null
+	var av: PackedVector3Array = PackedVector3Array()
+	var an: PackedVector3Array = PackedVector3Array()
+	var ix: PackedInt32Array = PackedInt32Array()
+	if not _append_face_triangle_project(mi, mdt, face_idx, hit_normal_world, av, an, ix):
+		return null
+	return _arraymesh_from_tri_arrays(av, an, ix)
+
+
+func _logical_face_hover_mesh(
+	mi: MeshInstance3D, guid: String, topo_id: String, hit_normal_world: Vector3
+) -> ArrayMesh:
+	var topos: Array = _triangle_topo.get(guid, []) as Array
+	if topos.is_empty():
+		return null
+	var src: Mesh = mi.mesh
+	if src == null or src.get_surface_count() < 1:
+		return null
+	var mdt: MeshDataTool = MeshDataTool.new()
+	if mdt.create_from_surface(src, 0) != OK:
+		return null
+	var fc: int = mdt.get_face_count()
+	var av: PackedVector3Array = PackedVector3Array()
+	var an: PackedVector3Array = PackedVector3Array()
+	var ix: PackedInt32Array = PackedInt32Array()
+	for face_idx in range(fc):
+		if face_idx >= topos.size():
+			break
+		if str(topos[face_idx]) != topo_id:
+			continue
+		_append_face_triangle_project(mi, mdt, face_idx, hit_normal_world, av, an, ix)
+	if ix.is_empty():
+		return null
+	return _arraymesh_from_tri_arrays(av, an, ix)
+
+
+func _append_face_triangle_project(
+	mi: MeshInstance3D,
+	mdt: MeshDataTool,
+	face_idx: int,
+	hit_normal_world: Vector3,
+	vertices: PackedVector3Array,
+	normals: PackedVector3Array,
+	indices: PackedInt32Array,
+) -> bool:
 	var fc: int = mdt.get_face_count()
 	if face_idx < 0 or face_idx >= fc:
-		return null
+		return false
 	var iv0: int = mdt.get_face_vertex(face_idx, 0)
 	var iv1: int = mdt.get_face_vertex(face_idx, 1)
 	var iv2: int = mdt.get_face_vertex(face_idx, 2)
@@ -224,7 +274,7 @@ func _triangle_hover_mesh(
 	var v2: Vector3 = mdt.get_vertex(iv2)
 	var nloc: Vector3 = (v1 - v0).cross(v2 - v0)
 	if nloc.length_squared() < 1e-12:
-		return null
+		return false
 	nloc = nloc.normalized()
 	var xf: Transform3D = mi.global_transform
 	var n_world_geom: Vector3 = (xf.basis * nloc).normalized()
@@ -247,23 +297,27 @@ func _triangle_hover_mesh(
 	var ln: Vector3 = inv_pv.basis * gn
 	if ln.length_squared() > 1e-12:
 		ln = ln.normalized()
+	var b: int = vertices.size()
+	vertices.push_back(l0)
+	vertices.push_back(l1)
+	vertices.push_back(l2)
+	normals.push_back(ln)
+	normals.push_back(ln)
+	normals.push_back(ln)
+	indices.push_back(b)
+	indices.push_back(b + 1)
+	indices.push_back(b + 2)
+	return true
+
+
+func _arraymesh_from_tri_arrays(
+	vertices: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array
+) -> ArrayMesh:
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	var av: PackedVector3Array = PackedVector3Array()
-	av.push_back(l0)
-	av.push_back(l1)
-	av.push_back(l2)
-	var an: PackedVector3Array = PackedVector3Array()
-	an.push_back(ln)
-	an.push_back(ln)
-	an.push_back(ln)
-	var ix: PackedInt32Array = PackedInt32Array()
-	ix.push_back(0)
-	ix.push_back(1)
-	ix.push_back(2)
-	arrays[Mesh.ARRAY_VERTEX] = av
-	arrays[Mesh.ARRAY_NORMAL] = an
-	arrays[Mesh.ARRAY_INDEX] = ix
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
 	var out: ArrayMesh = ArrayMesh.new()
 	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return out

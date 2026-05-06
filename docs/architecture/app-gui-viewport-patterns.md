@@ -40,6 +40,8 @@ En Godot, un **SubViewport** embebido en UI **no** debe asumir que `Node3D._unha
 
 Así el “viewport” es **único canal de entrada** hacia las herramientas 3D, análogo a centralizar el pick en un `View3DInventorViewer` en lugar de repartir eventos opacos por el grafo.
 
+**Navegación de cámara (Fase 2):** el `SubViewportContainer` primero delega en `OrbitCameraRig` (rueda, MMB, Mayús+MMB, gestos de pellizco y equivalentes trackpad Alt/Mayús/Ctrl+LMB); la cámara usa **Z arriba** para alinear el visor con el plano de trabajo XY. Si el rig no consume el evento, siguen el hover de Push/Pull (cara lógica por `topo_id`) y las herramientas con **LMB**. Los atajos de vista (p. ej. teclas **1–4**, **Inicio/R**, teclado numérico) se leen en `_unhandled_input` cuando el ratón está sobre el contenedor del viewport.
+
 ---
 
 ## 4. Herramientas como estado + manejador
