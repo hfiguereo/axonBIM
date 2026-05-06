@@ -151,7 +151,9 @@ Solo del backend al frontend. Eventos asíncronos:
 | Método | Params | Result |
 |--------|--------|--------|
 | `ifc.open` | `{ "path": "<file>" }` | `{ "project_guid": "...", "stats": {...} }` |
-| `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m> }` | `{ "guid": "...", "mesh": {...}, "topo_map": {...} }` |
+| `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m>, "join_with_guid": "<opcional>" }` | `{ "guid": "...", "mesh": {...}, "workspace_xy_half_m": [halfX_m, halfY_m] }` (medias en planta desde origen; crecen con margen **~12%** cuando el trazo las excede). Si `join_with_guid` refiere el muro previo y el ángulo es ~90°, el backend retrocede `p1` medio espesor para cerrar la esquina en cadena. |
+| `ifc.get_wall_spec` | `{ "guid": "<GlobalId>" }` | `{ "wall_spec": { "p1": {...}, "p2": {...}, "height": <m>, "thickness": <m> } }` |
+| `ifc.set_wall_typology` | `{ "guid": "<GlobalId>", "height": <m>, "thickness": <m>, "typology_id": "<opcional>" }` | `{ "guid": "...", "mesh": {...} }` |
 | `ifc.delete` | `{ "guid": "..." }` | `{ "ok": true }` |
 | `ifc.get_properties` | `{ "guid": "..." }` | `{ "properties": {...} }` |
 
@@ -169,8 +171,14 @@ Solo del backend al frontend. Eventos asíncronos:
 
 | Método | Params | Result |
 |--------|--------|--------|
+| `draw.ortho_snapshot` | `{ "view": "top\|front\|right", "width_px": 1280, "height_px": 800, "margin_px": 24, "view_id": "<opcional>", "requested_scale_m_per_px": <opcional>, "view_range": { ... }, "projection_engine": "analytical\|ocp" (opcional, por defecto `analytical`) }` | Igual que antes; el resultado incluye `projection_engine` cuando hay muros (proyección de aristas desde caja analítica o malla OCP según el motor). Sin muros: comportamiento anterior. |
+| `draw.export_dxf_walls` | `{ "out_path": ".../walls.dxf", "view": "top\|front\|right" (opcional, por defecto `top`), "view_range": { ... } (opcional) }` | `{ "path": "...", "segment_count": <int>, "view": "..." }` — DXF R2010 mínimo, capa `WALLS`, proyección **analítica** (metros en plano de la vista). |
 | `draw.export_plan` | `{ "level": "<storey_guid>", "format": "dxf\|pdf", "out_path": "...", "norma": "MIVED" }` | `{ "ok": true, "path": "..." }` |
 | `draw.export_section` | `{ "plane": {...}, "format": "...", "out_path": "..." }` | `{ "ok": true, "path": "..." }` |
+
+Nota de producto actual (frontend): en vistas 2D el modo por defecto es `auto` (intenta
+snapshot vectorial analítico y cae a ortográfico de modelo si hay error o resultado vacío).
+El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 
 ### 5.5 `project.*` / `history.*`
 
@@ -194,7 +202,7 @@ Solo del backend al frontend. Eventos asíncronos:
 | Categoría | Timeout cliente |
 |-----------|-----------------|
 | Operaciones triviales (`system.*`, `ifc.get_*`) | 5s |
-| Mutaciones simples (`ifc.create_wall`, `geom.extrude_face`) | 10s |
+| Mutaciones simples (`ifc.create_wall`, `ifc.set_wall_typology`, `geom.extrude_face`) | 10s |
 | Booleanas, parsing IFC grande, exportación 2D | 60s |
 | Operaciones bulk explícitas | configurable por llamada con campo `_timeout_ms` en `params` |
 

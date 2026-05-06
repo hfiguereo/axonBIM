@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from axonbim import __version__
+from axonbim.handlers import draw as draw_handlers
 from axonbim.handlers import geom as geom_handlers
 from axonbim.handlers import history as history_handlers
 from axonbim.handlers import ifc as ifc_handlers
@@ -98,6 +99,7 @@ def _build_dispatcher() -> Dispatcher:
     project_handlers.register(dispatcher)
     geom_handlers.register(dispatcher)
     history_handlers.register(dispatcher)
+    draw_handlers.register(dispatcher)
     return dispatcher
 
 

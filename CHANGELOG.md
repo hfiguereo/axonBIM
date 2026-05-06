@@ -7,8 +7,46 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Arreglado
+
+- Godot: el **viewport** queda **recortado** al panel central (`clip_contents` en el contenedor y la capa overlay); el `SubViewport` deja de usar **`UPDATE_ALWAYS`** por defecto (menos carga GPU) y en pestañas **2D OCC** el render 3D se **pausa** (`UPDATE_DISABLED`) mientras la vista 2D cubre el área.
+- Godot: tras **crear un muro** en vista 2D, el refresco OCC va **difuso (~120 ms)** para reducir parpadeos o saltos de layout.
+- Backend: **`draw.ortho_snapshot`** con **ningún muro** en sesión devuelve `lines_px` vacío y `world_bounds_uv` del **espacio de trabajo** (ya se puede alinear el trazo 2D sin crear antes un muro en 3D).
+
 ### Añadido
 
+- Backend: RPC **`draw.export_dxf_walls`** (ezdxf) exporta la proyección **analítica** de muros a DXF (planta `top` por defecto; capa `WALLS`).
+- Backend / contrato: **`draw.ortho_snapshot`** acepta **`projection_engine`** (`analytical` por defecto u `ocp`) para elegir proyección de aristas desde caja analítica o malla OCP.
+- Godot: botón **Exportar muros DXF (planta)…** en Proyecto llama a `draw.export_dxf_walls` (ruta `.dxf` elegida por el usuario).
+- Godot: botón **Modo 2D** (`Auto`, `Plano vectorial`, `Modelo ortográfico`) para enrutar vistas 2D: en `Auto`, snapshot analítico con fallback automático a ortográfico si falla o viene vacío.
+- Godot / backend: borrar **`IfcWall`** con RPC `ifc.delete`, botón **Eliminar muro** en Propiedades y **Supr**
+  con foco sobre el viewport (respeta foco en cuadros de texto). El árbol del proyecto y el visor 3D
+  se mantienen alineados.
+- Godot: postprocesado del visor tipo taller: **tonemap ACES**, **MSAA 4×**, rejilla amplia en suelo y panel gizmo de vistas; **fondo plano** sin domo de cielo (evita líneas de horizonte artefacto).
+- Backend: nuevo endpoint RPC **`draw.ortho_snapshot`** (OCC) para vistas ortogonales `top/front/right`, con payload de líneas 2D rasterizables y metadatos de escala/encuadre por vista.
+- Frontend: canvas 2D OCC con estados de vista **`loading` / `ready` / `error` / `fallback`** y fallback automático a preset ortográfico legacy si el backend OCC falla.
+- Frontend (OCC 2D): navegación directa en canvas (`rueda=zoom`, `MMB=pan`) y bloqueo de navegación de cámara 3D durante trazado de muros en vistas 2D.
+- Frontend/Backend: `draw.ortho_snapshot` acepta `view_range` (`cut_plane_m`, `top_m`, `bottom_m`, `depth_m`) y la planta OCC lo usa para filtrar geometría visible.
+
+### Cambiado
+
+- Documentación / contrato de producto: **nivel base fijo 00** hasta niveles y desfases; **trazar muro en vista 2D OCC** alineado a **huella X/Y** en ese datum (la cámara 3D no define el dibujo). Constante compartida ``BASE_STOREY_ELEVATION_M`` en ``main_scene.gd`` / ``create_wall_tool.gd``; manual de usuario actualizado.
+- Godot: menos microcortes CPU en la rejilla de suelo: solo reaplica translucido cuando cambia **el tipo de vista** (bucket de planitud), no en cada ``_process``.
+- Godot: HUD **WorkspaceHud** en el visor con **medias del espacio IFC en planta** (desde ``workspace_xy_half_m`` en ``ifc.create_wall``) y pista grosera de **escala visual** orto/perspectiva desde el rig.
+- Backend/Sesión: ``WorkspaceXYHalfExtents`` vivo en ``IfcSession``; cada muro válido **amplía** proporcionalmente (×1,12) las medias X/Y cuando el segmento las supera (`workspace_xy.py`, ``ifc.create_wall``).
+- Godot: botón **Generar vistas 2D...** en Proyecto exporta capturas ortográficas **top/front/right** a PNG en una carpeta elegida por el usuario (manteniendo el preset de cámara previo al finalizar).
+- Godot: **Generar vistas 2D...** usa OCC por defecto (si está habilitado) y guarda `vista_top/front/right.png`; mantiene opción legacy temporal como degradación automática.
+- Godot: al crear muros en `Planta 2D` OCC, la vista se refresca en caliente sin necesidad de cambiar de pestaña.
+- Godot: sistema base de **pestañas de vistas** en el viewport (`Modelado`, `Planta 2D`, `Frente 2D`, `Derecha 2D`) y **ventana auxiliar por vista** para preparar la conexión OCC por tab sin romper el flujo actual.
+- Godot: vistas 2D movidas al **Project Browser** (`Vistas 2D`), con acciones `+ Vista 2D` y `Eliminar vista`; selección en árbol activa la previsualización ortográfica del tab correspondiente (sin OCC aún).
+- Godot: **orto y perspectiva** usan **solo color de fondo uniforme** (`BG_CLEAR_COLOR`; perspectiva algo más clara) y ambiente por color; ya no hay **cielo procedural** (`OrbitCameraRig.viewport_projection_mode_changed`, `main_scene.gd`).
+- Godot: ``SubViewportContainer`` **sin márgenes interior ni borde** (~10px antes + trazo azul) y **SplitContainer** del área de trabajo con **``dragger_visibility = DRAGGER_HIDDEN``** (sin icono de agarre; sigue pudiendo arrastrarse la franja de separación).
+- Godot: **Crear muro** — el **primer** trazo usa P1+P2; los siguientes continúan desde el extremo anterior
+  (clave **P2**, un clic habitual). **Alt + clic** fija nuevo P1 sin desactivar la herramienta. Se mantienen
+  snap orthogonal, guías, tipología desde **Propiedades**, envolvente y heurísticas posteriores a Push/Pull.
+
+- Backend: RPC ``ifc.get_wall_spec`` y ``ifc.set_wall_typology`` (misma sesión;
+  conserva eje P1–P2, regenera IFC y malla).
 - Godot: **navegación de viewport** — convención **Z arriba** (plano XY), órbita
   (botón central + arrastre), pan (Mayús + botón central), zoom (rueda y
   pellizco), trackpad (**Alt+LMB**, **Mayús+LMB**, **Ctrl/Meta+LMB** vertical),
@@ -47,6 +85,10 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Cambiado
 
+- Godot: vistas **Planta / Frente / Derecha** en **proyección ortogonal**; **Persp** y
+  órbita (MMB o Alt+LMB) en perspectiva. Cielo procedural del viewport más **claro**,
+  sin bloom; cuadrícula en **plano XY** con opacidad según inclinación
+  (`OrbitCameraRig`, `workspace_floor_grid.gd`).
 - Godot: el renderer por defecto del proyecto pasa de **Forward+** (Vulkan) a
   **GL Compatibility** (OpenGL). En Fedora + Flatpak + GPU NVIDIA (p. ej. RTX
   movil) Vulkan suele terminar en ``SIGABRT`` en el binario ``godot-bin`` (ABRT),

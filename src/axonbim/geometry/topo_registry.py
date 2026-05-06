@@ -48,6 +48,12 @@ def get_wall_spec(guid: str) -> WallSpec | None:
         return _WALL_SPEC.get(guid)
 
 
+def all_wall_specs() -> dict[str, WallSpec]:
+    """Copia ``guid -> WallSpec`` de la sesión actual."""
+    with _LOCK:
+        return dict(_WALL_SPEC)
+
+
 def update_wall_spec(guid: str, spec: WallSpec) -> None:
     """Sustituye el ``WallSpec`` tras una mutacion geometrica."""
     with _LOCK:
@@ -90,6 +96,17 @@ def mesh_for_guid(guid: str) -> Mesh | None:
     """Devuelve la malla registrada para ``guid``, o ``None``."""
     with _LOCK:
         return _BY_GUID.get(guid)
+
+
+def unregister_guid(guid: str) -> None:
+    """Elimina ``guid``, su ``WallSpec`` y los ``topo_id`` derivados del registro."""
+    with _LOCK:
+        old = _BY_GUID.pop(guid, None)
+        if old is not None:
+            for tid in set(old.topo_ids):
+                if _BY_TOPO.get(tid) == guid:
+                    del _BY_TOPO[tid]
+        _WALL_SPEC.pop(guid, None)
 
 
 def has_topo_id(topo_id: str) -> bool:

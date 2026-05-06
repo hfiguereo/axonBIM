@@ -31,5 +31,7 @@ Ver regla [`60-documentation.mdc`](../../../.cursor/rules/60-documentation.mdc),
 | Nº | Título | Estado | Fecha |
 |----|--------|--------|-------|
 | 0000 | Plantilla | Template | 2026-04-20 |
+| 0001 | Adoptar ortogonales OCC con multi-viewport | Proposed | 2026-05-05 |
+| 0002 | Estrategia combinada 2D analítica + ortográfica + DXF | Accepted | 2026-05-06 |
 
-> Aún no hay ADRs registrados. Las decisiones de la Fase 1 (ver [`docs/phase-reports/phase-1-report.md`](../../phase-reports/phase-1-report.md) §5) pueden retroactivamente convertirse en ADRs a medida que el proyecto madure.
+> ADRs propuestos deben discutirse y, al aceptarse, mantenerse inmutables.

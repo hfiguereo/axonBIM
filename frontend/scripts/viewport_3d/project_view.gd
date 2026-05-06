@@ -331,6 +331,55 @@ func has_entity(guid: String) -> bool:
 	return _entities.has(guid)
 
 
+## Dimensiones de la caja alineada a **ejes mundiales** que envuelve la malla (metros).
+func get_entity_mesh_world_aabb_size(guid: String) -> Vector3:
+	if not _entities.has(guid):
+		return Vector3.ZERO
+	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
+	var src: Mesh = mi.mesh
+	if src == null or src.get_surface_count() < 1:
+		return Vector3.ZERO
+	var mdt: MeshDataTool = MeshDataTool.new()
+	if mdt.create_from_surface(src, 0) != OK:
+		return Vector3.ZERO
+	var xf: Transform3D = mi.global_transform
+	var vmin: Vector3 = Vector3(INF, INF, INF)
+	var vmax: Vector3 = Vector3(-INF, -INF, -INF)
+	var vc: int = mdt.get_vertex_count()
+	for i in range(vc):
+		var wv: Vector3 = xf * mdt.get_vertex(i)
+		vmin = vmin.min(wv)
+		vmax = vmax.max(wv)
+	return vmax - vmin
+
+
+## AABB mundial de todas las entidades visibles. Si no hay entidades, size=Vector3.ZERO.
+func get_scene_world_aabb() -> AABB:
+	var has_points: bool = false
+	var vmin: Vector3 = Vector3(INF, INF, INF)
+	var vmax: Vector3 = Vector3(-INF, -INF, -INF)
+	for guid in _entities.keys():
+		var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
+		if mi == null:
+			continue
+		var src: Mesh = mi.mesh
+		if src == null or src.get_surface_count() < 1:
+			continue
+		var mdt: MeshDataTool = MeshDataTool.new()
+		if mdt.create_from_surface(src, 0) != OK:
+			continue
+		var xf: Transform3D = mi.global_transform
+		var vc: int = mdt.get_vertex_count()
+		for i in range(vc):
+			var wv: Vector3 = xf * mdt.get_vertex(i)
+			vmin = vmin.min(wv)
+			vmax = vmax.max(wv)
+			has_points = true
+	if not has_points:
+		return AABB(Vector3.ZERO, Vector3.ZERO)
+	return AABB(vmin, vmax - vmin)
+
+
 func selected_guid() -> String:
 	return _selected_guid
 
@@ -424,8 +473,9 @@ func _guid_from_collider(collider: Variant) -> String:
 
 func _default_material() -> StandardMaterial3D:
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.82, 0.78, 0.70)
-	mat.roughness = 0.75
+	mat.albedo_color = Color(0.58, 0.56, 0.52)
+	mat.roughness = 0.86
+	mat.metallic = 0.0
 	return mat
 
 

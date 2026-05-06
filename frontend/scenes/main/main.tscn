@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/main_scene.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/project_view.gd" id="2"]
@@ -9,6 +9,8 @@
 [ext_resource type="Texture2D" path="res://assets/icons/tools/tool_edit_element.svg" id="7"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/orbit_camera_rig.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/nav_viewport_gizmo.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/viewport_3d/workspace_floor_grid.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/viewport_2d/ortho_occ_canvas.gd" id="11"]
 
 [sub_resource type="Sky" id="Sky_3d"]
 sky_material = null
@@ -26,9 +28,9 @@ glow_intensity = 0.18
 glow_strength = 0.45
 
 [sub_resource type="PlaneMesh" id="1"]
-size = Vector2(24, 24)
-subdivide_width = 20
-subdivide_depth = 20
+size = Vector2(320, 320)
+subdivide_width = 32
+subdivide_depth = 32
 
 [node name="Main" type="Node"]
 script = ExtResource("1")
@@ -126,6 +128,14 @@ theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
 theme_override_font_sizes/font_size = 11
 text = "Modelado"
 
+[node name="WallDraftHint" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado/VBoxModelado"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.65, 0.78, 0.92, 1)
+text = ""
+autowrap_mode = 2
+
 [node name="CreateWallButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelModelado/VBoxModelado"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -156,6 +166,21 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Guardar IFC..."
 icon = ExtResource("6")
+
+[node name="Export2DViewsButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Generar vistas 2D..."
+
+[node name="ExportWallDxfButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Exportar muros DXF (planta)..."
+
+[node name="View2DModeButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Modo 2D: Auto (vectorial->orto)"
 
 [node name="RibbonToolsPlaceholder" type="CenterContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack"]
 unique_name_in_owner = true
@@ -190,6 +215,23 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Navegador de proyecto"
 
+[node name="View2DTreeActions" type="HBoxContainer" parent="UI/Root/Workspace/MainSplit/LeftDock"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="AddView2DButton" type="Button" parent="UI/Root/Workspace/MainSplit/LeftDock/View2DTreeActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+ Vista 2D"
+
+[node name="DeleteView2DButton" type="Button" parent="UI/Root/Workspace/MainSplit/LeftDock/View2DTreeActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Eliminar vista"
+
 [node name="ProjectTree" type="Tree" parent="UI/Root/Workspace/MainSplit/LeftDock"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -205,6 +247,7 @@ split_offset = 720
 
 [node name="ViewportContainer" type="SubViewportContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit"]
 unique_name_in_owner = true
+clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -215,9 +258,10 @@ mouse_filter = 0
 unique_name_in_owner = true
 handle_input_locally = true
 size = Vector2i(1000, 720)
-render_target_update_mode = 4
+render_target_update_mode = 2
 
 [node name="ViewportOverlay" type="Control" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer"]
+clip_contents = true
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
@@ -226,7 +270,81 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="ViewTabsHost" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -240.0
+offset_top = 8.0
+offset_right = 240.0
+offset_bottom = 44.0
+grow_horizontal = 2
+
+[node name="ViewTabsBar" type="TabBar" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/ViewTabsHost"]
+unique_name_in_owner = true
+layout_mode = 2
+clip_tabs = false
+tab_count = 4
+current_tab = 0
+tab_0/title = "Modelado"
+tab_1/title = "Planta 2D"
+tab_2/title = "Frente 2D"
+tab_3/title = "Derecha 2D"
+
+[node name="View2DPlaceholder" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="View2DPlaceholderVBox" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/View2DPlaceholder"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="View2DPlaceholderTitle" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/View2DPlaceholder/View2DPlaceholderVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Vista ortogonal lista para OCC"
+
+[node name="View2DPlaceholderHint" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/View2DPlaceholder/View2DPlaceholderVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = "Este tab ya existe y está listo para conectarse al render 2D OCC. Puedes usar \"Generar vistas 2D...\" para export rápido en PNG."
+
+[node name="View2DPreview" type="Control" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/View2DPlaceholder/View2DPlaceholderVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("11")
+
+[node name="WorkspaceHud" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 440.0
+offset_bottom = 56.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.74, 0.8, 0.87, 0.95)
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 2
+text = "Espacio IFC en planta: ±50 m · ±50 m (medias)"
+
 [node name="NavGizmo" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay"]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -265,8 +383,9 @@ shadow_enabled = true
 
 [node name="Grid" type="MeshInstance3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
 unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 mesh = SubResource("1")
+script = ExtResource("10")
 
 [node name="ProjectView" type="Node3D" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/SubViewport/World"]
 unique_name_in_owner = true
@@ -312,6 +431,75 @@ layout_mode = 2
 autowrap_mode = 2
 text = "Geometría: (pendiente RPC en Fase 2)"
 
+[node name="WallTypologyTitle" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.72, 0.8, 0.92, 1)
+text = "Tipología / familia"
+
+[node name="WallTypologyOption" type="OptionButton" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(0, 30)
+
+[node name="WallTypologyDims" type="HBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LblWallPropsH" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/WallTypologyDims"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Alt. m"
+
+[node name="WallPropsHeightSpin" type="SpinBox" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/WallTypologyDims"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.5
+max_value = 60.0
+step = 0.05
+value = 3.0
+
+[node name="LblWallPropsT" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/WallTypologyDims"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Esp. m"
+
+[node name="WallPropsThicknessSpin" type="SpinBox" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/WallTypologyDims"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.05
+max_value = 2.0
+step = 0.01
+value = 0.2
+
+[node name="WallApplyTypologyButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Aplicar tipología al muro"
+
+[node name="DeleteWallButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Eliminar muro"
+
+[node name="WallTraceTypologyHint" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.55, 0.65, 0.78, 1)
+autowrap_mode = 2
+text = ""
+
 [node name="EditModeButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -343,6 +531,7 @@ disabled = true
 [node name="StatusBar" type="PanelContainer" parent="UI/Root"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 30)
+
 
 [node name="LogLabel" type="Label" parent="UI/Root/StatusBar"]
 unique_name_in_owner = true

@@ -80,6 +80,15 @@ def create_wall(
     return WallResult(guid=str(wall.GlobalId), mesh=mesh)
 
 
+def delete_wall(session: IfcSession, guid: str) -> None:
+    """Elimina un ``IfcWall`` del modelo IFC y libera relaciones con ``remove_product``."""
+    wall = _wall_by_guid(session, guid)
+    if wall is None:
+        raise ValueError(f"No existe IfcWall con GlobalId={guid!r}")
+    _run("root.remove_product", session.file, product=wall)
+    _log.info("Muro eliminado: guid=%s", guid)
+
+
 def update_wall_geometry(session: IfcSession, guid: str, spec: WallSpec) -> WallResult:
     """Regenera representacion IFC y malla Godot para un ``IfcWall`` existente."""
     wall = _wall_by_guid(session, guid)
