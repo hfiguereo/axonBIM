@@ -42,6 +42,30 @@ var _reconnect_delay_ms: int = RECONNECT_INITIAL_DELAY_MS
 var _reconnect_at_ms: int = 0
 
 
+func _log_info(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("info"):
+		logger.call("info", message)
+	else:
+		print("[INFO ] ", message)
+
+
+func _log_warn(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("warn"):
+		logger.call("warn", message)
+	else:
+		push_warning(message)
+
+
+func _log_error(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("error"):
+		logger.call("error", message)
+	else:
+		push_error(message)
+
+
 func _ready() -> void:
 	set_process(true)
 	_host = _resolve_host()
@@ -49,7 +73,7 @@ func _ready() -> void:
 	if _port > 0:
 		_connect_to_backend()
 	else:
-		Logger.warn(
+		_log_warn(
 			(
 				"RpcClient: no hay puerto TCP configurado (env AXONBIM_RPC_PORT). "
 				+ "Pasale --tcp-port al backend y reinicia."
@@ -92,7 +116,7 @@ func call_rpc(
 	if not _is_connected:
 		await _wait_until_connected(CONNECT_WAIT_MS)
 	if not _is_connected:
-		Logger.warn("RpcClient: sin conexion al backend (¿arranco con make run?)")
+		_log_warn("RpcClient: sin conexion al backend (¿arranco con make run?)")
 		return _timeout_like_error(-32099, "backend no conectado")
 
 	_next_id += 1
@@ -121,12 +145,12 @@ func call_rpc(
 ## Envia una notificacion (sin id, sin respuesta esperada).
 func notify_rpc(method: String, params: Dictionary = {}) -> void:
 	if _port <= 0:
-		Logger.warn("RpcClient.notify_rpc('%s') sin TCP" % method)
+		_log_warn("RpcClient.notify_rpc('%s') sin TCP" % method)
 		return
 	if not _is_connected:
 		await _wait_until_connected(CONNECT_WAIT_MS)
 	if not _is_connected:
-		Logger.warn("RpcClient.notify_rpc('%s') sin conexion activa" % method)
+		_log_warn("RpcClient.notify_rpc('%s') sin conexion activa" % method)
 		return
 	var payload: Dictionary = {"jsonrpc": "2.0", "method": method, "params": params}
 	_send_framed(JSON.stringify(payload))
@@ -140,14 +164,14 @@ func _process(_delta: float) -> void:
 		if not _is_connected:
 			_is_connected = true
 			_reconnect_delay_ms = RECONNECT_INITIAL_DELAY_MS
-			Logger.info("RpcClient conectado a %s:%d" % [_host, _port])
+			_log_info("RpcClient conectado a %s:%d" % [_host, _port])
 			connected.emit()
 		_drain_available_bytes()
 		_consume_buffer()
 	elif status == StreamPeerTCP.STATUS_ERROR or status == StreamPeerTCP.STATUS_NONE:
 		if _is_connected:
 			_is_connected = false
-			Logger.warn("RpcClient: conexion con backend perdida")
+			_log_warn("RpcClient: conexion con backend perdida")
 			disconnected.emit()
 		_try_reconnect()
 
@@ -175,7 +199,7 @@ func _drain_available_bytes() -> void:
 	var got: Array = _stream.get_data(available)
 	var err: int = got[0]
 	if err != OK:
-		Logger.error("RpcClient: get_data fallo con codigo %d" % err)
+		_log_error("RpcClient: get_data fallo con codigo %d" % err)
 		return
 	_buffer.append_array(got[1])
 
@@ -188,11 +212,11 @@ func _consume_buffer() -> void:
 		var header_text: String = _buffer.slice(0, header_end).get_string_from_ascii()
 		var content_length: int = _parse_content_length(header_text)
 		if content_length < 0:
-			Logger.error("RpcClient: header sin Content-Length valido")
+			_log_error("RpcClient: header sin Content-Length valido")
 			_buffer = PackedByteArray()
 			return
 		if content_length > MAX_BODY_BYTES:
-			Logger.error("RpcClient: Content-Length excesivo (%d)" % content_length)
+			_log_error("RpcClient: Content-Length excesivo (%d)" % content_length)
 			_buffer = PackedByteArray()
 			return
 
@@ -210,17 +234,17 @@ func _handle_body(text: String) -> void:
 	var parser: JSON = JSON.new()
 	var err: int = parser.parse(text)
 	if err != OK:
-		Logger.error("RpcClient: JSON del backend invalido en linea %d" % parser.get_error_line())
+		_log_error("RpcClient: JSON del backend invalido en linea %d" % parser.get_error_line())
 		return
 	var payload = parser.data
 	if typeof(payload) != TYPE_DICTIONARY:
-		Logger.error("RpcClient: respuesta no-objeto del backend")
+		_log_error("RpcClient: respuesta no-objeto del backend")
 		return
 	var dict: Dictionary = payload
 	if dict.has("id") and dict["id"] != null:
 		var id_val: Variant = dict["id"]
 		if typeof(id_val) != TYPE_INT and typeof(id_val) != TYPE_FLOAT:
-			Logger.error("RpcClient: id no numerico en respuesta")
+			_log_error("RpcClient: id no numerico en respuesta")
 			return
 		response_arrived.emit(int(id_val), dict)
 	else:
@@ -232,9 +256,9 @@ func _handle_body(text: String) -> void:
 
 func _handle_builtin_notification(method: String, params: Dictionary) -> void:
 	if method == "system.warning":
-		Logger.warn("backend: %s" % str(params.get("message", params)))
+		_log_warn("backend: %s" % str(params.get("message", params)))
 	elif method == "system.info":
-		Logger.info("backend: %s" % str(params.get("message", params)))
+		_log_info("backend: %s" % str(params.get("message", params)))
 
 
 func _send_framed(text: String) -> void:
@@ -258,7 +282,7 @@ func _wait_until_connected(max_wait_ms: int) -> void:
 func _connect_to_backend() -> void:
 	var err: int = _stream.connect_to_host(_host, _port)
 	if err != OK:
-		Logger.error("RpcClient: connect_to_host %s:%d fallo (%d)" % [_host, _port, err])
+		_log_error("RpcClient: connect_to_host %s:%d fallo (%d)" % [_host, _port, err])
 
 
 func _resolve_host() -> String:

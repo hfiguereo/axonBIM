@@ -31,9 +31,17 @@ var _face_hover_mi: MeshInstance3D
 var _face_hover_locked: bool = false
 
 
+func _log_warn(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("warn"):
+		logger.call("warn", message)
+	else:
+		push_warning(message)
+
+
 func add_entity(guid: String, mesh_dict: Dictionary) -> void:
 	if _entities.has(guid):
-		Logger.warn("Entidad %s ya existe, se sobrescribe" % guid)
+		_log_warn("Entidad %s ya existe, se sobrescribe" % guid)
 		remove_entity(guid)
 
 	var instance: MeshInstance3D = MeshInstance3D.new()
@@ -48,7 +56,7 @@ func add_entity(guid: String, mesh_dict: Dictionary) -> void:
 
 func replace_entity_mesh(guid: String, mesh_dict: Dictionary) -> void:
 	if not _entities.has(guid):
-		Logger.warn("replace_entity_mesh: no existe %s" % guid)
+		_log_warn("replace_entity_mesh: no existe %s" % guid)
 		return
 	clear_face_hover()
 	var mi: MeshInstance3D = _entities[guid]

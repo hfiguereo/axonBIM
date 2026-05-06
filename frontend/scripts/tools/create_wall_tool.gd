@@ -43,27 +43,28 @@ var _last_created_guid: String = ""
 var _axis_lock: String = ""
 
 
-func _agent_debug_log(run_id: String, hypothesis_id: String, location: String, message: String, data: Dictionary) -> void:
-	var payload: Dictionary = {
-		"sessionId": "58a65c",
-		"runId": run_id,
-		"hypothesisId": hypothesis_id,
-		"location": location,
-		"message": message,
-		"data": data,
-		"timestamp": Time.get_unix_time_from_system() * 1000.0,
-	}
-	var log_path: String = "/home/hector/AxonBIM/.cursor/debug-58a65c.log"
-	var mode: FileAccess.ModeFlags = (
-		FileAccess.READ_WRITE if FileAccess.file_exists(log_path) else FileAccess.WRITE_READ
-	)
-	var f: FileAccess = FileAccess.open(log_path, mode)
-	if f == null:
-		return
-	f.seek_end()
-	f.store_line(JSON.stringify(payload))
-	f.flush()
-	f.close()
+func _log_info(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("info"):
+		logger.call("info", message)
+	else:
+		print("[INFO ] ", message)
+
+
+func _log_warn(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("warn"):
+		logger.call("warn", message)
+	else:
+		push_warning(message)
+
+
+func _log_error(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("error"):
+		logger.call("error", message)
+	else:
+		push_error(message)
 
 
 func setup(camera: Camera3D, project_view: Node3D) -> void:
@@ -81,7 +82,7 @@ func activate() -> void:
 	_axis_lock = ""
 	_ensure_overlay()
 	_redraw_overlay()
-	Logger.info("Crear muro: activo. P1+P2 primera vez; luego continuan desde ultimo extremo.")
+	_log_info("Crear muro: activo. P1+P2 primera vez; luego continuan desde ultimo extremo.")
 	draft_hint_changed.emit("Primera vez: P1 y P2. Siguientes: solo P2 desde el último clic. Alt+clic = nuevo origen.")
 	hint_viewport_shortcuts()
 
@@ -179,7 +180,7 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 			"P1=(%.2f, %.2f). Clic P2 — eje XY respecto al P1; Alt+clic aquí fuerza nuevo P1 desde el clic."
 			% [_first_point.x, _first_point.y]
 		)
-		Logger.info("Primer punto del muro (o nueva cadena): %s" % str(_first_point))
+		_log_info("Primer punto del muro (o nueva cadena): %s" % str(_first_point))
 		return
 
 	if alt_restart:
@@ -191,14 +192,14 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 		draft_hint_changed.emit(
 			"P1 reiniciado (Alt) en (%0.2f, %0.2f). Clic siguiente = P2." % [_first_point.x, _first_point.y]
 		)
-		Logger.info("Nuevo origen de trazo (Alt): %s" % str(_first_point))
+		_log_info("Nuevo origen de trazo (Alt): %s" % str(_first_point))
 		return
 
 	var point: Vector3 = _snap_origin_axes(point_raw)
 	var second_pt: Vector3 = _snap_second_point(_first_point, point)
 	var seg_len: float = second_pt.distance_to(_first_point)
 	if seg_len < MIN_SEGMENT_M:
-		Logger.warn("Segmento demasiado corto; elige P2 más lejos.")
+		_log_warn("Segmento demasiado corto; elige P2 más lejos.")
 		draft_hint_changed.emit("Segmento corto. Ajusta P2 o usa Alt+clic para nuevo P1.")
 		return
 
@@ -214,32 +215,9 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 ## Clic con punto ya en plano horizontal (OCC 2D); evita ``project_ray`` del SubViewport 3D.
 func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 	if not _active:
-		# #region agent log
-		_agent_debug_log(
-			"pre-fix-2",
-			"H6",
-			"create_wall_tool.gd:handle_viewport_click_world_floor",
-			"ignored click: tool inactive",
-			{"point_xy": [point_world_xy.x, point_world_xy.y]},
-		)
-		# #endregion
 		return
 	var point_raw: Vector3 = Vector3(point_world_xy.x, point_world_xy.y, BASE_STOREY_ELEVATION_M)
 	var alt_restart: bool = Input.is_physical_key_pressed(KEY_ALT)
-	# #region agent log
-	_agent_debug_log(
-		"pre-fix-2",
-		"H6",
-		"create_wall_tool.gd:handle_viewport_click_world_floor",
-		"2d floor click received",
-		{
-			"has_first": _has_first,
-			"alt_restart": alt_restart,
-			"point_xy": [point_raw.x, point_raw.y],
-			"last_guid": _last_created_guid,
-		},
-	)
-	# #endregion
 	if not _has_first:
 		var point_start: Vector3 = _snap_origin_axes(point_raw)
 		_first_point = point_start
@@ -251,7 +229,7 @@ func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 			"P1=(%.2f, %.2f). Clic P2 — eje XY respecto al P1; Alt+clic aquí fuerza nuevo P1 desde el clic."
 			% [_first_point.x, _first_point.y]
 		)
-		Logger.info("Primer punto del muro (o nueva cadena): %s" % str(_first_point))
+		_log_info("Primer punto del muro (o nueva cadena): %s" % str(_first_point))
 		return
 	if alt_restart:
 		_first_point = _snap_origin_axes(point_raw)
@@ -262,27 +240,13 @@ func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 		draft_hint_changed.emit(
 			"P1 reiniciado (Alt) en (%0.2f, %0.2f). Clic siguiente = P2." % [_first_point.x, _first_point.y]
 		)
-		Logger.info("Nuevo origen de trazo (Alt): %s" % str(_first_point))
+		_log_info("Nuevo origen de trazo (Alt): %s" % str(_first_point))
 		return
 	var point: Vector3 = _snap_origin_axes(point_raw)
 	var second_pt: Vector3 = _snap_second_point(_first_point, point)
 	var seg_len: float = second_pt.distance_to(_first_point)
 	if seg_len < MIN_SEGMENT_M:
-		# #region agent log
-		_agent_debug_log(
-			"pre-fix-2",
-			"H7",
-			"create_wall_tool.gd:handle_viewport_click_world_floor",
-			"segment rejected by min length",
-			{
-				"seg_len": seg_len,
-				"min_len": MIN_SEGMENT_M,
-				"p1": [_first_point.x, _first_point.y],
-				"p2": [second_pt.x, second_pt.y],
-			},
-		)
-		# #endregion
-		Logger.warn("Segmento demasiado corto; elige P2 más lejos.")
+		_log_warn("Segmento demasiado corto; elige P2 más lejos.")
 		draft_hint_changed.emit("Segmento corto. Ajusta P2 o usa Alt+clic para nuevo P1.")
 		return
 	var p1: Vector3 = _first_point
@@ -396,36 +360,12 @@ func _submit_wall(p1: Vector3, p2: Vector3, join_with_guid: String) -> bool:
 	}
 	if join_with_guid != "":
 		params["join_with_guid"] = join_with_guid
-	# #region agent log
-	_agent_debug_log(
-		"pre-fix-2",
-		"H8",
-		"create_wall_tool.gd:_submit_wall",
-		"submitting ifc.create_wall",
-		{
-			"p1": [p1.x, p1.y, p1.z],
-			"p2": [p2.x, p2.y, p2.z],
-			"height": default_height,
-			"thickness": default_thickness,
-			"join_with_guid": join_with_guid,
-		},
-	)
-	# #endregion
 	var resp: Dictionary = await RpcClient.call_rpc("ifc.create_wall", params)
 	if not is_inside_tree():
 		wall_submit_finished.emit()
 		return false
 	if not resp.get("ok"):
-		# #region agent log
-		_agent_debug_log(
-			"pre-fix-2",
-			"H8",
-			"create_wall_tool.gd:_submit_wall",
-			"ifc.create_wall failed",
-			{"error": str(resp.get("error", {}))},
-		)
-		# #endregion
-		Logger.error("create_wall fallo: %s" % str(resp.get("error")))
+		_log_error("create_wall fallo: %s" % str(resp.get("error")))
 		wall_submit_finished.emit()
 		draft_hint_changed.emit("Error RPC. Clic P1 de nuevo (o Alt+clic para origen).")
 		return false
@@ -439,16 +379,7 @@ func _submit_wall(p1: Vector3, p2: Vector3, join_with_guid: String) -> bool:
 	_project_view.add_entity(guid, mesh_dict)
 	_last_created_guid = guid
 	wall_created.emit(guid, half_xy)
-	# #region agent log
-	_agent_debug_log(
-		"pre-fix-2",
-		"H8",
-		"create_wall_tool.gd:_submit_wall",
-		"ifc.create_wall ok",
-		{"guid": guid, "workspace_half_xy": [half_xy.x, half_xy.y]},
-	)
-	# #endregion
-	Logger.info("Muro creado: %s" % guid)
+	_log_info("Muro creado: %s" % guid)
 	wall_submit_finished.emit()
 	return true
 

@@ -22,6 +22,14 @@ var _extrusion_axis: Vector3 = Vector3.ZERO
 var _anchor: Vector3 = Vector3.ZERO
 
 
+func _log_info(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("info"):
+		logger.call("info", message)
+	else:
+		print("[INFO ] ", message)
+
+
 func setup(camera: Camera3D, project_view: Node3D) -> void:
 	_camera = camera
 	_project_view = project_view
@@ -35,7 +43,7 @@ func activate(editable_guid: String = "") -> void:
 	_pending_topo = ""
 	_extrusion_axis = Vector3.ZERO
 	_project_view.clear_face_hover()
-	Logger.info(
+	_log_info(
 		"Push/Pull: pasa el raton sobre la cara; clic para fijarla; segundo clic = profundidad."
 	)
 

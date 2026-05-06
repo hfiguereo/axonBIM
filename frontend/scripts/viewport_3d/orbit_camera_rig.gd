@@ -7,6 +7,7 @@ extends Node3D
 ##
 ## Ratón: MMB=orbita, Mayús+MMB=pan, rueda=zoom. Trackpad: Alt+LMB=orbita,
 ## Mayús+LMB=pan, Ctrl/Cmd+LMB arrastre vertical=zoom. Pellizco: ``InputEventMagnifyGesture``.
+## Algunos trackpads reportan scroll como ``InputEventPanGesture``; se mapea a zoom.
 ##
 ## Presets **top** / **front** / **right** usan proyección **ortogonal**; al orbitar
 ## (MMB o Alt+LMB) se pasa a **perspectiva** conservando la dirección de vista.
@@ -34,6 +35,7 @@ var _mmb_orbit: bool = false
 var _mmb_pan: bool = false
 var _view_preset: String = "persp"
 var _last_perspective_mode_emitted: bool = true
+var _orthographic_zoom_locked: bool = false
 
 
 func _ready() -> void:
@@ -64,18 +66,30 @@ func handle_viewport_gui_input(event: InputEvent) -> bool:
 			if mb.ctrl_pressed or mb.meta_pressed:
 				return true
 		if mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
+			if _orthographic_zoom_locked and _view_preset != "persp":
+				return true
 			var steps := 1.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
 			if mb.shift_pressed:
 				steps *= 2.5
 			zoom_wheel_steps(steps)
 			return true
 	elif event is InputEventMagnifyGesture:
+		if _orthographic_zoom_locked and _view_preset != "persp":
+			return true
 		var mag := event as InputEventMagnifyGesture
 		var zf: float = 1.0 - (mag.factor - 1.0) * 0.5
 		zf = clampf(zf, 0.8, 1.2)
 		_distance = clampf(_distance * zf, MIN_DISTANCE, MAX_DISTANCE)
 		_apply()
 		return true
+	elif event is InputEventPanGesture:
+		if _orthographic_zoom_locked and _view_preset != "persp":
+			return true
+		var pg := event as InputEventPanGesture
+		if abs(pg.delta.y) > 0.0:
+			var steps: float = clampf(-pg.delta.y * 0.10, -3.0, 3.0)
+			zoom_wheel_steps(steps)
+			return true
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		if _mmb_orbit:
@@ -93,6 +107,8 @@ func handle_viewport_gui_input(event: InputEvent) -> bool:
 				pan_from_mouse_delta(mm.relative.x, mm.relative.y)
 				return true
 			if Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META):
+				if _orthographic_zoom_locked and _view_preset != "persp":
+					return true
 				var zoom_factor: float = 1.0 + mm.relative.y * 0.0012
 				zoom_factor = clampf(zoom_factor, 0.85, 1.15)
 				_distance = clampf(_distance * zoom_factor, MIN_DISTANCE, MAX_DISTANCE)
@@ -119,6 +135,16 @@ func handle_key_view(event: InputEventKey) -> bool:
 			return true
 		KEY_HOME, KEY_R:
 			reset_view()
+			return true
+		KEY_PLUS, KEY_KP_ADD:
+			if _orthographic_zoom_locked and _view_preset != "persp":
+				return true
+			zoom_wheel_steps(1.0)
+			return true
+		KEY_MINUS, KEY_KP_SUBTRACT:
+			if _orthographic_zoom_locked and _view_preset != "persp":
+				return true
+			zoom_wheel_steps(-1.0)
 			return true
 	return false
 
@@ -196,6 +222,8 @@ func pan_from_mouse_delta(dx: float, dy: float) -> void:
 
 
 func zoom_wheel_steps(steps: float) -> void:
+	if _orthographic_zoom_locked and _view_preset != "persp":
+		return
 	if steps == 0.0:
 		return
 	var f := pow(1.1, steps)
@@ -287,3 +315,33 @@ func frame_ortho_aabb(aabb: AABB) -> void:
 	span = maxf(span * ORTHO_FRAME_MARGIN, 2.0)
 	_distance = maxf(12.0, span / (2.0 * ORTHO_SIZE_SCALE))
 	_apply()
+
+
+func capture_view_state() -> Dictionary:
+	return {
+		"pivot": global_position,
+		"yaw": _yaw,
+		"pitch": _pitch,
+		"distance": _distance,
+		"preset": _view_preset,
+	}
+
+
+func apply_view_state(state: Dictionary) -> void:
+	if state.has("pivot"):
+		global_position = state["pivot"] as Vector3
+	if state.has("yaw"):
+		_yaw = float(state["yaw"])
+	if state.has("pitch"):
+		_pitch = float(state["pitch"])
+	if state.has("distance"):
+		_distance = clampf(float(state["distance"]), MIN_DISTANCE, MAX_DISTANCE)
+	if state.has("preset"):
+		var preset: String = str(state["preset"])
+		if preset in ["persp", "top", "front", "right"]:
+			_view_preset = preset
+	_apply()
+
+
+func set_orthographic_zoom_locked(locked: bool) -> void:
+	_orthographic_zoom_locked = locked

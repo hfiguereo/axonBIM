@@ -23,7 +23,7 @@ const VIEWPORT_ORTHO_CLEAR_BG: Color = Color(0.13, 0.14, 0.165, 1.0)
 const VIEWPORT_PERSP_AMBIENT_ENERGY: float = 0.48
 const VIEWPORT_ORTHO_AMBIENT_ENERGY: float = 0.40
 const UI_ACCENT_DANGER: Color = Color(0.93, 0.32, 0.26, 1.0)
-const USE_OCC_2D_VIEWS: bool = true
+const USE_OCC_2D_VIEWS: bool = false
 const VIEW2D_STATE_LOADING: String = "loading"
 const VIEW2D_STATE_READY: String = "ready"
 const VIEW2D_STATE_ERROR: String = "error"
@@ -31,10 +31,17 @@ const VIEW2D_STATE_FALLBACK: String = "fallback"
 const VIEW2D_MODE_AUTO: String = "auto"
 const VIEW2D_MODE_VECTORIAL: String = "vectorial"
 const VIEW2D_MODE_ORTHO: String = "ortho"
+const VIS_STYLE_ARCH: String = "arch"
+const VIS_STYLE_CONTRAST: String = "contrast"
+const VIS_STYLE_WIREFRAME: String = "wireframe"
+const SCALE_2D_PRESETS: Array = [20, 50, 75, 200, 500]
 const DEFAULT_PLAN_CUT_M: float = 1.2
 const DEFAULT_PLAN_BOTTOM_M: float = 0.0
 const DEFAULT_PLAN_TOP_M: float = 3.0
 const DEFAULT_PLAN_DEPTH_M: float = 1.2
+const KB_WALL_STEP_FINE_M: float = 0.10
+const KB_WALL_STEP_COARSE_M: float = 0.50
+const FLOAT_SNAP_THRESHOLD_PX: int = 36
 
 ## Cota del forjado de nivel base (00). Sin niveles ni desfases aún; trazado 2D OCC proyecta a **X/Y**
 ## sobre este datum — la cámara 3D no es la referencia geométrica del trazo en vista 2D.
@@ -61,6 +68,8 @@ var _typology_spin_suppress: bool = false
 @onready var _ribbon_tabs: TabBar = $%RibbonTabs
 @onready var _ribbon_tools_inicio: Control = $%RibbonToolsInicio
 @onready var _ribbon_tools_placeholder: Control = $%RibbonToolsPlaceholder
+@onready var _ribbon: Control = $UI/Root/Ribbon
+@onready var _ribbon_body: Control = $UI/Root/Ribbon/RibbonBody
 @onready var _ping_button: Button = $%PingButton
 @onready var _wall_button: Button = $%CreateWallButton
 @onready var _push_pull_button: Button = $%PushPullButton
@@ -105,6 +114,10 @@ var _typology_spin_suppress: bool = false
 @onready var _workspace_main_split: HSplitContainer = $UI/Root/Workspace/MainSplit
 @onready var _workspace_inner_split: HSplitContainer = $UI/Root/Workspace/MainSplit/InnerSplit
 @onready var _workspace_hud: Label = %WorkspaceHud
+@onready var _left_dock: Control = $UI/Root/Workspace/MainSplit/LeftDock
+@onready var _right_dock: Control = $UI/Root/Workspace/MainSplit/InnerSplit/RightDock
+@onready var _left_dock_header: Control = $UI/Root/Workspace/MainSplit/LeftDock/LeftDockHeader
+@onready var _right_dock_header: Control = $UI/Root/Workspace/MainSplit/InnerSplit/RightDock/RightDockHeader
 
 var _workspace_xy_half_cached: Vector2 = Vector2(50.0, 50.0)
 var _hud_ticks: int = 0
@@ -117,35 +130,39 @@ var _next_view2d_idx: int = 1
 var _occ_wall_snapshot_debounce: Timer
 var _occ_wall_snapshot_pending_id: String = ""
 var _view2d_render_mode: String = VIEW2D_MODE_AUTO
+var _view2d_mode_before_wall: String = ""
 var _has_last_valid_occ_uv: bool = false
 var _last_valid_occ_uv: Vector2 = Vector2.ZERO
+var _kb_wall_cursor_world: Vector3 = Vector3.ZERO
+var _kb_wall_cursor_ready: bool = false
+var _visual_style_current: String = VIS_STYLE_ARCH
+var _visual_style_option: OptionButton
+var _scale_2d_preset_option: OptionButton
+var _scale_2d_custom_spin: SpinBox
+var _workspace_tabs_host_top: PanelContainer
+var _workspace_tool_context_row: HBoxContainer
+var _mini_view_tabs: TabBar
+var _floating_views: Dictionary = {}  # int tab_idx -> Window
+var _floating_viewports: Dictionary = {}  # int tab_idx -> {subviewport,camera,rig,host}
+var _view_state_by_tab: Dictionary = {}  # int -> {name,preset,camera,view_range,visual_style,is_default}
+var _workspace_floating_windows: Dictionary = {}  # "left"/"right" -> Window
+var _workspace_dock_slots: Dictionary = {}  # "left"/"right" -> {parent,index}
+var _suppress_auto_snap: bool = false
+var _snap_guide_overlay: ColorRect
+var _saved_tab_before_switch: int = -1
+var _view_name_seq: int = 1
 
 
-func _agent_debug_log(run_id: String, hypothesis_id: String, location: String, message: String, data: Dictionary) -> void:
-	var payload: Dictionary = {
-		"sessionId": "58a65c",
-		"runId": run_id,
-		"hypothesisId": hypothesis_id,
-		"location": location,
-		"message": message,
-		"data": data,
-		"timestamp": Time.get_unix_time_from_system() * 1000.0,
-	}
-	var log_path: String = "/home/hector/AxonBIM/.cursor/debug-58a65c.log"
-	var mode: FileAccess.ModeFlags = (
-		FileAccess.READ_WRITE if FileAccess.file_exists(log_path) else FileAccess.WRITE_READ
-	)
-	var f: FileAccess = FileAccess.open(log_path, mode)
-	if f == null:
-		return
-	f.seek_end()
-	f.store_line(JSON.stringify(payload))
-	f.flush()
-	f.close()
+func _log_info(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("info"):
+		logger.call("info", message)
+	else:
+		print("[INFO ] ", message)
 
 
 func _ready() -> void:
-	Logger.info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
+	_log_info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
 	_log_label.text = (
 		"Vista: 1-3 orto | 4 persp — ambos fondo plano sin horizonte artefacto | "
 		+ "MMB orbita orto→persp | Mayus+MMB pan | rueda zoom | Inicio/R reset"
@@ -206,16 +223,59 @@ func _ready() -> void:
 	_build_project_tree()
 	_refresh_status()
 	_refresh_properties_panel()
+	_init_default_view_states()
+	_ensure_viewport_bottom_palette()
+	_install_workspace_top_bars()
+	_ensure_view_tab_top_controls()
+	_install_workspace_modularity_controls()
+	_ensure_snap_guide_overlay()
 	call_deferred("_refresh_workspace_hud")
 	_update_view2d_mode_button_text()
 	_on_view_tabs_changed(_view_tabs_bar.current_tab)
+	_refresh_ribbon_compact_mode()
 
 
 func _physics_process(_delta: float) -> void:
 	_hud_ticks += 1
+	for tab_key in _floating_views.keys():
+		_on_auto_snap_window_moved("view", int(tab_key))
 	if _hud_ticks % 12 != 0:
 		return
+	_save_active_view_state(_active_view_tab)
+	_save_open_floating_view_states()
 	_refresh_workspace_hud()
+
+
+func _sync_floating_viewport_cameras() -> void:
+	for k in _floating_viewports.keys():
+		var tab_idx: int = int(k)
+		if not _view_state_by_tab.has(tab_idx):
+			continue
+		var slot: Dictionary = _floating_viewports[k] as Dictionary
+		var rig: OrbitRig = slot.get("rig") as OrbitRig
+		var cam: Camera3D = slot.get("camera") as Camera3D
+		var row: Dictionary = _view_state_by_tab[tab_idx] as Dictionary
+		var cam_state: Dictionary = row.get("camera", {}) as Dictionary
+		if rig != null and not cam_state.is_empty():
+			rig.apply_view_state(cam_state)
+		var snap: Dictionary = row.get("camera_snapshot", {}) as Dictionary
+		_apply_camera_snapshot_to_camera(cam, snap)
+
+
+func _save_open_floating_view_states() -> void:
+	for k in _floating_viewports.keys():
+		var tab_idx: int = int(k)
+		if not _view_state_by_tab.has(tab_idx):
+			continue
+		var slot: Dictionary = _floating_viewports[k] as Dictionary
+		var rig: OrbitRig = slot.get("rig") as OrbitRig
+		var cam: Camera3D = slot.get("camera") as Camera3D
+		var row: Dictionary = _view_state_by_tab[tab_idx] as Dictionary
+		if rig != null:
+			row["camera"] = rig.capture_view_state()
+		if cam != null:
+			row["camera_snapshot"] = _capture_camera_snapshot_from(cam)
+		_view_state_by_tab[tab_idx] = row
 
 
 func _refresh_workspace_hud() -> void:
@@ -225,24 +285,18 @@ func _refresh_workspace_hud() -> void:
 	if is_instance_valid(_camera_rig) and _camera_rig.has_method("get_viewport_scale_hint_fragment"):
 		cam_hint = str(_camera_rig.get_viewport_scale_hint_fragment())
 	var occ_hint: String = ""
-	if USE_OCC_2D_VIEWS and _active_view_tab != 0:
-		var preset: String = _tab_to_preset(_active_view_tab)
-		var id: String = _find_view2d_id_by_preset(preset)
-		if id != "":
-			var row: Dictionary = _view2d_runtime_state.get(id, {}) as Dictionary
-			var vr: Dictionary = row.get("view_range", {}) as Dictionary
-			var zoom: float = 1.0
-			if _view_2d_preview.has_method("zoom_factor"):
-				zoom = float(_view_2d_preview.call("zoom_factor"))
-			occ_hint = (
-				" | OCC2D x%.2f · corte %.2fm · top %.2fm · bottom %.2fm"
-				% [
-					zoom,
-					float(vr.get("cut_plane_m", DEFAULT_PLAN_CUT_M)),
-					float(vr.get("top_m", DEFAULT_PLAN_TOP_M)),
-					float(vr.get("bottom_m", DEFAULT_PLAN_BOTTOM_M)),
-				]
-			)
+	if _active_view_tab != 0 and _view_state_by_tab.has(_active_view_tab):
+		var row: Dictionary = _view_state_by_tab[_active_view_tab] as Dictionary
+		var vr: Dictionary = row.get("view_range", {}) as Dictionary
+		occ_hint = (
+			" | %s · corte %.2fm · top %.2fm · bottom %.2fm"
+			% [
+				str(row.get("name", "Vista")),
+				float(vr.get("cut_plane_m", DEFAULT_PLAN_CUT_M)),
+				float(vr.get("top_m", DEFAULT_PLAN_TOP_M)),
+				float(vr.get("bottom_m", DEFAULT_PLAN_BOTTOM_M)),
+			]
+		)
 	_workspace_hud.text = (
 		"Espacio IFC planta ±X %.0f m · ±Y %.0f m (medias)   |   %s%s"
 		% [_workspace_xy_half_cached.x, _workspace_xy_half_cached.y, cam_hint, occ_hint]
@@ -277,41 +331,989 @@ func _on_occ_wall_snapshot_debounce_timeout() -> void:
 
 
 func _on_view_tabs_changed(tab: int) -> void:
+	if _active_view_tab != tab:
+		_save_active_view_state(_active_view_tab)
 	_active_view_tab = tab
 	_has_last_valid_occ_uv = false
 	var modelado: bool = tab == 0
 	_apply_subviewport_render_policy()
 	_workspace_hud.visible = true
-	_view_2d_placeholder.visible = USE_OCC_2D_VIEWS and not modelado
-	%NavGizmo.visible = not USE_OCC_2D_VIEWS or modelado
+	_view_2d_placeholder.visible = false
+	%NavGizmo.visible = modelado
 	var rig: OrbitRig = _camera_rig as OrbitRig
 	if rig == null:
+		_sync_mini_tabs_from_main()
+		_apply_visual_style(_visual_style_current)
 		return
+	rig.set_orthographic_zoom_locked(false)
+	_apply_view_state_for_tab(tab)
 	if modelado:
-		if _view_2d_preview.has_method("clear_snapshot"):
-			_view_2d_preview.call("clear_snapshot")
-		if _view_2d_preview.has_method("reset_view_transform"):
-			_view_2d_preview.call("reset_view_transform")
-		rig.set_view_preset("persp")
 		_log_label.text = "Vista activa: Modelado 3D (interactivo)."
-		return
-	var preset: String = _tab_to_preset(tab)
-	if not USE_OCC_2D_VIEWS:
+	else:
+		_log_label.text = "Vista activa: %s (modelo único en ortográfica)." % _view_tabs_bar.get_tab_title(tab)
+	_sync_mini_tabs_from_main()
+	_refresh_top_palette_controls()
+	_apply_visual_style(_visual_style_current)
+	_refresh_main_viewport_docked_state()
+
+
+func _default_view_range_for_tab(tab: int) -> Dictionary:
+	if tab == 1:
+		return {
+			"cut_plane_m": DEFAULT_PLAN_CUT_M,
+			"top_m": DEFAULT_PLAN_TOP_M,
+			"bottom_m": DEFAULT_PLAN_BOTTOM_M,
+			"depth_m": DEFAULT_PLAN_DEPTH_M,
+		}
+	return {"cut_plane_m": 0.0, "top_m": 10.0, "bottom_m": -10.0, "depth_m": 10.0}
+
+
+func _preset_for_tab(tab: int) -> String:
+	match tab:
+		0:
+			return "persp"
+		1:
+			return "top"
+		2:
+			return "front"
+		3:
+			return "right"
+		_:
+			return "top"
+
+
+func _default_view_name_for_tab(tab: int) -> String:
+	match tab:
+		0:
+			return "Modelado 3D"
+		1:
+			return "Planta Nivel 00"
+		2:
+			return "Frente A"
+		3:
+			return "Derecha A"
+		_:
+			return "Vista %d" % tab
+
+
+func _init_default_view_states() -> void:
+	var rig: OrbitRig = _camera_rig as OrbitRig
+	for i in range(_view_tabs_bar.tab_count):
+		var preset: String = _preset_for_tab(i)
 		rig.set_view_preset(preset)
-		_auto_frame_current_view2d()
-		_log_label.text = (
-			"Vista 2D activa (%s): pan/zoom/selección habilitados."
-			% _view_tabs_bar.get_tab_title(tab)
+		_view_state_by_tab[i] = {
+			"name": _default_view_name_for_tab(i),
+			"preset": preset,
+			"camera": rig.capture_view_state(),
+			"camera_snapshot": _capture_main_camera_snapshot(),
+			"view_range": _default_view_range_for_tab(i),
+			"visual_style": _visual_style_current,
+			"scale_2d": 1.0,
+			"is_default": i <= 3,
+		}
+		_view_tabs_bar.set_tab_title(i, str(_view_state_by_tab[i]["name"]))
+	rig.set_view_preset("persp")
+
+
+func _create_or_reuse_view_tab(name: String, preset: String, view_range: Dictionary, is_default: bool) -> int:
+	for k in _view_state_by_tab.keys():
+		var idx: int = int(k)
+		var row: Dictionary = _view_state_by_tab[k] as Dictionary
+		if str(row.get("name", "")) == name:
+			return idx
+	var tab_idx: int = _view_tabs_bar.tab_count
+	_view_tabs_bar.add_tab(name)
+	var rig: OrbitRig = _camera_rig as OrbitRig
+	rig.set_view_preset(preset)
+	_view_state_by_tab[tab_idx] = {
+		"name": name,
+		"preset": preset,
+		"camera": rig.capture_view_state(),
+		"camera_snapshot": _capture_main_camera_snapshot(),
+		"view_range": view_range.duplicate(true),
+		"visual_style": _visual_style_current,
+		"scale_2d": 1.0,
+		"is_default": is_default,
+	}
+	return tab_idx
+
+
+func _save_active_view_state(tab: int) -> void:
+	if tab < 0 or not _view_state_by_tab.has(tab):
+		return
+	var rig: OrbitRig = _camera_rig as OrbitRig
+	var row: Dictionary = _view_state_by_tab[tab] as Dictionary
+	row["camera"] = rig.capture_view_state()
+	row["camera_snapshot"] = _capture_main_camera_snapshot()
+	row["visual_style"] = _visual_style_current
+	_view_state_by_tab[tab] = row
+
+
+func _apply_view_state_for_tab(tab: int) -> void:
+	if not _view_state_by_tab.has(tab):
+		return
+	var rig: OrbitRig = _camera_rig as OrbitRig
+	var row: Dictionary = _view_state_by_tab[tab] as Dictionary
+	var cam: Dictionary = row.get("camera", {}) as Dictionary
+	if cam.is_empty():
+		rig.set_view_preset(str(row.get("preset", _preset_for_tab(tab))))
+	else:
+		rig.apply_view_state(cam)
+	var style: String = str(row.get("visual_style", VIS_STYLE_ARCH))
+	_visual_style_current = style
+	if _visual_style_option != null:
+		for i in range(_visual_style_option.item_count):
+			if str(_visual_style_option.get_item_metadata(i)) == style:
+				_visual_style_option.select(i)
+				break
+
+
+func _capture_main_camera_snapshot() -> Dictionary:
+	return _capture_camera_snapshot_from(_camera)
+
+
+func _capture_camera_snapshot_from(cam: Camera3D) -> Dictionary:
+	return {
+		"transform": cam.global_transform,
+		"projection": cam.projection,
+		"fov": cam.fov,
+		"size": cam.size,
+		"near": cam.near,
+		"far": cam.far,
+	}
+
+
+func _apply_camera_snapshot_to_camera(cam: Camera3D, snap: Dictionary) -> void:
+	if cam == null or snap.is_empty():
+		return
+	if snap.has("transform"):
+		cam.global_transform = snap["transform"] as Transform3D
+	if snap.has("projection"):
+		cam.projection = int(snap["projection"])
+	if snap.has("fov"):
+		cam.fov = float(snap["fov"])
+	if snap.has("size"):
+		cam.size = float(snap["size"])
+	if snap.has("near"):
+		cam.near = float(snap["near"])
+	if snap.has("far"):
+		cam.far = float(snap["far"])
+
+
+func _ensure_viewport_bottom_palette() -> void:
+	if _visual_style_option != null:
+		return
+	var strip: PanelContainer = PanelContainer.new()
+	strip.name = "ViewportBottomPalette"
+	strip.custom_minimum_size = Vector2(640.0, 40.0)
+	strip.mouse_filter = Control.MOUSE_FILTER_STOP
+	var root: Control = get_node_or_null("UI/Root")
+	if root == null:
+		return
+	strip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	strip.offset_left = 8.0
+	strip.offset_right = -8.0
+	strip.offset_top = -44.0
+	strip.offset_bottom = -4.0
+	root.add_child(strip)
+	var status_bar: Control = _log_label.get_parent() as Control
+	if status_bar != null:
+		root.move_child(strip, maxi(0, status_bar.get_index()))
+	strip.z_index = 95
+	var row: HBoxContainer = HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	row.add_theme_constant_override("separation", 8)
+	strip.add_child(row)
+	var style_lbl: Label = Label.new()
+	style_lbl.text = "Estilo visual"
+	row.add_child(style_lbl)
+	_visual_style_option = OptionButton.new()
+	_visual_style_option.add_item("Arquitectonico", 0)
+	_visual_style_option.set_item_metadata(0, VIS_STYLE_ARCH)
+	_visual_style_option.add_item("Alto contraste", 1)
+	_visual_style_option.set_item_metadata(1, VIS_STYLE_CONTRAST)
+	_visual_style_option.add_item("Alambrico", 2)
+	_visual_style_option.set_item_metadata(2, VIS_STYLE_WIREFRAME)
+	_visual_style_option.select(0)
+	_visual_style_option.item_selected.connect(_on_visual_style_selected)
+	row.add_child(_visual_style_option)
+	var scale_lbl: Label = Label.new()
+	scale_lbl.text = "Escala 2D"
+	row.add_child(scale_lbl)
+	_scale_2d_preset_option = OptionButton.new()
+	for den in SCALE_2D_PRESETS:
+		_scale_2d_preset_option.add_item("1:%d" % int(den))
+	_scale_2d_preset_option.add_item("Custom")
+	_scale_2d_preset_option.custom_minimum_size = Vector2(120.0, 0.0)
+	_scale_2d_preset_option.item_selected.connect(_on_workspace_scale_preset_selected)
+	row.add_child(_scale_2d_preset_option)
+	_scale_2d_custom_spin = SpinBox.new()
+	_scale_2d_custom_spin.min_value = 10.0
+	_scale_2d_custom_spin.max_value = 2000.0
+	_scale_2d_custom_spin.step = 5.0
+	_scale_2d_custom_spin.custom_minimum_size = Vector2(96.0, 0.0)
+	_scale_2d_custom_spin.prefix = "1:"
+	_scale_2d_custom_spin.value_changed.connect(_on_workspace_custom_den_changed)
+	row.add_child(_scale_2d_custom_spin)
+	_apply_panel_style(strip, UI_PANEL_ELEVATED, UI_BORDER, 10)
+	_style_label(style_lbl, UI_TEXT)
+	_style_label(scale_lbl, UI_TEXT)
+	_refresh_top_palette_controls()
+	_apply_visual_style(_visual_style_current)
+
+
+func _install_workspace_top_bars() -> void:
+	var workspace: VBoxContainer = get_node_or_null("UI/Root/Workspace")
+	if workspace == null or workspace.has_node("WorkspaceTopBars"):
+		return
+	var top_strip: PanelContainer = PanelContainer.new()
+	top_strip.name = "WorkspaceTopBars"
+	top_strip.custom_minimum_size = Vector2(0.0, 40.0)
+	workspace.add_child(top_strip)
+	workspace.move_child(top_strip, 0)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_strip.add_child(row)
+	var host: Control = _view_tabs_bar.get_parent() as Control
+	if host != null:
+		if host.get_parent() != null:
+			host.get_parent().remove_child(host)
+		row.add_child(host)
+		host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		host.custom_minimum_size = Vector2(560.0, 30.0)
+		host.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var tool_row: HBoxContainer = HBoxContainer.new()
+	tool_row.name = "WorkspaceToolContextRow"
+	tool_row.add_theme_constant_override("separation", 6)
+	row.add_child(tool_row)
+	_workspace_tabs_host_top = top_strip
+	_workspace_tool_context_row = tool_row
+	_rebuild_tool_context_row()
+	_apply_panel_style(top_strip, UI_PANEL_ELEVATED, UI_BORDER, 10)
+
+
+func _rebuild_tool_context_row() -> void:
+	if _workspace_tool_context_row == null:
+		return
+	for c in _workspace_tool_context_row.get_children():
+		c.queue_free()
+	var float_btn: Button = Button.new()
+	float_btn.text = "Flotar vista"
+	float_btn.icon = load("res://assets/icons/actions/action_ping_backend.svg")
+	float_btn.pressed.connect(_on_float_active_view_pressed)
+	_workspace_tool_context_row.add_child(float_btn)
+	var close_btn: Button = Button.new()
+	close_btn.text = "Cerrar vista"
+	close_btn.icon = load("res://assets/icons/actions/action_undo.svg")
+	close_btn.pressed.connect(_on_delete_view2d_pressed)
+	_workspace_tool_context_row.add_child(close_btn)
+	var wall_btn: Button = Button.new()
+	wall_btn.text = "Muro"
+	wall_btn.icon = load("res://assets/icons/tools/tool_create_wall.svg")
+	wall_btn.pressed.connect(_on_create_wall_pressed)
+	_workspace_tool_context_row.add_child(wall_btn)
+	var edit_btn: Button = Button.new()
+	edit_btn.text = "Editar"
+	edit_btn.icon = load("res://assets/icons/tools/tool_edit_element.svg")
+	edit_btn.pressed.connect(_on_edit_mode_button_pressed)
+	_workspace_tool_context_row.add_child(edit_btn)
+	var pp_btn: Button = Button.new()
+	pp_btn.text = "Push/Pull"
+	pp_btn.icon = load("res://assets/icons/tools/tool_push_pull.svg")
+	pp_btn.pressed.connect(_on_push_pull_pressed)
+	_workspace_tool_context_row.add_child(pp_btn)
+	_apply_button_style(float_btn, UI_ACCENT_BLUE)
+	_apply_button_style(close_btn, UI_ACCENT_DANGER)
+	_apply_button_style(wall_btn, UI_ACCENT_BLUE)
+	_apply_button_style(edit_btn, UI_ACCENT_AMBER)
+	_apply_button_style(pp_btn, UI_ACCENT_AMBER)
+
+
+func _ensure_view_tab_top_controls() -> void:
+	if _workspace_tool_context_row != null:
+		return
+	var host: Control = _view_tabs_bar.get_parent() as Control
+	if host == null or host.has_node("ViewTabTopControls"):
+		return
+	_view_tabs_bar.custom_minimum_size = Vector2(0.0, 28.0)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.name = "ViewTabTopControls"
+	row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	row.offset_right = -8.0
+	row.offset_top = 2.0
+	row.add_theme_constant_override("separation", 4)
+	var float_btn: Button = Button.new()
+	float_btn.text = "Flotar"
+	float_btn.pressed.connect(_on_float_active_view_pressed)
+	row.add_child(float_btn)
+	var close_btn: Button = Button.new()
+	close_btn.text = "Cerrar"
+	close_btn.pressed.connect(_on_delete_view2d_pressed)
+	row.add_child(close_btn)
+	_apply_button_style(float_btn, UI_ACCENT_BLUE)
+	_apply_button_style(close_btn, UI_ACCENT_DANGER)
+	host.add_child(row)
+
+
+func _install_workspace_modularity_controls() -> void:
+	_install_dock_toggle_button(_left_dock_header, "Desacoplar", "left")
+	_install_dock_toggle_button(_right_dock_header, "Desacoplar", "right")
+	_refresh_workspace_dock_toggle_row("left")
+	_refresh_workspace_dock_toggle_row("right")
+
+
+func _install_dock_toggle_button(header: Control, label: String, side: String) -> void:
+	if header == null:
+		return
+	var row: HBoxContainer = header.get_node_or_null("DockToggleRow")
+	if row == null:
+		row = HBoxContainer.new()
+		row.name = "DockToggleRow"
+		row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		row.offset_right = -8.0
+		row.offset_top = 4.0
+		header.add_child(row)
+	if row.get_node_or_null("DockSnapLeft") == null:
+		var snap_left_btn: Button = Button.new()
+		snap_left_btn.name = "DockSnapLeft"
+		snap_left_btn.text = "Snap Izq"
+		snap_left_btn.pressed.connect(_on_snap_workspace_panel.bind(side, "left"))
+		row.add_child(snap_left_btn)
+		_apply_button_style(snap_left_btn, UI_ACCENT_BLUE)
+	if row.get_node_or_null("DockSnapRight") == null:
+		var snap_right_btn: Button = Button.new()
+		snap_right_btn.name = "DockSnapRight"
+		snap_right_btn.text = "Snap Der"
+		snap_right_btn.pressed.connect(_on_snap_workspace_panel.bind(side, "right"))
+		row.add_child(snap_right_btn)
+		_apply_button_style(snap_right_btn, UI_ACCENT_BLUE)
+	if row.get_node_or_null("DockSnapTop") == null:
+		var snap_top_btn: Button = Button.new()
+		snap_top_btn.name = "DockSnapTop"
+		snap_top_btn.text = "Snap Arriba"
+		snap_top_btn.pressed.connect(_on_snap_workspace_panel.bind(side, "top"))
+		row.add_child(snap_top_btn)
+		_apply_button_style(snap_top_btn, UI_ACCENT_BLUE)
+	if row.get_node_or_null("DockRedock") == null:
+		var redock_btn: Button = Button.new()
+		redock_btn.name = "DockRedock"
+		redock_btn.text = "Acoplar"
+		redock_btn.pressed.connect(_redock_workspace_panel.bind(side))
+		row.add_child(redock_btn)
+		_apply_button_style(redock_btn, UI_ACCENT_DANGER)
+	var btn: Button = Button.new()
+	btn.name = "DockToggleMain"
+	btn.text = label
+	btn.pressed.connect(_on_toggle_workspace_dock.bind(side))
+	row.add_child(btn)
+	_apply_button_style(btn, UI_ACCENT_BLUE)
+
+
+func _refresh_workspace_dock_toggle_row(side: String) -> void:
+	var header: Control = _left_dock_header if side == "left" else _right_dock_header
+	if header == null:
+		return
+	var row: HBoxContainer = header.get_node_or_null("DockToggleRow")
+	if row == null:
+		return
+	var is_floating: bool = _workspace_floating_windows.has(side)
+	var main_btn: Button = row.get_node_or_null("DockToggleMain")
+	var snap_left_btn: Button = row.get_node_or_null("DockSnapLeft")
+	var snap_right_btn: Button = row.get_node_or_null("DockSnapRight")
+	var snap_top_btn: Button = row.get_node_or_null("DockSnapTop")
+	var redock_btn: Button = row.get_node_or_null("DockRedock")
+	if main_btn != null:
+		main_btn.visible = not is_floating
+	if snap_left_btn != null:
+		snap_left_btn.visible = is_floating
+	if snap_right_btn != null:
+		snap_right_btn.visible = is_floating
+	if snap_top_btn != null:
+		snap_top_btn.visible = is_floating
+	if redock_btn != null:
+		redock_btn.visible = is_floating
+
+
+func _on_toggle_workspace_dock(side: String) -> void:
+	if _workspace_floating_windows.has(side):
+		_redock_workspace_panel(side)
+	else:
+		_undock_workspace_panel(side)
+
+
+func _on_snap_workspace_panel(side: String, zone: String) -> void:
+	if not _workspace_floating_windows.has(side):
+		return
+	var win: Window = _workspace_floating_windows[side]
+	_snap_window_to_zone(win, zone)
+
+
+func _undock_workspace_panel(side: String) -> void:
+	var panel: Control = _left_dock if side == "left" else _right_dock
+	if panel == null or panel.get_parent() == null:
+		return
+	var parent: Node = panel.get_parent()
+	var idx: int = panel.get_index()
+	_workspace_dock_slots[side] = {"parent": parent, "index": idx}
+	parent.remove_child(panel)
+	var win: Window = Window.new()
+	win.title = "Panel %s" % ("izquierdo" if side == "left" else "derecho")
+	win.size = Vector2i(360, 760)
+	add_child(win)
+	win.add_child(panel)
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.offset_left = 0.0
+	panel.offset_top = 0.0
+	panel.offset_right = 0.0
+	panel.offset_bottom = 0.0
+	win.close_requested.connect(_redock_workspace_panel.bind(side))
+	_workspace_floating_windows[side] = win
+	win.popup_centered()
+	_snap_window_to_zone(win, "left" if side == "left" else "right")
+	_refresh_workspace_dock_toggle_row(side)
+
+
+func _redock_workspace_panel(side: String) -> void:
+	if not _workspace_floating_windows.has(side):
+		return
+	var win: Window = _workspace_floating_windows[side]
+	var panel: Control = _left_dock if side == "left" else _right_dock
+	if panel.get_parent() == win:
+		win.remove_child(panel)
+	var slot: Dictionary = _workspace_dock_slots.get(side, {}) as Dictionary
+	var parent: Node = slot.get("parent")
+	var idx: int = int(slot.get("index", -1))
+	if parent != null:
+		parent.add_child(panel)
+		if idx >= 0:
+			parent.move_child(panel, mini(idx, parent.get_child_count() - 1))
+		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+		panel.offset_left = 0.0
+		panel.offset_top = 0.0
+		panel.offset_right = 0.0
+		panel.offset_bottom = 0.0
+	_workspace_dock_slots.erase(side)
+	_workspace_floating_windows.erase(side)
+	win.queue_free()
+	_refresh_workspace_dock_toggle_row(side)
+
+
+func _workspace_edge_snap_target(side: String) -> int:
+	var main_pos: Vector2i = DisplayServer.window_get_position()
+	var main_size: Vector2i = DisplayServer.window_get_size()
+	if side == "left":
+		return main_pos.x + 16
+	return main_pos.x + main_size.x - 16
+
+
+func _workspace_top_snap_y() -> int:
+	var main_pos: Vector2i = DisplayServer.window_get_position()
+	if _workspace_main_split == null:
+		return main_pos.y + 80
+	var rect: Rect2 = _workspace_main_split.get_global_rect()
+	return int(round(main_pos.y + rect.position.y + 8.0))
+
+
+func _workspace_content_rect_screen() -> Rect2i:
+	var main_pos: Vector2i = DisplayServer.window_get_position()
+	var main_size: Vector2i = DisplayServer.window_get_size()
+	if _workspace_main_split == null:
+		return Rect2i(main_pos.x + 8, main_pos.y + 80, maxi(600, main_size.x - 16), maxi(320, main_size.y - 96))
+	var rect: Rect2 = _workspace_main_split.get_global_rect()
+	var x: int = int(round(main_pos.x + rect.position.x))
+	var y: int = int(round(main_pos.y + rect.position.y))
+	var w: int = int(round(rect.size.x))
+	var h: int = int(round(rect.size.y))
+	return Rect2i(x, y, maxi(300, w), maxi(240, h))
+
+
+func _workspace_side_from_window(win: Window) -> String:
+	for k in _workspace_floating_windows.keys():
+		if _workspace_floating_windows[k] == win:
+			return str(k)
+	return ""
+
+
+func _snap_window_to_zone(win: Window, zone: String) -> void:
+	if win == null:
+		return
+	_suppress_auto_snap = true
+	var main_pos: Vector2i = DisplayServer.window_get_position()
+	var main_size: Vector2i = DisplayServer.window_get_size()
+	var top_y: int = _workspace_top_snap_y()
+	var workspace_side: String = _workspace_side_from_window(win)
+	var is_workspace_panel: bool = workspace_side != ""
+	var ws_rect: Rect2i = _workspace_content_rect_screen()
+	match zone:
+		"left":
+			if is_workspace_panel:
+				var panel_w: int = clampi(int(round(float(ws_rect.size.x) * 0.24)), 260, 420)
+				win.position = Vector2i(ws_rect.position.x + 8, ws_rect.position.y + 8)
+				win.size = Vector2i(panel_w, maxi(260, ws_rect.size.y - 16))
+			else:
+				win.position = Vector2i(main_pos.x + 16, top_y)
+				win.size = Vector2i(maxi(340, int(main_size.x * 0.40)), maxi(300, main_size.y - 120))
+		"right":
+			if is_workspace_panel:
+				var panel_w: int = clampi(int(round(float(ws_rect.size.x) * 0.24)), 260, 420)
+				win.position = Vector2i(ws_rect.position.x + ws_rect.size.x - panel_w - 8, ws_rect.position.y + 8)
+				win.size = Vector2i(panel_w, maxi(260, ws_rect.size.y - 16))
+			else:
+				var w: int = maxi(340, int(main_size.x * 0.40))
+				win.position = Vector2i(main_pos.x + maxi(16, main_size.x - w - 16), top_y)
+				win.size = Vector2i(w, maxi(300, main_size.y - 120))
+		"top":
+			if is_workspace_panel:
+				win.position = Vector2i(ws_rect.position.x + 8, ws_rect.position.y + 8)
+				win.size = Vector2i(maxi(420, ws_rect.size.x - 16), maxi(260, int(float(ws_rect.size.y) * 0.42)))
+			else:
+				win.position = Vector2i(main_pos.x + 16, top_y)
+				win.size = Vector2i(maxi(480, main_size.x - 32), maxi(260, int(main_size.y * 0.45)))
+		_:
+			win.popup_centered()
+	_suppress_auto_snap = false
+
+
+func _on_auto_snap_window_moved(kind: String, key: Variant) -> void:
+	if _suppress_auto_snap:
+		return
+	var win: Window = null
+	var workspace_side: String = ""
+	if kind == "view":
+		var tab_idx: int = int(key)
+		if _floating_views.has(tab_idx):
+			win = _floating_views[tab_idx]
+	elif kind == "workspace":
+		workspace_side = str(key)
+		if _workspace_floating_windows.has(workspace_side):
+			win = _workspace_floating_windows[workspace_side]
+	if win == null:
+		_hide_snap_guide()
+		return
+	var main_pos: Vector2i = DisplayServer.window_get_position()
+	var main_size: Vector2i = DisplayServer.window_get_size()
+	var top_y: int = _workspace_top_snap_y()
+	var left_d: int = absi(win.position.x - (main_pos.x + 16))
+	var right_d: int = absi((win.position.x + win.size.x) - (main_pos.x + main_size.x - 16))
+	var top_d: int = absi(win.position.y - top_y)
+	var allow_top_snap: bool = kind == "view"
+	var best: int = mini(left_d, right_d)
+	if allow_top_snap:
+		best = mini(best, top_d)
+	if best > FLOAT_SNAP_THRESHOLD_PX:
+		_hide_snap_guide()
+		return
+	var zone: String = "left"
+	if right_d < left_d:
+		zone = "right"
+	if allow_top_snap and top_d < mini(left_d, right_d):
+		zone = "top"
+	if kind == "workspace":
+		# En paneles laterales, acercar al borde lateral correspondiente los re-acopla.
+		var edge_target: int = _workspace_edge_snap_target(workspace_side)
+		var edge_dist: int = (
+			absi(win.position.x - edge_target)
+			if workspace_side == "left"
+			else absi((win.position.x + win.size.x) - edge_target)
 		)
+		if edge_dist <= FLOAT_SNAP_THRESHOLD_PX:
+			_redock_workspace_panel(workspace_side)
+			_hide_snap_guide()
+			return
+	_show_snap_guide(zone)
+	if best == left_d:
+		_snap_window_to_zone(win, "left")
+	elif best == right_d:
+		_snap_window_to_zone(win, "right")
+	elif allow_top_snap:
+		_snap_window_to_zone(win, "top")
+	_hide_snap_guide()
+
+
+func _ensure_snap_guide_overlay() -> void:
+	if _snap_guide_overlay != null:
 		return
-	# OCC activo: si no viene del browser, resolver por preset default.
-	var chosen_id: String = _find_view2d_id_by_preset(preset)
-	if chosen_id == "":
-		rig.set_view_preset(preset)
-		_auto_frame_current_view2d()
-		_log_label.text = "Vista 2D sin OCC asociada; fallback ortográfico."
+	var root: Control = get_node_or_null("UI/Root")
+	if root == null:
 		return
-	_render_view2d_for_id(chosen_id)
+	_snap_guide_overlay = ColorRect.new()
+	_snap_guide_overlay.name = "SnapGuideOverlay"
+	_snap_guide_overlay.color = Color(0.22, 0.74, 0.97, 0.18)
+	_snap_guide_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_snap_guide_overlay.visible = false
+	_snap_guide_overlay.z_index = 200
+	root.add_child(_snap_guide_overlay)
+
+
+func _show_snap_guide(zone: String) -> void:
+	if _snap_guide_overlay == null:
+		return
+	_snap_guide_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_snap_guide_overlay.offset_left = 0.0
+	_snap_guide_overlay.offset_top = 0.0
+	_snap_guide_overlay.offset_right = 0.0
+	_snap_guide_overlay.offset_bottom = 0.0
+	match zone:
+		"left":
+			_snap_guide_overlay.anchor_right = 0.40
+		"right":
+			_snap_guide_overlay.anchor_left = 0.60
+		"top":
+			_snap_guide_overlay.anchor_bottom = 0.45
+		_:
+			pass
+	_snap_guide_overlay.visible = true
+
+
+func _hide_snap_guide() -> void:
+	if _snap_guide_overlay != null:
+		_snap_guide_overlay.visible = false
+
+
+func _refresh_top_palette_controls() -> void:
+	if _scale_2d_preset_option == null or _scale_2d_custom_spin == null:
+		return
+	var is_2d: bool = _active_view_tab != 0 and _view_state_by_tab.has(_active_view_tab)
+	_scale_2d_preset_option.visible = is_2d
+	_scale_2d_custom_spin.visible = false
+	if not is_2d:
+		return
+	var row: Dictionary = _view_state_by_tab[_active_view_tab] as Dictionary
+	var den_from_state: int = _denominator_from_scale_factor(float(row.get("scale_2d", 1.0)))
+	var preset_idx: int = SCALE_2D_PRESETS.find(den_from_state)
+	_scale_2d_custom_spin.value = float(den_from_state)
+	if preset_idx >= 0:
+		_scale_2d_preset_option.select(preset_idx)
+		_scale_2d_custom_spin.visible = false
+	else:
+		_scale_2d_preset_option.select(_scale_2d_preset_option.item_count - 1)
+		_scale_2d_custom_spin.visible = true
+	if is_2d:
+		_log_label.text = "Escala activa %d:%d" % [1, den_from_state]
+
+
+func _on_workspace_scale_preset_selected(selected_idx: int) -> void:
+	var target_tab: int = _view_tabs_bar.current_tab
+	if target_tab != _active_view_tab:
+		_on_view_tabs_changed(target_tab)
+	if target_tab == 0 or not _view_state_by_tab.has(target_tab):
+		return
+	var custom_idx: int = SCALE_2D_PRESETS.size()
+	if selected_idx == custom_idx:
+		_scale_2d_custom_spin.visible = true
+		_set_floating_2d_scale_factor(target_tab, _scale_factor_from_denominator(_scale_2d_custom_spin.value))
+		return
+	_scale_2d_custom_spin.visible = false
+	var den: int = int(SCALE_2D_PRESETS[selected_idx])
+	_set_floating_2d_scale_factor(target_tab, _scale_factor_from_denominator(den))
+
+
+func _on_workspace_custom_den_changed(value: float) -> void:
+	var target_tab: int = _view_tabs_bar.current_tab
+	if target_tab != _active_view_tab:
+		_on_view_tabs_changed(target_tab)
+	if target_tab == 0 or not _view_state_by_tab.has(target_tab):
+		return
+	if _scale_2d_preset_option.selected != _scale_2d_preset_option.item_count - 1:
+		return
+	_set_floating_2d_scale_factor(target_tab, _scale_factor_from_denominator(value))
+
+
+func _sync_mini_tabs_from_main() -> void:
+	return
+
+
+func _on_mini_view_tab_changed(tab: int) -> void:
+	_view_tabs_bar.current_tab = tab
+	_on_view_tabs_changed(tab)
+
+
+func _on_visual_style_selected(idx: int) -> void:
+	var md: Variant = _visual_style_option.get_item_metadata(idx)
+	_visual_style_current = str(md)
+	_apply_visual_style(_visual_style_current)
+
+
+func _apply_visual_style(style_id: String) -> void:
+	if style_id == VIS_STYLE_WIREFRAME:
+		_subviewport.debug_draw = Viewport.DEBUG_DRAW_WIREFRAME
+	else:
+		_subviewport.debug_draw = Viewport.DEBUG_DRAW_DISABLED
+	var env: Environment = _world_environment.environment
+	if env == null:
+		return
+	match style_id:
+		VIS_STYLE_CONTRAST:
+			env.background_mode = Environment.BG_CLEAR_COLOR
+			env.background_color = Color(0.06, 0.065, 0.08, 1.0)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = Color(0.76, 0.80, 0.86, 1.0)
+			env.ambient_light_energy = 0.62
+			_light.light_energy = 1.22
+			_grid.visible = false
+		VIS_STYLE_WIREFRAME:
+			_apply_environment_viewport_flat(true)
+			_light.light_energy = 0.95
+			_grid.visible = true
+		_:
+			var is_persp: bool = (
+				is_instance_valid(_camera_rig) and _camera_rig.has_method("is_perspective_preset")
+				and bool(_camera_rig.is_perspective_preset())
+			)
+			_apply_environment_viewport_flat(is_persp)
+			_light.light_energy = 1.08
+			_grid.visible = true
+
+
+func _active_view_title() -> String:
+	return _view_tabs_bar.get_tab_title(_view_tabs_bar.current_tab)
+
+
+func _on_float_active_view_pressed() -> void:
+	var idx: int = _view_tabs_bar.current_tab
+	if _floating_views.has(idx):
+		var existing: Window = _floating_views[idx]
+		existing.grab_focus()
+		return
+	var win: Window = Window.new()
+	win.title = "Vista flotante: %s" % _active_view_title()
+	win.size = Vector2i(840, 520)
+	win.unresizable = false
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.offset_left = 12.0
+	vbox.offset_top = 12.0
+	vbox.offset_right = -12.0
+	vbox.offset_bottom = -12.0
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var vp_host: SubViewportContainer = SubViewportContainer.new()
+	vp_host.stretch = true
+	vp_host.custom_minimum_size = Vector2(0.0, 380.0)
+	var vp: SubViewport = SubViewport.new()
+	vp.size = Vector2i(1280, 720)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp.transparent_bg = false
+	vp.own_world_3d = false
+	vp.world_3d = _subviewport.world_3d
+	var floating_rig: OrbitRig = OrbitRig.new() as OrbitRig
+	var floating_cam: Camera3D = Camera3D.new()
+	floating_cam.name = "Camera3D"
+	floating_rig.add_child(floating_cam)
+	vp.add_child(floating_rig)
+	vp_host.add_child(vp)
+	vp_host.gui_input.connect(_on_floating_viewport_gui_input.bind(idx))
+	vbox.add_child(vp_host)
+	var row: HBoxContainer = HBoxContainer.new()
+	var activate_btn: Button = Button.new()
+	activate_btn.text = "Activar vista"
+	activate_btn.pressed.connect(_on_activate_floating_view.bind(idx))
+	row.add_child(activate_btn)
+	var snap_left_btn: Button = Button.new()
+	snap_left_btn.text = "Snap Izq"
+	snap_left_btn.pressed.connect(_on_snap_floating_view.bind(idx, "left"))
+	row.add_child(snap_left_btn)
+	var snap_right_btn: Button = Button.new()
+	snap_right_btn.text = "Snap Der"
+	snap_right_btn.pressed.connect(_on_snap_floating_view.bind(idx, "right"))
+	row.add_child(snap_right_btn)
+	var snap_top_btn: Button = Button.new()
+	snap_top_btn.text = "Snap Arriba"
+	snap_top_btn.pressed.connect(_on_snap_floating_view.bind(idx, "top"))
+	row.add_child(snap_top_btn)
+	var close_btn: Button = Button.new()
+	close_btn.text = "Acoplar"
+	close_btn.pressed.connect(_on_close_floating_view.bind(idx))
+	row.add_child(close_btn)
+	var hint: Label = Label.new()
+	hint.text = "Preview en vivo del viewport principal (base para desacople por vista)."
+	row.add_child(hint)
+	vbox.add_child(row)
+	_apply_button_style(activate_btn, UI_ACCENT_BLUE)
+	_apply_button_style(snap_left_btn, UI_ACCENT_BLUE)
+	_apply_button_style(snap_right_btn, UI_ACCENT_BLUE)
+	_apply_button_style(snap_top_btn, UI_ACCENT_BLUE)
+	_apply_button_style(close_btn, UI_ACCENT_BLUE)
+	_style_label(hint, UI_MUTED)
+	win.add_child(vbox)
+	win.close_requested.connect(_on_close_floating_view.bind(idx))
+	add_child(win)
+	_floating_views[idx] = win
+	_floating_viewports[idx] = {
+		"subviewport": vp,
+		"camera": floating_cam,
+		"rig": floating_rig,
+		"host": vp_host,
+	}
+	if _view_state_by_tab.has(idx):
+		var row_state: Dictionary = _view_state_by_tab[idx] as Dictionary
+		var cam_state: Dictionary = row_state.get("camera", {}) as Dictionary
+		if not cam_state.is_empty():
+			floating_rig.apply_view_state(cam_state)
+		var snap: Dictionary = row_state.get("camera_snapshot", {}) as Dictionary
+		_apply_camera_snapshot_to_camera(floating_cam, snap)
+	win.popup_centered()
+	_snap_window_to_zone(win, "right")
+	_refresh_main_viewport_docked_state()
+
+
+func _on_snap_floating_view(tab_idx: int, zone: String) -> void:
+	if not _floating_views.has(tab_idx):
+		return
+	var win: Window = _floating_views[tab_idx]
+	_snap_window_to_zone(win, zone)
+
+
+func _on_floating_viewport_gui_input(event: InputEvent, tab_idx: int) -> void:
+	if not _floating_viewports.has(tab_idx):
+		return
+	var slot: Dictionary = _floating_viewports[tab_idx] as Dictionary
+	var rig: OrbitRig = slot.get("rig") as OrbitRig
+	if rig == null:
+		return
+	if rig.handle_viewport_gui_input(event):
+		var row: Dictionary = _view_state_by_tab.get(tab_idx, {}) as Dictionary
+		if not row.is_empty():
+			row["camera"] = rig.capture_view_state()
+			var cam: Camera3D = slot.get("camera") as Camera3D
+			row["camera_snapshot"] = _capture_camera_snapshot_from(cam)
+			_view_state_by_tab[tab_idx] = row
+
+
+func _set_floating_2d_scale_factor(tab_idx: int, new_scale: float) -> void:
+	if tab_idx == 0 or not _view_state_by_tab.has(tab_idx):
+		return
+	var row: Dictionary = _view_state_by_tab[tab_idx] as Dictionary
+	var old_scale: float = maxf(0.0001, float(row.get("scale_2d", 1.0)))
+	new_scale = clampf(float(new_scale), 0.05, 20.0)
+	var cam_state: Dictionary = row.get("camera", {}) as Dictionary
+	var dist: float = float(cam_state.get("distance", 14.0))
+	cam_state["distance"] = clampf(dist * old_scale / new_scale, 2.0, 1200.0)
+	row["camera"] = cam_state
+	var snap: Dictionary = row.get("camera_snapshot", {}) as Dictionary
+	if not snap.is_empty():
+		var old_size: float = float(snap.get("size", 10.0))
+		snap["size"] = maxf(2.0, old_size * old_scale / new_scale)
+		row["camera_snapshot"] = snap
+	row["scale_2d"] = new_scale
+	_view_state_by_tab[tab_idx] = row
+	if tab_idx == _active_view_tab:
+		var rig: OrbitRig = _camera_rig as OrbitRig
+		if rig != null and tab_idx != 0:
+			var live_state: Dictionary = rig.capture_view_state()
+			var live_dist: float = float(live_state.get("distance", 14.0))
+			live_state["distance"] = clampf(live_dist * old_scale / new_scale, 2.0, 1200.0)
+			rig.apply_view_state(live_state)
+			row["camera"] = rig.capture_view_state()
+			row["camera_snapshot"] = _capture_main_camera_snapshot()
+			row["scale_2d"] = new_scale
+			_view_state_by_tab[tab_idx] = row
+		_apply_view_state_for_tab(tab_idx)
+		var den: int = _denominator_from_scale_factor(new_scale)
+		_log_label.text = "Escala aplicada en vista %s: 1:%d" % [_view_tabs_bar.get_tab_title(tab_idx), den]
+		_save_active_view_state(tab_idx)
+	_sync_floating_viewport_cameras()
+
+
+func _denominator_from_scale_factor(scale_factor: float) -> int:
+	var sf: float = maxf(0.0001, scale_factor)
+	return int(round(100.0 / sf))
+
+
+func _scale_factor_from_denominator(denominator: float) -> float:
+	var den: float = maxf(1.0, denominator)
+	return 100.0 / den
+
+
+func _on_floating_2d_scale_preset_selected(selected_idx: int, tab_idx: int, custom_spin: SpinBox) -> void:
+	var custom_idx: int = SCALE_2D_PRESETS.size()
+	if selected_idx == custom_idx:
+		custom_spin.visible = true
+		_set_floating_2d_scale_factor(tab_idx, _scale_factor_from_denominator(custom_spin.value))
+		return
+	custom_spin.visible = false
+	var den: int = int(SCALE_2D_PRESETS[selected_idx])
+	_set_floating_2d_scale_factor(tab_idx, _scale_factor_from_denominator(den))
+
+
+func _on_floating_2d_custom_den_changed(value: float, tab_idx: int) -> void:
+	_set_floating_2d_scale_factor(tab_idx, _scale_factor_from_denominator(value))
+
+
+func _on_activate_floating_view(tab_idx: int) -> void:
+	_view_tabs_bar.current_tab = tab_idx
+	_on_view_tabs_changed(tab_idx)
+
+
+func _on_close_floating_view(tab_idx: int) -> void:
+	if not _floating_views.has(tab_idx):
+		return
+	var win: Window = _floating_views[tab_idx]
+	if _floating_viewports.has(tab_idx):
+		var slot: Dictionary = _floating_viewports[tab_idx] as Dictionary
+		var rig: OrbitRig = slot.get("rig") as OrbitRig
+		var cam: Camera3D = slot.get("camera") as Camera3D
+		if _view_state_by_tab.has(tab_idx):
+			var row: Dictionary = _view_state_by_tab[tab_idx] as Dictionary
+			if rig != null:
+				row["camera"] = rig.capture_view_state()
+			if cam != null:
+				row["camera_snapshot"] = _capture_camera_snapshot_from(cam)
+			_view_state_by_tab[tab_idx] = row
+	_floating_views.erase(tab_idx)
+	_floating_viewports.erase(tab_idx)
+	win.queue_free()
+	_refresh_main_viewport_docked_state()
+	if tab_idx > 3:
+		_close_view_tab(tab_idx)
+
+
+func _close_floating_view(tab_idx: int) -> void:
+	_on_close_floating_view(tab_idx)
+
+
+func _on_dock_all_views_pressed() -> void:
+	var keys: Array = _floating_views.keys()
+	for k in keys:
+		_on_close_floating_view(int(k))
+	_refresh_main_viewport_docked_state()
+
+
+func _refresh_main_viewport_docked_state() -> void:
+	if _subviewport == null:
+		return
+	var active_is_floating: bool = _floating_views.has(_active_view_tab)
+	if active_is_floating:
+		_subviewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		_view_2d_placeholder.visible = true
+		_view_2d_placeholder_title.text = "Vista activa desacoplada"
+		_view_2d_placeholder_hint.text = (
+			"La vista \"%s\" está en ventana flotante. "
+			% _view_tabs_bar.get_tab_title(_active_view_tab)
+			+ "Acóplala o activa otra pestaña para mostrarla aquí."
+		)
+		%NavGizmo.visible = false
+		return
+	_apply_subviewport_render_policy()
+	_view_2d_placeholder.visible = false
+	%NavGizmo.visible = _active_view_tab == 0
+
+
+func _duplicate_active_view() -> void:
+	var tab: int = _view_tabs_bar.current_tab
+	if not _view_state_by_tab.has(tab):
+		return
+	_save_active_view_state(tab)
+	var src: Dictionary = _view_state_by_tab[tab] as Dictionary
+	var next_name: String = "%s copia %d" % [str(src.get("name", "Vista")), _view_name_seq]
+	_view_name_seq += 1
+	var new_tab: int = _view_tabs_bar.tab_count
+	_view_tabs_bar.add_tab(next_name)
+	var row: Dictionary = src.duplicate(true)
+	row["name"] = next_name
+	row["is_default"] = false
+	_view_state_by_tab[new_tab] = row
+	_view_tabs_bar.current_tab = new_tab
+	_on_view_tabs_changed(new_tab)
 
 
 func _set_wall_trace_mode(enable: bool) -> void:
@@ -328,27 +1330,9 @@ func _set_wall_trace_mode(enable: bool) -> void:
 
 func _render_view2d_for_id(id: String) -> void:
 	if not _view2d_defs.has(id):
-		# #region agent log
-		_agent_debug_log(
-			"pre-fix",
-			"H2",
-			"main_scene.gd:_render_view2d_for_id",
-			"view id not found",
-			{"id": id, "known_count": _view2d_defs.size()},
-		)
-		# #endregion
 		return
 	var d: Dictionary = _view2d_defs[id] as Dictionary
 	var preset: String = str(d.get("preset", "top"))
-	# #region agent log
-	_agent_debug_log(
-		"pre-fix",
-		"H1",
-		"main_scene.gd:_render_view2d_for_id",
-		"render route selected",
-		{"id": id, "preset": preset, "mode": _view2d_render_mode, "active_tab": _active_view_tab},
-	)
-	# #endregion
 	if _view2d_render_mode == VIEW2D_MODE_ORTHO:
 		_activate_legacy_ortho_view2d(preset, "Vista 2D: modo Modelo ortográfico activo.")
 		return
@@ -375,15 +1359,6 @@ func _on_view2d_mode_toggle_pressed() -> void:
 			_view2d_render_mode = VIEW2D_MODE_ORTHO
 		_:
 			_view2d_render_mode = VIEW2D_MODE_AUTO
-	# #region agent log
-	_agent_debug_log(
-		"pre-fix",
-		"H1",
-		"main_scene.gd:_on_view2d_mode_toggle_pressed",
-		"2d mode toggled",
-		{"prev_mode": prev_mode, "next_mode": _view2d_render_mode, "active_tab": _active_view_tab},
-	)
-	# #endregion
 	_update_view2d_mode_button_text()
 	if _active_view_tab == 0:
 		return
@@ -433,6 +1408,10 @@ func _occ_uv_to_floor_point_world(uv: Vector2) -> Vector3:
 			return Vector3(uv.x, uv.y, zb)
 
 
+func _is_valid_occ_uv(uv: Vector2) -> bool:
+	return not (is_inf(uv.x) or is_inf(uv.y) or is_nan(uv.x) or is_nan(uv.y))
+
+
 func _find_view2d_id_by_preset(preset: String) -> String:
 	for id in _view2d_defs.keys():
 		var row: Dictionary = _view2d_defs[id] as Dictionary
@@ -475,20 +1454,6 @@ func _render_occ_view2d_async(id: String) -> void:
 		params["requested_scale_m_per_px"] = float(existing.get("scale_m_per_px", 1.0))
 		params["view_range"] = existing.get("view_range", _default_view_range_for_preset(preset))
 	var resp: Dictionary = await RpcClient.call_rpc("draw.ortho_snapshot", params, 30000)
-	# #region agent log
-	_agent_debug_log(
-		"pre-fix",
-		"H3",
-		"main_scene.gd:_render_occ_view2d_async",
-		"ortho snapshot response",
-		{
-			"id": id,
-			"ok": bool(resp.get("ok", false)),
-			"mode": _view2d_render_mode,
-			"error": str(resp.get("error", {})),
-		},
-	)
-	# #endregion
 	if not is_inside_tree():
 		return
 	if not bool(resp.get("ok", false)):
@@ -524,15 +1489,6 @@ func _render_occ_view2d_async(id: String) -> void:
 			row["view_range"] = res["view_range"]
 		_view2d_runtime_state[id] = row
 	if int(res.get("line_count", 0)) == 0 and _view2d_render_mode == VIEW2D_MODE_AUTO:
-		# #region agent log
-		_agent_debug_log(
-			"pre-fix",
-			"H4",
-			"main_scene.gd:_render_occ_view2d_async",
-			"fallback by empty line_count",
-			{"id": id, "line_count": int(res.get("line_count", 0)), "mode": _view2d_render_mode},
-		)
-		# #endregion
 		_set_view2d_status(id, VIEW2D_STATE_FALLBACK, "Snapshot vacío; usando modelo ortográfico.")
 		_activate_legacy_ortho_view2d(
 			preset,
@@ -774,11 +1730,47 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_do_redo_async()
 		elif k.pressed and k.keycode == KEY_Z and k.ctrl_pressed:
 			_do_undo_async()
+		elif k.pressed and k.alt_pressed and not k.ctrl_pressed and not k.meta_pressed:
+			if k.keycode == KEY_1:
+				_switch_view_tab_keyboard(1)
+				get_viewport().set_input_as_handled()
+			elif k.keycode == KEY_2:
+				_switch_view_tab_keyboard(2)
+				get_viewport().set_input_as_handled()
+			elif k.keycode == KEY_3:
+				_switch_view_tab_keyboard(3)
+				get_viewport().set_input_as_handled()
+			elif k.keycode == KEY_4:
+				_switch_view_tab_keyboard(0)
+				get_viewport().set_input_as_handled()
 		elif k.pressed and k.keycode == KEY_DELETE and _delete_wall_shortcut_allowed():
 			_on_delete_wall_pressed()
 			get_viewport().set_input_as_handled()
+		elif k.pressed and k.ctrl_pressed and not k.shift_pressed and k.keycode == KEY_D:
+			_duplicate_active_view()
+			get_viewport().set_input_as_handled()
+		elif k.pressed and k.ctrl_pressed and not k.shift_pressed and k.keycode == KEY_W:
+			_on_delete_view2d_pressed()
+			get_viewport().set_input_as_handled()
 		elif k.pressed and k.keycode == KEY_ESCAPE and _wall_tool.is_active():
 			_cancel_wall_tool_with_esc()
+			get_viewport().set_input_as_handled()
+		elif k.pressed and k.keycode == KEY_TAB and k.alt_pressed and not k.ctrl_pressed and not k.meta_pressed:
+			var dir: int = -1 if k.shift_pressed else 1
+			if _select_wall_by_keyboard_step(dir):
+				get_viewport().set_input_as_handled()
+		elif k.pressed and k.keycode == KEY_W and not k.ctrl_pressed and not k.alt_pressed and not k.meta_pressed:
+			_on_create_wall_pressed()
+			get_viewport().set_input_as_handled()
+		elif k.pressed and k.keycode == KEY_E and not k.ctrl_pressed and not k.alt_pressed and not k.meta_pressed:
+			if _is_edit_mode_active():
+				_exit_edit_mode("Modo edición: cerrado")
+			else:
+				var selected_guid: String = _project_view.selected_guid()
+				if selected_guid != "":
+					_enter_edit_mode(selected_guid)
+			get_viewport().set_input_as_handled()
+		elif (k.pressed or k.echo) and _wall_tool.is_active() and _handle_wall_keyboard_input(k):
 			get_viewport().set_input_as_handled()
 		elif k.pressed and k.keycode == KEY_ESCAPE and _is_edit_mode_active():
 			_exit_edit_mode("Modo edición: cerrado")
@@ -791,14 +1783,126 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 
+func _switch_view_tab_keyboard(tab: int) -> void:
+	_view_tabs_bar.current_tab = tab
+	_on_view_tabs_changed(tab)
+	var title: String = _view_tabs_bar.get_tab_title(tab)
+	_log_label.text = "Vista activa (teclado): %s" % title
+
+
+func _activate_wall_stable_2d_mode_if_needed() -> void:
+	if not USE_OCC_2D_VIEWS or _active_view_tab == 0:
+		return
+	if _view2d_mode_before_wall == "":
+		_view2d_mode_before_wall = _view2d_render_mode
+	if _view2d_render_mode != VIEW2D_MODE_ORTHO:
+		_view2d_render_mode = VIEW2D_MODE_ORTHO
+		_update_view2d_mode_button_text()
+		var preset: String = _tab_to_preset(_active_view_tab)
+		var id: String = _find_view2d_id_by_preset(preset)
+		if id != "":
+			_render_view2d_for_id(id)
+
+
+func _restore_view2d_mode_after_wall() -> void:
+	if _view2d_mode_before_wall == "":
+		return
+	_view2d_render_mode = _view2d_mode_before_wall
+	_view2d_mode_before_wall = ""
+	_update_view2d_mode_button_text()
+	if USE_OCC_2D_VIEWS and _active_view_tab != 0:
+		var preset: String = _tab_to_preset(_active_view_tab)
+		var id: String = _find_view2d_id_by_preset(preset)
+		if id != "":
+			_render_view2d_for_id(id)
+
+
+func _wall_guids_sorted() -> Array:
+	var guids: Array = []
+	for guid in _wall_tree_items.keys():
+		guids.append(str(guid))
+	guids.sort()
+	return guids
+
+
+func _select_wall_by_keyboard_step(step: int) -> bool:
+	var guids: Array = _wall_guids_sorted()
+	if guids.is_empty():
+		return false
+	var current_guid: String = _project_view.selected_guid()
+	var idx: int = guids.find(current_guid)
+	if idx < 0:
+		idx = 0 if step >= 0 else guids.size() - 1
+	else:
+		idx = posmod(idx + step, guids.size())
+	var guid: String = str(guids[idx])
+	_project_view.set_selection(guid)
+	_sync_tree_selection(guid)
+	if _is_edit_mode_active() and guid != _edit_mode_guid:
+		_exit_edit_mode("")
+	_refresh_properties_panel()
+	_log_label.text = "Selección (teclado): %s" % guid
+	return true
+
+
+func _init_keyboard_wall_cursor_if_needed() -> void:
+	if _kb_wall_cursor_ready:
+		return
+	var ref := Vector2.ZERO
+	if _wall_tool != null and _wall_tool.has_method("get_chain_floor_reference_xy"):
+		ref = _wall_tool.call("get_chain_floor_reference_xy") as Vector2
+	_kb_wall_cursor_world = Vector3(ref.x, ref.y, BASE_STOREY_ELEVATION_M)
+	_kb_wall_cursor_ready = true
+	_wall_tool.handle_viewport_motion_world_floor(_kb_wall_cursor_world)
+
+
+func _handle_wall_keyboard_input(k: InputEventKey) -> bool:
+	var step: float = KB_WALL_STEP_COARSE_M if k.shift_pressed else KB_WALL_STEP_FINE_M
+	if k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER:
+		_init_keyboard_wall_cursor_if_needed()
+		_wall_tool.handle_viewport_click_world_floor(_kb_wall_cursor_world)
+		_log_label.text = "Crear muro (teclado): punto confirmado (Enter). Flechas mueven cursor."
+		return true
+	if k.keycode == KEY_BACKSPACE:
+		_wall_tool.reset_draft()
+		_kb_wall_cursor_ready = false
+		_log_label.text = "Crear muro (teclado): trazo reiniciado."
+		return true
+	if (
+		k.keycode != KEY_UP
+		and k.keycode != KEY_DOWN
+		and k.keycode != KEY_LEFT
+		and k.keycode != KEY_RIGHT
+	):
+		return false
+	_init_keyboard_wall_cursor_if_needed()
+	match k.keycode:
+		KEY_UP:
+			_kb_wall_cursor_world.y += step
+		KEY_DOWN:
+			_kb_wall_cursor_world.y -= step
+		KEY_LEFT:
+			_kb_wall_cursor_world.x -= step
+		KEY_RIGHT:
+			_kb_wall_cursor_world.x += step
+	_wall_tool.handle_viewport_motion_world_floor(_kb_wall_cursor_world)
+	_log_label.text = (
+		"Cursor muro (teclado): X=%.2f Y=%.2f | paso %.2fm (%s)"
+		% [
+			_kb_wall_cursor_world.x,
+			_kb_wall_cursor_world.y,
+			step,
+			"Shift" if k.shift_pressed else "fino",
+		]
+	)
+	return true
+
+
 func _adjust_active_view_cut(delta_m: float) -> void:
-	var preset: String = _tab_to_preset(_active_view_tab)
-	var id: String = _find_view2d_id_by_preset(preset)
-	if id == "":
+	if not _view_state_by_tab.has(_active_view_tab):
 		return
-	if not _view2d_runtime_state.has(id):
-		return
-	var row: Dictionary = _view2d_runtime_state[id] as Dictionary
+	var row: Dictionary = _view_state_by_tab[_active_view_tab] as Dictionary
+	var preset: String = str(row.get("preset", _preset_for_tab(_active_view_tab)))
 	var vr: Dictionary = row.get("view_range", _default_view_range_for_preset(preset)) as Dictionary
 	var cut: float = float(vr.get("cut_plane_m", DEFAULT_PLAN_CUT_M))
 	var bottom: float = float(vr.get("bottom_m", DEFAULT_PLAN_BOTTOM_M))
@@ -806,10 +1910,9 @@ func _adjust_active_view_cut(delta_m: float) -> void:
 	cut = clampf(cut + delta_m, bottom, top)
 	vr["cut_plane_m"] = cut
 	row["view_range"] = vr
-	_view2d_runtime_state[id] = row
-	_render_view2d_for_id(id)
+	_view_state_by_tab[_active_view_tab] = row
 	_refresh_workspace_hud()
-	_log_label.text = "Planta 2D OCC: plano de corte %.2f m (PgUp/PgDn)." % cut
+	_log_label.text = "Rango de vista (%s): corte %.2f m (PgUp/PgDn)." % [str(row.get("name", preset)), cut]
 
 
 func _do_undo_async() -> void:
@@ -856,6 +1959,14 @@ func _on_ribbon_tab_changed(tab: int) -> void:
 	var inicio: bool = tab == 0
 	_ribbon_tools_inicio.visible = inicio
 	_ribbon_tools_placeholder.visible = not inicio
+
+
+func _refresh_ribbon_compact_mode() -> void:
+	if _ribbon == null or _ribbon_body == null:
+		return
+	# Mantener cinta siempre visible (preferencia de workspace tipo Revit).
+	_ribbon_body.visible = true
+	_ribbon.custom_minimum_size = Vector2(0.0, 118.0)
 
 
 func _build_project_tree() -> void:
@@ -975,14 +2086,8 @@ func _activate_view2d_from_tree(id: String) -> void:
 	var d: Dictionary = _view2d_defs[id] as Dictionary
 	var label: String = str(d.get("label", "Vista 2D"))
 	var preset: String = str(d.get("preset", "top"))
-	var tab: int = _view_tab_for_preset(preset)
+	var tab: int = _create_or_reuse_view_tab(label, preset, _default_view_range_for_preset(preset), false)
 	_view_tabs_bar.current_tab = tab
-	if USE_OCC_2D_VIEWS:
-		_active_view_tab = tab
-		_view_2d_placeholder.visible = true
-		%NavGizmo.visible = false
-		_render_view2d_for_id(id)
-		return
 	_on_view_tabs_changed(tab)
 	_log_label.text = "Vista 2D activa: %s" % label
 
@@ -991,7 +2096,8 @@ func _on_add_view2d_pressed() -> void:
 	var preset: String = _tab_to_preset(_active_view_tab)
 	if preset == "persp":
 		preset = "top"
-	var label: String = "Vista 2D %d" % _next_view2d_idx
+	var label: String = "Planta Nivel %02d" % _view_name_seq if preset == "top" else "Sección %d" % _view_name_seq
+	_view_name_seq += 1
 	var id: String = _register_view2d_tree_item(label, preset)
 	if _view2d_items.has(id):
 		var it: TreeItem = _view2d_items[id] as TreeItem
@@ -1001,23 +2107,31 @@ func _on_add_view2d_pressed() -> void:
 
 
 func _on_delete_view2d_pressed() -> void:
-	var item: TreeItem = _project_tree.get_selected()
-	if item == null:
+	var tab: int = _view_tabs_bar.current_tab
+	_close_view_tab(tab)
+
+
+func _close_view_tab(tab: int) -> void:
+	if tab <= 3:
+		_log_label.text = "Las vistas base no se eliminan."
 		return
-	var md: Variant = item.get_metadata(0)
-	if not (md is String and String(md).begins_with("VIEW2D:")):
-		_log_label.text = "Selecciona una vista 2D del Project Browser para eliminarla."
+	if not _view_state_by_tab.has(tab):
 		return
-	var id: String = String(md).substr("VIEW2D:".length())
-	item.free()
-	_view2d_items.erase(id)
-	_view2d_defs.erase(id)
-	_view2d_runtime_state.erase(id)
-	if _view_2d_preview.has_method("clear_snapshot"):
-		_view_2d_preview.call("clear_snapshot")
+	if _floating_views.has(tab):
+		var win: Window = _floating_views[tab]
+		_floating_views.erase(tab)
+		_floating_viewports.erase(tab)
+		win.queue_free()
+	_view_state_by_tab.erase(tab)
+	_view_tabs_bar.remove_tab(tab)
+	var remapped: Dictionary = {}
+	for k in _view_state_by_tab.keys():
+		var idx: int = int(k)
+		remapped[idx if idx < tab else idx - 1] = _view_state_by_tab[k]
+	_view_state_by_tab = remapped
 	_view_tabs_bar.current_tab = 0
 	_on_view_tabs_changed(0)
-	_log_label.text = "Vista 2D eliminada."
+	_log_label.text = "Vista cerrada."
 
 
 func _refresh_properties_panel() -> void:
@@ -1280,11 +2394,14 @@ func _on_ping_pressed() -> void:
 func _on_create_wall_pressed() -> void:
 	if _wall_tool.is_active():
 		_wall_tool.deactivate()
+		_kb_wall_cursor_ready = false
+		_restore_view2d_mode_after_wall()
 		_set_wall_trace_mode(false)
 		_project_view.clear_selection()
 		_exit_edit_mode("")
 		_refresh_properties_panel()
 		_log_label.text = "Crear muro: herramienta cerrada."
+		_refresh_ribbon_compact_mode()
 		return
 	if _active_view_tab == 2 or _active_view_tab == 3:
 		_view_tabs_bar.current_tab = 1
@@ -1298,11 +2415,15 @@ func _on_create_wall_pressed() -> void:
 	_refresh_properties_panel()
 	_sync_trace_defaults_to_wall_tool()
 	_wall_tool.activate()
+	_kb_wall_cursor_ready = false
+	_activate_wall_stable_2d_mode_if_needed()
 	_set_wall_trace_mode(true)
 	_log_label.text = (
 		"Crear muro: primer trazo P1+P2; los siguientes salen solo con P2 desde el último extremo "
-		+ "(Alt+clic = nuevo P1). Esc o botón para salir."
+		+ "(Alt+clic = nuevo P1). Teclado: flechas mueven, Enter confirma, Shift acelera, Backspace reinicia. "
+		+ "Global: W muro, E editar, Alt+Tab siguiente muro, Alt+Shift+Tab anterior, Alt+1/2/3/4 cambia vista."
 	)
+	_refresh_ribbon_compact_mode()
 
 
 func _on_push_pull_pressed() -> void:
@@ -1310,17 +2431,20 @@ func _on_push_pull_pressed() -> void:
 		_push_pull_tool.deactivate()
 		_refresh_properties_panel()
 		_log_label.text = "Push/Pull: cancelado"
+		_refresh_ribbon_compact_mode()
 		return
 	if not _is_edit_mode_active():
 		_log_label.text = "Entra en modo edición para usar Push/Pull."
 		return
 	_wall_tool.deactivate()
+	_restore_view2d_mode_after_wall()
 	_set_wall_trace_mode(false)
 	_project_view.set_selection(_edit_mode_guid)
 	_refresh_properties_panel()
 	_push_pull_tool.activate(_edit_mode_guid)
 	_refresh_properties_panel()
 	_log_label.text = "Push/Pull: elige una cara del elemento en edición."
+	_refresh_ribbon_compact_mode()
 
 
 func _on_save_pressed() -> void:
@@ -1505,23 +2629,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_viewport_container_gui_input(event: InputEvent) -> void:
-	var in_occ_2d: bool = USE_OCC_2D_VIEWS and _active_view_tab != 0
-	if event is InputEventMouseButton:
-		var mb_dbg: InputEventMouseButton = event
-		if mb_dbg.pressed and mb_dbg.button_index == MOUSE_BUTTON_LEFT:
-			# #region agent log
-			_agent_debug_log(
-				"pre-fix-2",
-				"H5",
-				"main_scene.gd:_on_viewport_container_gui_input",
-				"left click dispatch state",
-				{
-					"in_occ_2d": in_occ_2d,
-					"wall_tool_active": _wall_tool.is_active(),
-					"active_tab": _active_view_tab,
-				},
-			)
-			# #endregion
+	var in_occ_2d: bool = USE_OCC_2D_VIEWS and _active_view_tab != 0 and _view2d_render_mode != VIEW2D_MODE_ORTHO
 	if in_occ_2d and _view_2d_preview.has_method("handle_input"):
 		var consumed_2d: bool = bool(_view_2d_preview.call("handle_input", event))
 		if consumed_2d:
@@ -1537,25 +2645,23 @@ func _on_viewport_container_gui_input(event: InputEvent) -> void:
 		if _wall_tool.is_active():
 			if in_occ_2d and _view_2d_preview.has_method("to_projected_world_uv"):
 				var uv_mm: Vector2 = _view_2d_preview.call("to_projected_world_uv", mm.position)
-				if not (is_inf(uv_mm.x) or is_inf(uv_mm.y)):
+				if _is_valid_occ_uv(uv_mm):
 					_has_last_valid_occ_uv = true
 					_last_valid_occ_uv = uv_mm
 					var pwm: Vector3 = _occ_uv_to_floor_point_world(uv_mm)
 					_wall_tool.handle_viewport_motion_world_floor(pwm)
 				else:
+					# En OCC 2D no degradamos a proyección 3D para evitar jitter
+					# por desalineación de coordenadas entre backends gráficos.
+					if _has_last_valid_occ_uv:
+						var pwm_last: Vector3 = _occ_uv_to_floor_point_world(_last_valid_occ_uv)
+						_wall_tool.handle_viewport_motion_world_floor(pwm_last)
+						return
 					var pos_fallback_m: Vector2 = _subviewport.get_mouse_position()
 					if in_occ_2d and _view_2d_preview.has_method("to_snapshot_space"):
 						pos_fallback_m = _view_2d_preview.call("to_snapshot_space", mm.position)
-					# #region agent log
-					_agent_debug_log(
-						"post-fix",
-						"H5",
-						"main_scene.gd:_on_viewport_container_gui_input",
-						"motion fallback to 3d projection due invalid uv",
-						{"mouse_x": mm.position.x, "mouse_y": mm.position.y},
-					)
-					# #endregion
 					_wall_tool.handle_viewport_motion(pos_fallback_m)
+					return
 			else:
 				var pos_m: Vector2 = _subviewport.get_mouse_position()
 				if in_occ_2d and _view_2d_preview.has_method("to_snapshot_space"):
@@ -1568,39 +2674,12 @@ func _on_viewport_container_gui_input(event: InputEvent) -> void:
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			if in_occ_2d and _wall_tool.is_active() and _view_2d_preview.has_method("to_projected_world_uv"):
 				var uv_cl: Vector2 = _view_2d_preview.call("to_projected_world_uv", mb.position)
-				# #region agent log
-				_agent_debug_log(
-					"pre-fix-2",
-					"H5",
-					"main_scene.gd:_on_viewport_container_gui_input",
-					"2d projected uv from click",
-					{"uv_x": uv_cl.x, "uv_y": uv_cl.y, "mouse_x": mb.position.x, "mouse_y": mb.position.y},
-				)
-				# #endregion
-				if not (is_inf(uv_cl.x) or is_inf(uv_cl.y)):
+				if _is_valid_occ_uv(uv_cl):
 					_has_last_valid_occ_uv = true
 					_last_valid_occ_uv = uv_cl
 					var pwc: Vector3 = _occ_uv_to_floor_point_world(uv_cl)
-					# #region agent log
-					_agent_debug_log(
-						"pre-fix-2",
-						"H5",
-						"main_scene.gd:_on_viewport_container_gui_input",
-						"2d floor world point for wall click",
-						{"x": pwc.x, "y": pwc.y, "z": pwc.z},
-					)
-					# #endregion
 					_wall_tool.handle_viewport_click_world_floor(pwc)
 				else:
-					# #region agent log
-					_agent_debug_log(
-						"post-fix",
-						"H5",
-						"main_scene.gd:_on_viewport_container_gui_input",
-						"click fallback to 3d projection due invalid uv",
-						{"mouse_x": mb.position.x, "mouse_y": mb.position.y},
-					)
-					# #endregion
 					if _has_last_valid_occ_uv:
 						var pwc_last: Vector3 = _occ_uv_to_floor_point_world(_last_valid_occ_uv)
 						_wall_tool.handle_viewport_click_world_floor(pwc_last)
@@ -1641,11 +2720,14 @@ func _on_wall_draft_hint(text: String) -> void:
 
 func _cancel_wall_tool_with_esc() -> void:
 	_wall_tool.deactivate()
+	_kb_wall_cursor_ready = false
+	_restore_view2d_mode_after_wall()
 	_set_wall_trace_mode(false)
 	_project_view.clear_selection()
 	_exit_edit_mode("")
 	_refresh_properties_panel()
 	_log_label.text = "Crear muro: cancelado (Esc)."
+	_refresh_ribbon_compact_mode()
 
 
 func _sync_wall_defaults_from_selected_wall_if_possible() -> void:
@@ -1693,6 +2775,7 @@ func _enter_edit_mode(guid: String) -> void:
 	if guid == "" or not _project_view.has_entity(guid):
 		return
 	_wall_tool.deactivate()
+	_restore_view2d_mode_after_wall()
 	_push_pull_tool.deactivate()
 	_edit_mode_guid = guid
 	_project_view.set_selection(guid)
@@ -1700,6 +2783,7 @@ func _enter_edit_mode(guid: String) -> void:
 	_sync_tree_selection(guid)
 	_refresh_properties_panel()
 	_log_label.text = "Modo edición: %s. Usa Push/Pull o Esc para salir." % guid
+	_refresh_ribbon_compact_mode()
 
 
 func _exit_edit_mode(message: String) -> void:
@@ -1711,6 +2795,7 @@ func _exit_edit_mode(message: String) -> void:
 	_refresh_properties_panel()
 	if message != "":
 		_log_label.text = message
+	_refresh_ribbon_compact_mode()
 
 
 func _is_edit_mode_active() -> bool:
