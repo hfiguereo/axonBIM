@@ -186,6 +186,23 @@ Si **aun asi** crashea o ABRT sigue generando volcados:
 4. Solo si necesitas Forward+/Vulkan: *Project → Project Settings → Rendering →
    Method → Forward+*, sabiendo que puede volver a inestabilidad en tu GPU.
 
+#### Consola: `failed to load driver: nvidia-drm`, `glx: failed to create dri3 screen`, `pci id … driver (null)`
+
+En **portátiles híbridos** (Intel integrada + NVIDIA), el binario de Godot a veces
+**sondea la NVIDIA** antes de quedarse con **Mesa en Intel**; por eso ves avisos
+aunque al final diga algo como *Using Device: Intel … Mesa*. **No indica que
+AxonBIM esté roto** si la ventana abre y el viewport responde.
+
+- `./start` y `scripts/dev/run_dev.sh` exportan **`DRI_PRIME=0`** cuando no lo
+  definiste tú, para preferir la GPU integrada y reducir ese ruido.
+- Si quieres forzar **solo el stack Mesa** en GLX (otro caso de mensajes
+  persistentes): prueba una vez
+  `__GLX_VENDOR_LIBRARY_NAME=mesa ./start` (no lo fijamos por defecto porque
+  en algunos equipos querrás la NVIDIA con `DRI_PRIME=1`).
+- Para usar la **NVIDIA** de verdad con drivers propietarios, instálalos y
+  configura PRIME/offload según la guía de Fedora/RPM Fusion; hasta entonces es
+  normal que la dGPU no cargue como DRI3 principal.
+
 #### "Crear muro" no hace nada
 
 Comprueba que el backend esté en marcha (`uv run python -m axonbim --tcp`) y que

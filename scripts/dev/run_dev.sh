@@ -35,6 +35,36 @@ if [[ -z "${GODOT_BIN}" ]]; then
 	exit 1
 fi
 
+# Portatil Intel + NVIDIA: sin DRI_PRIME, Mesa/Godot suelen intentar la dGPU y
+# mostrar "failed to load driver: nvidia-drm" aunque luego rendericen con Intel.
+if [[ -z "${DRI_PRIME:-}" ]]; then
+	export DRI_PRIME=0
+fi
+
+_import_nonempty=0
+if [[ -d "${ROOT}/frontend/.godot/imported" ]]; then
+	for _f in "${ROOT}/frontend/.godot/imported/"*; do
+		if [[ -e "${_f}" ]]; then
+			_import_nonempty=1
+			break
+		fi
+	done
+fi
+_port_busy=0
+if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -qE ":${PORT}\\s"; then
+	_port_busy=1
+fi
+
+if [[ "${_port_busy}" -eq 1 ]]; then
+	echo "AxonBIM: el puerto TCP ${PORT} ya esta en uso (otra instancia de ./start?). Cerrala o: AXONBIM_RPC_PORT=5800 ./start" >&2
+	exit 1
+fi
+
+if [[ "${_import_nonempty}" -eq 0 ]]; then
+	echo "AxonBIM: importando recursos Godot (primera ejecucion o sin .godot/imported)..." >&2
+	"${GODOT_BIN}" --path "${ROOT}/frontend" --import
+fi
+
 echo "AxonBIM: backend TCP 127.0.0.1:${PORT} + Godot (frontend/)"
 
 uv run python -m axonbim --tcp-port "${PORT}" --log-level "${LOG_LEVEL}" &

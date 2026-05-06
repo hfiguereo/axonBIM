@@ -156,7 +156,6 @@ func _apply_viewport_polish() -> void:
 	sky_material.ground_bottom_color = VIEWPORT_GROUND_BOTTOM
 	sky_material.sun_angle_max = 12.0
 	sky_material.sun_curve = 0.08
-	sky_material.sun_energy_multiplier = 0.35
 	var sky: Sky = Sky.new()
 	sky.sky_material = sky_material
 	env.background_mode = Environment.BG_SKY
