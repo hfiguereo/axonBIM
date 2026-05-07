@@ -66,3 +66,35 @@ godot --headless --path frontend -s addons/gut/gut_cmdln.gd -gtest=res://tests/
 - Sobre normativa → pregunta antes de inventar.
 - Sobre el roadmap → `ROADMAP.md`, no es información de codificación.
 - Sobre el manual de usuario → `docs/manual-de-axonbim.md` y `.cursor/rules/67-manual-de-axonbim.mdc`.
+
+## Cursor Cloud specific instructions
+
+### Entorno
+
+- **Python 3.12+** ya disponible en la VM. `uv` se instala con `curl -LsSf https://astral.sh/uv/install.sh | sh` si no está en PATH; el update script lo maneja.
+- **Godot Engine** no está disponible en la VM Cloud (headless, sin GPU). El frontend Godot no se puede ejecutar ni probar aquí. Solo el backend Python es testeable end-to-end.
+- El backend RPC no requiere servicios externos (ni Docker, ni PostgreSQL, ni Redis). Usa SQLite embebido.
+
+### Backend: arranque y verificación
+
+```bash
+# Instalar deps y correr tests
+uv sync --all-extras
+uv run pytest -q
+
+# Lint + typecheck
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy --strict src/
+
+# Iniciar backend RPC (TCP 127.0.0.1:5799)
+uv run python -u -m axonbim --tcp
+```
+
+Para verificar que el backend responde, enviar un ping JSON-RPC por TCP al puerto 5799 con framing `Content-Length` (protocolo LSP). Los puntos (`p1`, `p2`) para `ifc.create_wall` deben pasarse como diccionarios `{"x": ..., "y": ..., "z": ...}`, no como arrays.
+
+### Gotchas
+
+- `ruff format --check` puede reportar archivos que necesitan reformateo; esto no bloquea `ruff check` (lint) ni `mypy`.
+- El test `test_worker_manager` se salta por defecto (requiere `AXONBIM_RUN_GODOT_WORKER_TEST=1` + binario Godot).
+- La rama `temporal` tiene commits WIP divergentes de `develop` con conflictos de merge en 7 archivos del frontend; fusionar requiere resolución manual.
