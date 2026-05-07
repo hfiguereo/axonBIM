@@ -7,14 +7,24 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] — 2026-05-07
+
+Segunda alpha técnica: **vistas 2D** (`draw.ortho_snapshot` analítico u OCP, canvas OCC), **export DXF de muros**, **UI** (tema raíz, subventanas nativas, EventBus piloto, ViewportManager), **worker Godot headless** opcional (ADR-0003, puerto auxiliar) y **ROADMAP** actualizado frente al tronco real.
+
 ### Arreglado
 
+- Godot: carga estable de `ViewportManager` en `main_scene.gd` usando **preload** del script (evita fallo de parseo cuando `class_name` aún no está en alcance).
+- Godot: **vista flotante** — `apply_view_state` del rig en **ventana auxiliar** se difiere hasta que el `Window` está en el árbol (evita error `!is_inside_tree()` / `get_global_transform`).
 - Godot: el **viewport** queda **recortado** al panel central (`clip_contents` en el contenedor y la capa overlay); el `SubViewport` deja de usar **`UPDATE_ALWAYS`** por defecto (menos carga GPU) y en pestañas **2D OCC** el render 3D se **pausa** (`UPDATE_DISABLED`) mientras la vista 2D cubre el área.
 - Godot: tras **crear un muro** en vista 2D, el refresco OCC va **difuso (~120 ms)** para reducir parpadeos o saltos de layout.
 - Backend: **`draw.ortho_snapshot`** con **ningún muro** en sesión devuelve `lines_px` vacío y `world_bounds_uv` del **espacio de trabajo** (ya se puede alinear el trazo 2D sin crear antes un muro en 3D).
 
 ### Añadido
 
+- ADR-0003 y contrato JSON-RPC del **worker Godot** headless (puerto auxiliar default `5800`, métodos `worker.ping` y `worker.aabb_intersects`); módulo `WorkerManager` y apagado automático con el servidor RPC; activación opcional con `AXONBIM_SPAWN_GODOT_WORKER=1` (también `AXONBIM_GODOT_BIN`, `AXONBIM_WORKER_PORT`).
+- Godot: autoload **EventBus** que reexpone notificaciones RPC como señales tipadas (pilotos en la escena principal).
+- Godot: tema base **axon_theme.tres** aplicado al contenedor raíz del layout.
+- Godot: **subventanas nativas** del sistema (`embed_subwindows=false` en ajustes de ventana).
 - Backend: RPC **`draw.export_dxf_walls`** (ezdxf) exporta la proyección **analítica** de muros a DXF (planta `top` por defecto; capa `WALLS`).
 - Backend / contrato: **`draw.ortho_snapshot`** acepta **`projection_engine`** (`analytical` por defecto u `ocp`) para elegir proyección de aristas desde caja analítica o malla OCP.
 - Godot: botón **Exportar muros DXF (planta)…** en Proyecto llama a `draw.export_dxf_walls` (ruta `.dxf` elegida por el usuario).
@@ -27,6 +37,10 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Frontend: canvas 2D OCC con estados de vista **`loading` / `ready` / `error` / `fallback`** y fallback automático a preset ortográfico legacy si el backend OCC falla.
 - Frontend (OCC 2D): navegación directa en canvas (`rueda=zoom`, `MMB=pan`) y bloqueo de navegación de cámara 3D durante trazado de muros en vistas 2D.
 - Frontend/Backend: `draw.ortho_snapshot` acepta `view_range` (`cut_plane_m`, `top_m`, `bottom_m`, `depth_m`) y la planta OCC lo usa para filtrar geometría visible.
+- CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
+  `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
+  funciona; antes argparse rechazaba `--tcp` por ambigüedad con
+  `--tcp-host`/`--tcp-port`.
 
 ### Cambiado
 
@@ -82,9 +96,6 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
   junto con **desinstalar Flatpak** (`flatpak uninstall org.godotengine.Godot`)
   cuando Vulkan/SIGABRT molesta.
 - `Makefile`: `run-godot` prefije `~/.local/bin/godot` si existe.
-
-### Cambiado
-
 - Godot: vistas **Planta / Frente / Derecha** en **proyección ortogonal**; **Persp** y
   órbita (MMB o Alt+LMB) en perspectiva. Cielo procedural del viewport más **claro**,
   sin bloom; cuadrícula en **plano XY** con opacidad según inclinación
@@ -94,6 +105,7 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
   movil) Vulkan suele terminar en ``SIGABRT`` en el binario ``godot-bin`` (ABRT),
   no en el codigo AxonBIM. Quien necesite Forward+ puede cambiarlo en Ajustes
   del proyecto. Ver ``frontend/project.godot`` comentario en ``config/features``.
+- **ROADMAP.md**: tabla de estado del tronco (OCC/2D, DXF, worker, UI) y hitos de Fases 2–4 alineados con lo ya implementado frente a lo pendiente normado (MIVED, SQLite undo, etc.).
 
 ### Corregido
 
@@ -118,13 +130,6 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
   unifica el puerto a `5799` (alineado con el README).
 - Documentación: se restaura `docs/architecture/app-gui-viewport-patterns.md`,
   citada desde `project_view.gd` y ausente en el árbol tras limpieza de ramas.
-
-### Añadido
-
-- CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
-  `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
-  funciona; antes argparse rechazaba `--tcp` por ambigüedad con
-  `--tcp-host`/`--tcp-port`.
 
 ## [0.1.0-alpha.1] — 2026-04-20
 
@@ -188,5 +193,6 @@ Godot ↔ Python y el flujo mínimo para crear un muro IFC y guardarlo en disco.
   (el cliente ya sabe recibirlas). Se abordará junto con el sistema de
   eventos de Fase 2.
 
-[Unreleased]: https://github.com/hector-figuereo/AxonBIM/compare/v0.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/hector-figuereo/AxonBIM/compare/v0.1.0-alpha.2...HEAD
+[0.1.0-alpha.2]: https://github.com/hector-figuereo/AxonBIM/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/hector-figuereo/AxonBIM/releases/tag/v0.1.0-alpha.1

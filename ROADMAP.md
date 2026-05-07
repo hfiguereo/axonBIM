@@ -22,6 +22,21 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 
 ---
 
+## Estado del tronco (sincronizado con alpha recientes)
+
+Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (sin sustituir los criterios de salida formales):
+
+| Área | Qué hay hoy | Notas |
+|------|-------------|--------|
+| **Puente RPC** | TCP `5799` + Unix socket; `RpcClient`; protocolo en `jsonrpc-protocol.md` | Base Fase 1. |
+| **OCC / 2D** | `draw.ortho_snapshot` con motor **analítico** u **OCP** (`projection_engine`); canvas 2D OCC en Godot con estados y fallback a ortográfico legacy | Cubre “motor 2D” operativo; **no** es aún plano MIVED completo (Fase 3). |
+| **DXF** | `draw.export_dxf_walls` (proyección analítica de muros, capa `WALLS`) | Distinto de planta normada CCRD §3.7. |
+| **Godot UI** | Cinta, pestañas de vista (modelado + 2D), docks desacoplables, vista flotante, tema `axon_theme.tres`, subventanas nativas (`embed_subwindows`), `EventBus` (piloto), `ViewportManager` (política de render del `SubViewport`) | Mejora producto sin cambiar la autoridad del backend. |
+| **Worker headless** | Proceso Godot opcional en **puerto auxiliar** (`5800` default), métodos `worker.*` piloto; `WorkerManager` en Python; **ADR-0003** | Solo tareas **auxiliares** serializables; **no** sustituye IfcOpenShell/OCP como fuente de verdad. |
+| **Modelado** | Crear muro, tipologías, Push/Pull, edición por elemento, `geom.extrude_face` con estadísticas OCP, `history.undo` / `history.redo`, malla analítica + ruta B-Rep en evolución | Fase 2 **en progreso**; criterio “50+ paredes + identidad estable” sigue pendiente de cierre formal. |
+
+---
+
 ## Fase 1 — El puente de comunicación  *(Mes 1–3)*
 
 **Objetivo:** Lograr que Godot y Python hablen entre sí de forma estable.
@@ -34,6 +49,7 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 - [x] Cliente `RpcClient` (autoload) en Godot con manejo de errores, timeouts y reconexión automática.
 - [x] Demo end-to-end: botón en Godot → solicitud `ifc.create_wall` → Python responde con vértices/caras → Godot dibuja.
 - [x] Documentación viva del protocolo en `docs/architecture/jsonrpc-protocol.md`.
+- [x] **Extensión documentada:** puerto auxiliar del **worker Godot** (`worker.*`, framing idéntico; ver §5.7 del protocolo y **ADR-0003**). Opcional en runtime (`AXONBIM_SPAWN_GODOT_WORKER`).
 
 **Criterio de salida:** un usuario puede crear un muro IFC clickeando un botón, ver la malla, y el muro persiste en disco como `.ifc` válido. **✅ Alcanzado en `v0.1.0-alpha.1`.**
 
@@ -45,13 +61,14 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 
 **Hitos:**
 
-- [ ] Herramienta gráfica Push/Pull en Godot (selección de cara + arrastre).
-- [ ] Backend recibe el vector de extrusión, ejecuta booleana en OCP, actualiza IFC, devuelve nueva topología + mapa de IDs.
-- [ ] Sistema de IDs topológicos persistentes (hash B-Rep estable).
-- [ ] Undo/Redo con persistencia en SQLite (`axon_internal.db`).
-- [ ] Tests de regresión geométrica (snapshots con tolerancia 1e-6).
+- [x] Herramienta gráfica Push/Pull en Godot (cara + arrastre; modo edición por elemento).
+- [x] Backend recibe vector de extrusión (`geom.extrude_face`), usa cadena **OCP/OpenCASCADE** para validar/generar malla paralela y devuelve topología + `debug_ocp_mesh_stats` (convivencia con malla analítica).
+- [x] Sistema de IDs topológicos persistentes en **evolución** (formato Fase 2; ver `docs/architecture/topological-naming.md` y tests de regresión). *Cierre formal del criterio “estable entre operaciones” pendiente.*
+- [x] Undo/Redo en sesión vía RPC (`history.undo` / `history.redo`) integrado en la UI.
+- [ ] Undo/Redo con **persistencia** en SQLite (`axon_internal.db`) entre reinicios.
+- [x] Tests de regresión geométrica (snapshots con tolerancia 1e-6; suites RPC ampliadas).
 
-**Criterio de salida:** un modelo de 50+ paredes editado interactivamente sin perder identidad topológica entre operaciones.
+**Criterio de salida:** un modelo de 50+ paredes editado interactivamente sin perder identidad topológica entre operaciones. *(Pendiente de demostración sistemática; el código ya soporta flujos de edición múltiple.)*
 
 ---
 
@@ -59,12 +76,14 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 
 **Objetivo:** Representación técnica bajo estándar dominicano.
 
+**Contexto:** El motor **OCC** en el nombre histórico del roadmap se alinea hoy con **OpenCASCADE vía OCP** en el backend (`draw.ortho_snapshot`, mallas de muro, extrusión). La **salida gráfica normada** (CCRD/MIVED) es una capa adicional sobre ese pipeline.
+
 **Hitos:**
 
-- [ ] Generador de plantas 2D en Python (`ifcopenshell.draw` → `ezdxf`).
+- [x] Generador de vistas 2D en Python: **`draw.ortho_snapshot`** (analítico u OCP) + **`draw.export_dxf_walls`** (analítico). *Pendiente:* integración explícita con `ifcopenshell.draw` donde aporte valor sin duplicar OCC.
 - [ ] Aplicación estricta de simbología y grosores del **CCRD Vol. I** (MIVED) — ver `docs/normativa/mived/ccrd-vol-i.md` §3.7.
-- [ ] Sustitución de proyecciones 3D crudas por simbología técnica (hatches, arcos de puerta, líneas de ventana).
-- [ ] UI en Godot para gestionar vistas (planta, alzado, sección) y exportar DXF/PDF.
+- [ ] Sustitución de proyecciones “planas” por **simbología técnica** completa (hatches, arcos de puerta, líneas de ventana) según norma.
+- [x] UI en Godot: pestañas de vista, modos 2D, export PNG, DXF muros, **Project Browser** con vistas 2D. *Pendiente:* secciones, PDF, checklist MIVED completo.
 - [ ] Cajetín y rotulación bajo plantillas MIVED.
 
 **Criterio de salida:** exportar una planta arquitectónica de un proyecto residencial cumpliendo MIVED, lista para presentación oficial.
@@ -77,7 +96,7 @@ Estos principios **orientan** prioridades de producto; el detalle técnico sigue
 
 **Hitos:**
 
-- [ ] Navegador de proyecto en Godot (estructura espacial IFC, panel de propiedades).
+- [x] Navegador de proyecto en Godot (árbol + propiedades básicas). *Pendiente:* estructura espacial IFC según visión de producto completa.
 - [ ] Implementación de estados ISO 19650 (WIP / Shared / Published / Rejected / Archive) con trazabilidad SQLite append-only.
 - [ ] Congelamiento del entorno Python con PyInstaller o Conda-pack.
 - [ ] Empaquetado conjunto Godot + Python en **Flatpak**.
