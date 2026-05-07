@@ -9,10 +9,13 @@ Ver la política completa en la regla [`60-documentation.mdc`](../../.cursor/rul
 | Fase | Release | Reporte | Estado |
 |------|---------|---------|--------|
 | Fase 1 — El puente de comunicación | `v0.1.0-alpha.1` | [`phase-1-report.md`](phase-1-report.md) | Publicado |
-| Fase 2 — Geometría paramétrica interactiva | `v0.2.0-alpha` (previsto) | — | Pendiente |
-| Fase 3 — Normativa como código | `v0.3.0-alpha` (previsto) | — | Pendiente |
-| Fase 4 — Persistencia nativa y colaboración | `v0.4.0-alpha` (previsto) | — | Pendiente |
-| Fase 5 — Primera release pública | `v1.0.0` (previsto) | — | Pendiente |
+| Fase 2 — Modelado interactivo | `v0.1.0-alpha.2` (referencia documental) | [`phase-2-report.md`](phase-2-report.md) | Cierre documental |
+| Fase 3 — Normativa y motor 2D | *(pendiente)* | — | En curso |
+| Fase 4 — Ecosistema y publicación | *(pendiente)* | — | En curso |
+
+**Pendientes explícitos de Fases 3–4** (no son reportes de cierre): [`fases-3-y-4-inventario-pendientes.md`](fases-3-y-4-inventario-pendientes.md).
+
+**Más allá de v1.0:** ideas en [`ROADMAP.md`](../../ROADMAP.md) (colaboración en tiempo real, plugins de normativa, etc.).
 
 ## Cómo leer estos reportes
 

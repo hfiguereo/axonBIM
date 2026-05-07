@@ -9,6 +9,88 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Parámetro RPC opcional ``join_end_guid`` en ``ifc.create_wall``: ajuste de **cierre de habitación** (extiende ``p2`` cuando vuelve al primer muro del contorno, ortogonal). Herramienta Godot **Crear muro**: snap al primer vértice (~0,45 m) y envío de ``join_end_guid``.
+- Convención interna de **capas DXF** arquitectónicas (``DXF_ARCH_LAYER_SPECS``, prefijo ``AXON_*`` reservado); el export de muros **registra** todas las capas canónicas aunque solo escriba geometría en ``WALLS``; test de lectura DXF en ``test_handlers_draw.py``.
+- Historial SQLite por **ámbito** (`__unsaved__` hasta el primer `project.save`, luego ruta canónica del `.ifc`); migración automática columna `scope` en `session_history.db`.
+- Operaciones en **deshacer/rehacer**: `create_wall`, `delete_wall`, `set_wall_typology` además de `geom.extrude_face`; restauración de muro borrado con el mismo `GlobalId` (`restore_wall`).
+- Módulo `axonbim.history.recording` (`suppressed`) para no re-apilar al aplicar historial.
+- Doc [`docs/architecture/draw-delivery-layers.md`](docs/architecture/draw-delivery-layers.md) (evolución Fase 3 capas).
+- Doc [`docs/architecture/geometry-analytical-vs-ocp.md`](docs/architecture/geometry-analytical-vs-ocp.md) para contribuyentes.
+- Tests unitarios `tests/unit/test_history_extended.py`; tests de persistencia/estrés de historial (entradas previas de esta sección).
+
+### Documentación
+
+- Manual y [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md): `join_end_guid`, cierre de habitación en **Crear muro**; export DXF y capas `AXON_*`.
+- Manual: §2.1 **runbook** de fallos RPC / historial por archivo; tabla `project.save` y notas de `history.*` en [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) (plataforma e integración RPC).
+- Cierre documental **Fase 2** e inventario Fases 3–4: [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md), [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md); índice [`docs/phase-reports/README.md`](docs/phase-reports/README.md); desglose ROADMAP [`docs/roadmap/README.md`](docs/roadmap/README.md), plantilla [`docs/roadmap/00-guia-estructura-subhitos.md`](docs/roadmap/00-guia-estructura-subhitos.md). [`ROADMAP.md`](ROADMAP.md) alineado (SQLite, criterio 50+ muros).
+
+### Cambiado
+
+- `project.save` actualiza el ámbito del historial a la ruta del IFC guardado.
+
+## [0.1.0-alpha.2] — 2026-05-07
+
+Segunda alpha técnica: **vistas 2D** (`draw.ortho_snapshot` analítico u OCP, canvas OCC), **export DXF de muros**, **UI** (tema raíz, subventanas nativas, EventBus piloto, ViewportManager), **worker Godot headless** opcional (ADR-0003, puerto auxiliar) y **ROADMAP** actualizado frente al tronco real.
+
+### Arreglado
+
+- Godot: carga estable de `ViewportManager` en `main_scene.gd` usando **preload** del script (evita fallo de parseo cuando `class_name` aún no está en alcance).
+- Godot: **vista flotante** — `apply_view_state` del rig en **ventana auxiliar** se difiere hasta que el `Window` está en el árbol (evita error `!is_inside_tree()` / `get_global_transform`).
+- Godot: el **viewport** queda **recortado** al panel central (`clip_contents` en el contenedor y la capa overlay); el `SubViewport` deja de usar **`UPDATE_ALWAYS`** por defecto (menos carga GPU) y en pestañas **2D OCC** el render 3D se **pausa** (`UPDATE_DISABLED`) mientras la vista 2D cubre el área.
+- Godot: tras **crear un muro** en vista 2D, el refresco OCC va **difuso (~120 ms)** para reducir parpadeos o saltos de layout.
+- Backend: **`draw.ortho_snapshot`** con **ningún muro** en sesión devuelve `lines_px` vacío y `world_bounds_uv` del **espacio de trabajo** (ya se puede alinear el trazo 2D sin crear antes un muro en 3D).
+
+### Añadido
+
+- ADR-0003 y contrato JSON-RPC del **worker Godot** headless (puerto auxiliar default `5800`, métodos `worker.ping` y `worker.aabb_intersects`); módulo `WorkerManager` y apagado automático con el servidor RPC; activación opcional con `AXONBIM_SPAWN_GODOT_WORKER=1` (también `AXONBIM_GODOT_BIN`, `AXONBIM_WORKER_PORT`).
+- Godot: autoload **EventBus** que reexpone notificaciones RPC como señales tipadas (pilotos en la escena principal).
+- Godot: tema base **axon_theme.tres** aplicado al contenedor raíz del layout.
+- Godot: **subventanas nativas** del sistema (`embed_subwindows=false` en ajustes de ventana).
+- Backend: RPC **`draw.export_dxf_walls`** (ezdxf) exporta la proyección **analítica** de muros a DXF (planta `top` por defecto; capa `WALLS`).
+- Backend / contrato: **`draw.ortho_snapshot`** acepta **`projection_engine`** (`analytical` por defecto u `ocp`) para elegir proyección de aristas desde caja analítica o malla OCP.
+- Godot: botón **Exportar muros DXF (planta)…** en Proyecto llama a `draw.export_dxf_walls` (ruta `.dxf` elegida por el usuario).
+- Godot: botón **Modo 2D** (`Auto`, `Plano vectorial`, `Modelo ortográfico`) para enrutar vistas 2D: en `Auto`, snapshot analítico con fallback automático a ortográfico si falla o viene vacío.
+- Godot / backend: borrar **`IfcWall`** con RPC `ifc.delete`, botón **Eliminar muro** en Propiedades y **Supr**
+  con foco sobre el viewport (respeta foco en cuadros de texto). El árbol del proyecto y el visor 3D
+  se mantienen alineados.
+- Godot: postprocesado del visor tipo taller: **tonemap ACES**, **MSAA 4×**, rejilla amplia en suelo y panel gizmo de vistas; **fondo plano** sin domo de cielo (evita líneas de horizonte artefacto).
+- Backend: nuevo endpoint RPC **`draw.ortho_snapshot`** (OCC) para vistas ortogonales `top/front/right`, con payload de líneas 2D rasterizables y metadatos de escala/encuadre por vista.
+- Frontend: canvas 2D OCC con estados de vista **`loading` / `ready` / `error` / `fallback`** y fallback automático a preset ortográfico legacy si el backend OCC falla.
+- Frontend (OCC 2D): navegación directa en canvas (`rueda=zoom`, `MMB=pan`) y bloqueo de navegación de cámara 3D durante trazado de muros en vistas 2D.
+- Frontend/Backend: `draw.ortho_snapshot` acepta `view_range` (`cut_plane_m`, `top_m`, `bottom_m`, `depth_m`) y la planta OCC lo usa para filtrar geometría visible.
+- CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
+  `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
+  funciona; antes argparse rechazaba `--tcp` por ambigüedad con
+  `--tcp-host`/`--tcp-port`.
+
+### Cambiado
+
+- Documentación / contrato de producto: **nivel base fijo 00** hasta niveles y desfases; **trazar muro en vista 2D OCC** alineado a **huella X/Y** en ese datum (la cámara 3D no define el dibujo). Constante compartida ``BASE_STOREY_ELEVATION_M`` en ``main_scene.gd`` / ``create_wall_tool.gd``; manual de usuario actualizado.
+- Godot: menos microcortes CPU en la rejilla de suelo: solo reaplica translucido cuando cambia **el tipo de vista** (bucket de planitud), no en cada ``_process``.
+- Godot: HUD **WorkspaceHud** en el visor con **medias del espacio IFC en planta** (desde ``workspace_xy_half_m`` en ``ifc.create_wall``) y pista grosera de **escala visual** orto/perspectiva desde el rig.
+- Backend/Sesión: ``WorkspaceXYHalfExtents`` vivo en ``IfcSession``; cada muro válido **amplía** proporcionalmente (×1,12) las medias X/Y cuando el segmento las supera (`workspace_xy.py`, ``ifc.create_wall``).
+- Godot: botón **Generar vistas 2D...** en Proyecto exporta capturas ortográficas **top/front/right** a PNG en una carpeta elegida por el usuario (manteniendo el preset de cámara previo al finalizar).
+- Godot: **Generar vistas 2D...** usa OCC por defecto (si está habilitado) y guarda `vista_top/front/right.png`; mantiene opción legacy temporal como degradación automática.
+- Godot: al crear muros en `Planta 2D` OCC, la vista se refresca en caliente sin necesidad de cambiar de pestaña.
+- Godot: sistema base de **pestañas de vistas** en el viewport (`Modelado`, `Planta 2D`, `Frente 2D`, `Derecha 2D`) y **ventana auxiliar por vista** para preparar la conexión OCC por tab sin romper el flujo actual.
+- Godot: vistas 2D movidas al **Project Browser** (`Vistas 2D`), con acciones `+ Vista 2D` y `Eliminar vista`; selección en árbol activa la previsualización ortográfica del tab correspondiente (sin OCC aún).
+- Godot: **orto y perspectiva** usan **solo color de fondo uniforme** (`BG_CLEAR_COLOR`; perspectiva algo más clara) y ambiente por color; ya no hay **cielo procedural** (`OrbitCameraRig.viewport_projection_mode_changed`, `main_scene.gd`).
+- Godot: ``SubViewportContainer`` **sin márgenes interior ni borde** (~10px antes + trazo azul) y **SplitContainer** del área de trabajo con **``dragger_visibility = DRAGGER_HIDDEN``** (sin icono de agarre; sigue pudiendo arrastrarse la franja de separación).
+- Godot: **Crear muro** — el **primer** trazo usa P1+P2; los siguientes continúan desde el extremo anterior
+  (clave **P2**, un clic habitual). **Alt + clic** fija nuevo P1 sin desactivar la herramienta. Se mantienen
+  snap orthogonal, guías, tipología desde **Propiedades**, envolvente y heurísticas posteriores a Push/Pull.
+
+- Backend: RPC ``ifc.get_wall_spec`` y ``ifc.set_wall_typology`` (misma sesión;
+  conserva eje P1–P2, regenera IFC y malla).
+- Godot: **navegación de viewport** — convención **Z arriba** (plano XY), órbita
+  (botón central + arrastre), pan (Mayús + botón central), zoom (rueda y
+  pellizco), trackpad (**Alt+LMB**, **Mayús+LMB**, **Ctrl/Meta+LMB** vertical),
+  atajos **1–4** e **Inicio/R** con el ratón sobre el visor, teclado numérico
+  **7/1/3/0**, y panel **Planta / Frente / Derecha / Persp / Inicio** en la
+  esquina del visor (`OrbitCameraRig`, `NavViewportGizmo`).
+- Godot: hover de **Push/Pull** resalta la **cara lógica** completa (todos los
+  triángulos con el mismo `topo_id`), no solo el triángulo interceptado por el
+  rayo (`project_view.gd`).
 - Documentación: **Manual de AxonBIM** (`docs/manual-de-axonbim.md`) como guía de usuario de herramientas y flujos; regla de mantenimiento en `.cursor/rules/67-manual-de-axonbim.mdc` y enlace desde el README.
 - Backend: `geom.extrude_face` ahora sondea la malla equivalente generada con
   OCP/OpenCASCADE y reporta métricas `debug_ocp_mesh_stats` para validar la
@@ -35,43 +117,16 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
   junto con **desinstalar Flatpak** (`flatpak uninstall org.godotengine.Godot`)
   cuando Vulkan/SIGABRT molesta.
 - `Makefile`: `run-godot` prefije `~/.local/bin/godot` si existe.
-- CLI: nuevo flag `--tcp` como atajo que habilita TCP en el puerto default
-  `5799`. Equivalente a `--tcp-port 5799`. Ahora `uv run python -m axonbim --tcp`
-  funciona; antes argparse rechazaba `--tcp` por ambigüedad con
-  `--tcp-host`/`--tcp-port`.
-- Backend: handler RPC `geom.extrude_face` (stub Fase 2: validación Pydantic,
-  malla placeholder, `topo_map`) registrado en `python -m axonbim`; tests en
-  `tests/unit/test_handlers_geom.py`.
-- Godot: herramienta base **Push/Pull** (selección/arrastre simulado, llamada
-  RPC al soltar), iconos procedurales en toolbar, entidades transitorias en
-  `ProjectView` para preview de resultado.
-- Godot: camara **orbit** en viewport (boton medio + arrastre, rueda zoom)
-  via ``orbit_camera_3d.gd`` en la escena principal.
-- Godot: `AxonLogger` (`frontend/scripts/utils/axon_logger.gd`) para logging
-  sin colisión con la clase nativa `Logger` en Godot 4.6+.
-- Scripts de simulación headless (`frontend/scripts/dev/*.gd`) y registro de
-  fallos de simulación en `docs/phase-reports/simulation-failures.md`.
-- Cursor: reglas `65-microtareas-roadmap.mdc` y `66-microtask-simulation-checks.mdc`.
-- ROADMAP: directrices UI/UX para Fase 2 (toolbar minimalista, tooltips,
-  iconos procedurales, paneles flotantes).
-
-### Documentación
-
-- README y ROADMAP: politica **Flatpak al minimo** en Fedora para desarrollo;
-  plan **incremental** para volver a probar **Forward+ / Vulkan** sin bloquear
-  el nucleo BIM; Compatibility como fallback hasta aislar el entorno grafico.
-
-### Cambiado
-
-- Godot: paleta y ``StyleBoxFlat`` de cinta, docks, árbol y barra de estado
-  alineados a un boceto tipo escritorio BIM (antes en ``UI Ejemplo/``);
-  visor 3D con fondo más claro; anchuras mínimas de navegador y propiedades.
-  Detalle en ``docs/ui/UI-inspiration-notes.md``.
+- Godot: vistas **Planta / Frente / Derecha** en **proyección ortogonal**; **Persp** y
+  órbita (MMB o Alt+LMB) en perspectiva. Cielo procedural del viewport más **claro**,
+  sin bloom; cuadrícula en **plano XY** con opacidad según inclinación
+  (`OrbitCameraRig`, `workspace_floor_grid.gd`).
 - Godot: el renderer por defecto del proyecto pasa de **Forward+** (Vulkan) a
   **GL Compatibility** (OpenGL). En Fedora + Flatpak + GPU NVIDIA (p. ej. RTX
   movil) Vulkan suele terminar en ``SIGABRT`` en el binario ``godot-bin`` (ABRT),
   no en el codigo AxonBIM. Quien necesite Forward+ puede cambiarlo en Ajustes
   del proyecto. Ver ``frontend/project.godot`` comentario en ``config/features``.
+- **ROADMAP.md**: tabla de estado del tronco (OCC/2D, DXF, worker, UI) y hitos de Fases 2–4 alineados con lo ya implementado frente a lo pendiente normado (MIVED, SQLite undo, etc.).
 
 ### Corregido
 
@@ -166,5 +221,6 @@ Godot ↔ Python y el flujo mínimo para crear un muro IFC y guardarlo en disco.
   (el cliente ya sabe recibirlas). Se abordará junto con el sistema de
   eventos de Fase 2.
 
-[Unreleased]: https://github.com/hector-figuereo/AxonBIM/compare/v0.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/hector-figuereo/AxonBIM/compare/v0.1.0-alpha.2...HEAD
+[0.1.0-alpha.2]: https://github.com/hector-figuereo/AxonBIM/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/hector-figuereo/AxonBIM/releases/tag/v0.1.0-alpha.1

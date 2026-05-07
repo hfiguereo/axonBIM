@@ -3,7 +3,7 @@
 Spec viva del puente entre Godot (frontend) y Python (backend).
 
 > **Versión del protocolo:** `0.1.0` (alpha)
-> **Última revisión:** 2026-04
+> **Última revisión:** 2026-05
 > **Estado:** propuesta inicial — sujeto a cambios mientras estemos en Fase 1.
 
 ---
@@ -151,7 +151,9 @@ Solo del backend al frontend. Eventos asíncronos:
 | Método | Params | Result |
 |--------|--------|--------|
 | `ifc.open` | `{ "path": "<file>" }` | `{ "project_guid": "...", "stats": {...} }` |
-| `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m> }` | `{ "guid": "...", "mesh": {...}, "topo_map": {...} }` |
+| `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m>, "join_with_guid": "<opcional>", "join_end_guid": "<opcional>" }` | `{ "guid": "...", "mesh": {...}, "workspace_xy_half_m": [halfX_m, halfY_m] }` (medias en planta desde origen; crecen con margen **~12%** cuando el trazo las excede). Si `join_with_guid` refiere el muro previo y el ángulo es ~90°, el backend retrocede `p1` medio espesor para cerrar la esquina en cadena. Si `join_end_guid` refiere el **primer** muro del contorno y `p2` coincide con su `p1` en planta con esquina ~90°, el backend **extiende** `p2` medio espesor sobre el eje del tramo (cierre de habitación, simétrico al ajuste de cadena). |
+| `ifc.get_wall_spec` | `{ "guid": "<GlobalId>" }` | `{ "wall_spec": { "p1": {...}, "p2": {...}, "height": <m>, "thickness": <m> } }` |
+| `ifc.set_wall_typology` | `{ "guid": "<GlobalId>", "height": <m>, "thickness": <m>, "typology_id": "<opcional>" }` | `{ "guid": "...", "mesh": {...} }` |
 | `ifc.delete` | `{ "guid": "..." }` | `{ "ok": true }` |
 | `ifc.get_properties` | `{ "guid": "..." }` | `{ "properties": {...} }` |
 
@@ -177,17 +179,25 @@ Solo del backend al frontend. Eventos asíncronos:
 
 | Método | Params | Result |
 |--------|--------|--------|
+| `draw.ortho_snapshot` | `{ "view": "top\|front\|right", "width_px": 1280, "height_px": 800, "margin_px": 24, "view_id": "<opcional>", "requested_scale_m_per_px": <opcional>, "view_range": { ... }, "projection_engine": "analytical\|ocp" (opcional, por defecto `analytical`) }` | Igual que antes; el resultado incluye `projection_engine` cuando hay muros (proyección de aristas desde caja analítica o malla OCP según el motor). Sin muros: comportamiento anterior. |
+| `draw.export_dxf_walls` | `{ "out_path": ".../walls.dxf", "view": "top\|front\|right" (opcional, por defecto `top`), "view_range": { ... } (opcional) }` | `{ "path": "...", "segment_count": <int>, "view": "..." }` — DXF R2010 mínimo, capa `WALLS`, proyección **analítica** (metros en plano de la vista). |
 | `draw.export_plan` | `{ "level": "<storey_guid>", "format": "dxf\|pdf", "out_path": "...", "norma": "MIVED" }` | `{ "ok": true, "path": "..." }` |
 | `draw.export_section` | `{ "plane": {...}, "format": "...", "out_path": "..." }` | `{ "ok": true, "path": "..." }` |
+
+Nota de producto actual (frontend): en vistas 2D el modo por defecto es `auto` (intenta
+snapshot vectorial analítico y cae a ortográfico de modelo si hay error o resultado vacío).
+El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 
 ### 5.5 `project.*` / `history.*`
 
 | Método | Params | Result |
 |--------|--------|--------|
-| `project.save` | `{ "path": "..." }` | `{ "ok": true }` |
-| `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...}, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" }` |
-| `history.redo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...}, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" }` |
+| `project.save` | `{ "path": "..." }` | `{ "path": "...", "bytes": <int> }` |
+| `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...} \| null, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" \| "unsupported:..." }` |
+| `history.redo` | `{}` | Igual criterio que `history.undo`. |
 | `project.set_state` | `{ "state": "WIP\|Shared\|Published", "comment": "..." }` | `{ "ok": true, "snapshot_path": "..." }` |
+
+**Historial persistente (SQLite):** tipos de operación reversibles en el tronco: `extrude_face`, `set_wall_typology`, `delete_wall`, `create_wall` (la pila de redo usa además `recreate_wall` y `redo_delete_wall` de forma interna). **Ámbito:** hasta el primer `project.save` en la sesión del proceso, la pila usa el ámbito `__unsaved__`; tras guardar, el ámbito pasa a la **ruta absoluta canónica** del `.ifc` guardado, de modo que pilas de distintos archivos no se mezclan. Variable de entorno `AXONBIM_HISTORY_DB` fija el fichero SQLite (desarrollo/tests).
 
 ### 5.6 Notificaciones del backend
 
@@ -197,12 +207,37 @@ Solo del backend al frontend. Eventos asíncronos:
 | `project.state_changed` | `{ "state": "...", "by": "..." }` |
 | `system.warning` | `{ "message": "...", "level": "info\|warn" }` |
 
+### 5.7 Puerto auxiliar — proceso Godot Worker (headless)
+
+> **ADR:** [`0003-godot-worker-headless-auxiliar.md`](decisions/0003-godot-worker-headless-auxiliar.md)
+
+El **backend Python** (`python -m axonbim`, puerto TCP default `5799`) sigue siendo el **único** canal JSON-RPC para el frontend de producto (`RpcClient`) y la verdad IFC.
+
+Además puede existir un **segundo listener** en el mismo host: un proceso **Godot 4.x `--headless`** que expone JSON-RPC con **idéntico framing** (§2) pero en **otro puerto**, para tareas **auxiliares** (no mutan el IFC; no sustituyen IfcOpenShell/OCP salvo ADR futuro).
+
+| Concepto | Valor / notas |
+|----------|----------------|
+| Host | `127.0.0.1` (loopback) |
+| Puerto default | `5800` (no colisiona con `5799`) |
+| Variable de entorno | `AXONBIM_WORKER_PORT` — si está vacía, se usa el default `5800` en el worker; Python puede fijarla al spawnear el subproceso. |
+| Quién escucha | **Godot worker** (servidor TCP). |
+| Quién conecta | **Python** (`WorkerManager`, tests) u otras herramientas; el frontend Godot con UI **no** reemplaza su conexión principal por este puerto en la fase piloto. |
+
+#### Métodos `worker.*` (piloto)
+
+| Método | Params | Result |
+|--------|--------|--------|
+| `worker.ping` | `{}` | `{ "pong": true, "engine": "<string>" }` |
+| `worker.aabb_intersects` | `{ "a_min": [x,y,z], "a_max": [x,y,z], "b_min": [x,y,z], "b_max": [x,y,z] }` (metros, mundo alineado a ejes) | `{ "intersects": <bool> }` |
+
+Errores: mismos códigos JSON-RPC estándar; parámetros mal formados → `-32602` (`Invalid params`).
+
 ## 6. Timeouts
 
 | Categoría | Timeout cliente |
 |-----------|-----------------|
 | Operaciones triviales (`system.*`, `ifc.get_*`) | 5s |
-| Mutaciones simples (`ifc.create_wall`, `geom.extrude_face`) | 10s |
+| Mutaciones simples (`ifc.create_wall`, `ifc.set_wall_typology`, `geom.extrude_face`) | 10s |
 | Booleanas, parsing IFC grande, exportación 2D | 60s |
 | Operaciones bulk explícitas | configurable por llamada con campo `_timeout_ms` en `params` |
 

@@ -40,6 +40,8 @@ En Godot, un **SubViewport** embebido en UI **no** debe asumir que `Node3D._unha
 
 Así el “viewport” es **único canal de entrada** hacia las herramientas 3D, análogo a centralizar el pick en un `View3DInventorViewer` en lugar de repartir eventos opacos por el grafo.
 
+**Navegación de cámara (Fase 2):** el `SubViewportContainer` primero delega en `OrbitCameraRig` (rueda, MMB, Mayús+MMB, gestos de pellizco y equivalentes trackpad Alt/Mayús/Ctrl+LMB). Presets **1–3** son **ortogonales** (planta XY, frente, derecha); **4** y la órbita activan **perspectiva**. La cámara usa **Z arriba**. Si el rig no consume el evento, siguen el hover de Push/Pull (cara lógica por `topo_id`) y las herramientas con **LMB**. Los atajos de vista se leen en `_unhandled_input` cuando el ratón está sobre el contenedor del viewport. La cuadrícula del suelo (`workspace_floor_grid.gd`) reduce opacidad en vistas oblicuas.
+
 ---
 
 ## 4. Herramientas como estado + manejador
@@ -47,8 +49,25 @@ Así el “viewport” es **único canal de entrada** hacia las herramientas 3D,
 Patrón cercano a **editores con herramientas** (Blender, KiCad): una **herramienta activa** define qué significa cada clic en el lienzo/vista.
 
 - El botón de la barra solo **activa** o **cancela** la herramienta.
-- Los clics en el área 3D los procesa la herramienta (dos puntos → `ifc.create_wall`, etc.).
+- Los clics en el área 3D los procesa la herramienta (p. ej. cadena P1/P2 → `ifc.create_wall` por cada segmento, hasta Esc o desactivar).
 - Tras éxito o error RPC, la herramienta **termina** o deja el estado coherente con la UI.
+
+---
+
+## 4.1. Ruteo combinado de visualización 2D (producto)
+
+Para vistas `Planta/Frente/Derecha`, AxonBIM usa estrategia combinada:
+
+- **Modo Auto (default):**
+  1) intenta snapshot backend (`draw.ortho_snapshot`, motor analítico),
+  2) si falla o retorna vacío, cae a ortográfico de modelo.
+- **Modo Plano vectorial:** fuerza snapshot backend.
+- **Modo Modelo ortográfico:** usa solo la proyección ortográfica del viewport.
+
+Esto preserva la dualidad de arquitectura:
+
+- backend decide geometría 2D vectorial,
+- frontend decide experiencia visual e interacción/fallback.
 
 ---
 

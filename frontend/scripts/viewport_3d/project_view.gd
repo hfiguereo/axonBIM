@@ -5,8 +5,8 @@ extends Node3D
 ## para poder actualizar o eliminar entidades en sprints futuros. Sprint 1.4.
 ##
 ## Fase 2: colisión trimesh para ``face_index`` estable; ``pick_face_at_screen`` devuelve
-## ``topo_id`` (dos triángulos IFC comparten el mismo id por cara lógica de muro).
-## Resaltado y preview Push/Pull agrupan **todos** los triángulos con ese ``topo_id``.
+## ``topo_id`` por triángulo. El resaltado de hover agrupa **todos los triángulos** que
+## comparten el mismo ``topo_id`` (cara lógica B-Rep), no solo el triángulo bajo el rayo.
 ## ``replace_entity_mesh`` refresca tras ``geom.extrude_face``.
 ##
 ## Los clics en el viewport se manejan en ``main_scene.gd`` vía
@@ -33,9 +33,17 @@ var _face_hover_locked: bool = false
 var _extr_preview_mi: MeshInstance3D
 
 
+func _log_warn(message: String) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("warn"):
+		logger.call("warn", message)
+	else:
+		push_warning(message)
+
+
 func add_entity(guid: String, mesh_dict: Dictionary) -> void:
 	if _entities.has(guid):
-		AxonLogger.warn("Entidad %s ya existe, se sobrescribe" % guid)
+		_log_warn("Entidad %s ya existe, se sobrescribe" % guid)
 		remove_entity(guid)
 
 	var instance: MeshInstance3D = MeshInstance3D.new()
@@ -50,7 +58,7 @@ func add_entity(guid: String, mesh_dict: Dictionary) -> void:
 
 func replace_entity_mesh(guid: String, mesh_dict: Dictionary) -> void:
 	if not _entities.has(guid):
-		AxonLogger.warn("replace_entity_mesh: no existe %s" % guid)
+		_log_warn("replace_entity_mesh: no existe %s" % guid)
 		return
 	clear_face_hover()
 	var mi: MeshInstance3D = _entities[guid]
@@ -192,7 +200,12 @@ func _show_face_hover_mesh(hit: Dictionary, mat: StandardMaterial3D) -> void:
 			_hide_face_hover_preview_only()
 		return
 	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
-	var tri_mesh: ArrayMesh = _logical_face_hover_mesh(mi, guid, topo_id, hit["normal"] as Vector3)
+	var topo_id: String = str(hit.get("topo_id", ""))
+	var tri_mesh: ArrayMesh = null
+	if topo_id != "":
+		tri_mesh = _logical_face_hover_mesh(mi, guid, topo_id, hit["normal"] as Vector3)
+	if tri_mesh == null:
+		tri_mesh = _triangle_hover_mesh(mi, fi, hit["normal"] as Vector3)
 	if tri_mesh == null:
 		if _face_hover_locked:
 			clear_face_hover()
@@ -218,41 +231,53 @@ func _logical_face_hover_mesh(
 	var mdt: MeshDataTool = MeshDataTool.new()
 	if mdt.create_from_surface(src, 0) != OK:
 		return null
-	var topos: Array = _triangle_topo.get(guid, []) as Array
-	var fc: int = mdt.get_face_count()
-	var nt0: int = topos.size()
-	var n_faces: int = fc if fc < nt0 else nt0
-	var verts: PackedVector3Array = PackedVector3Array()
-	var norms: PackedVector3Array = PackedVector3Array()
-	var idx: PackedInt32Array = PackedInt32Array()
-	for fi: int in range(n_faces):
-		if str(topos[fi]) != topo_id:
-			continue
-		_append_oriented_tri_in_project_space(mi, mdt, fi, hit_normal_world, verts, norms, idx)
-	if verts.is_empty():
+	var av: PackedVector3Array = PackedVector3Array()
+	var an: PackedVector3Array = PackedVector3Array()
+	var ix: PackedInt32Array = PackedInt32Array()
+	if not _append_face_triangle_project(mi, mdt, face_idx, hit_normal_world, av, an, ix):
 		return null
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = norms
-	arrays[Mesh.ARRAY_INDEX] = idx
-	var out: ArrayMesh = ArrayMesh.new()
-	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return out
+	return _arraymesh_from_tri_arrays(av, an, ix)
 
 
-func _append_oriented_tri_in_project_space(
+func _logical_face_hover_mesh(
+	mi: MeshInstance3D, guid: String, topo_id: String, hit_normal_world: Vector3
+) -> ArrayMesh:
+	var topos: Array = _triangle_topo.get(guid, []) as Array
+	if topos.is_empty():
+		return null
+	var src: Mesh = mi.mesh
+	if src == null or src.get_surface_count() < 1:
+		return null
+	var mdt: MeshDataTool = MeshDataTool.new()
+	if mdt.create_from_surface(src, 0) != OK:
+		return null
+	var fc: int = mdt.get_face_count()
+	var av: PackedVector3Array = PackedVector3Array()
+	var an: PackedVector3Array = PackedVector3Array()
+	var ix: PackedInt32Array = PackedInt32Array()
+	for face_idx in range(fc):
+		if face_idx >= topos.size():
+			break
+		if str(topos[face_idx]) != topo_id:
+			continue
+		_append_face_triangle_project(mi, mdt, face_idx, hit_normal_world, av, an, ix)
+	if ix.is_empty():
+		return null
+	return _arraymesh_from_tri_arrays(av, an, ix)
+
+
+func _append_face_triangle_project(
 	mi: MeshInstance3D,
 	mdt: MeshDataTool,
 	face_idx: int,
 	hit_normal_world: Vector3,
-	verts: PackedVector3Array,
-	norms: PackedVector3Array,
-	idx: PackedInt32Array,
-) -> void:
+	vertices: PackedVector3Array,
+	normals: PackedVector3Array,
+	indices: PackedInt32Array,
+) -> bool:
 	var fc: int = mdt.get_face_count()
 	if face_idx < 0 or face_idx >= fc:
-		return
+		return false
 	var iv0: int = mdt.get_face_vertex(face_idx, 0)
 	var iv1: int = mdt.get_face_vertex(face_idx, 1)
 	var iv2: int = mdt.get_face_vertex(face_idx, 2)
@@ -261,7 +286,7 @@ func _append_oriented_tri_in_project_space(
 	var v2: Vector3 = mdt.get_vertex(iv2)
 	var nloc: Vector3 = (v1 - v0).cross(v2 - v0)
 	if nloc.length_squared() < 1e-12:
-		return
+		return false
 	nloc = nloc.normalized()
 	var xf: Transform3D = mi.global_transform
 	var n_world_geom: Vector3 = (xf.basis * nloc).normalized()
@@ -284,145 +309,27 @@ func _append_oriented_tri_in_project_space(
 	var ln: Vector3 = inv_pv.basis * gn
 	if ln.length_squared() > 1e-12:
 		ln = ln.normalized()
-	var b: int = verts.size()
-	verts.push_back(l0)
-	verts.push_back(l1)
-	verts.push_back(l2)
-	norms.push_back(ln)
-	norms.push_back(ln)
-	norms.push_back(ln)
-	idx.push_back(b)
-	idx.push_back(b + 1)
-	idx.push_back(b + 2)
+	var b: int = vertices.size()
+	vertices.push_back(l0)
+	vertices.push_back(l1)
+	vertices.push_back(l2)
+	normals.push_back(ln)
+	normals.push_back(ln)
+	normals.push_back(ln)
+	indices.push_back(b)
+	indices.push_back(b + 1)
+	indices.push_back(b + 2)
+	return true
 
 
-## Preview Push/Pull: cara lógica duplicada en el espacio desplazado por ``extrusion_world``.
-func clear_extrusion_preview() -> void:
-	if _extr_preview_mi != null:
-		_extr_preview_mi.visible = false
-
-
-func set_extrusion_preview(
-	guid: String, topo_id: String, extrusion_world: Vector3, hit_normal_world: Vector3
-) -> void:
-	if guid == "" or topo_id == "" or not _entities.has(guid):
-		clear_extrusion_preview()
-		return
-	if extrusion_world.length_squared() < 1e-12:
-		clear_extrusion_preview()
-		return
-	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
-	var shell: ArrayMesh = _logical_face_extrusion_preview_mesh(
-		mi, guid, topo_id, hit_normal_world, extrusion_world
-	)
-	if shell == null:
-		clear_extrusion_preview()
-		return
-	_ensure_extr_preview_node()
-	_extr_preview_mi.mesh = shell
-	_extr_preview_mi.material_override = _extrusion_preview_material()
-	_extr_preview_mi.position = Vector3.ZERO
-	_extr_preview_mi.rotation = Vector3.ZERO
-	_extr_preview_mi.scale = Vector3.ONE
-	_extr_preview_mi.visible = true
-
-
-func _ensure_extr_preview_node() -> void:
-	if _extr_preview_mi != null:
-		return
-	_extr_preview_mi = MeshInstance3D.new()
-	_extr_preview_mi.name = "ExtrusionPreview"
-	add_child(_extr_preview_mi)
-
-
-## Base + tapa desplazada (sin costados); suficiente para leer profundidad antes del segundo clic.
-func _logical_face_extrusion_preview_mesh(
-	mi: MeshInstance3D,
-	guid: String,
-	topo_id: String,
-	hit_normal_world: Vector3,
-	extrusion_world: Vector3,
+func _arraymesh_from_tri_arrays(
+	vertices: PackedVector3Array, normals: PackedVector3Array, indices: PackedInt32Array
 ) -> ArrayMesh:
-	var src: Mesh = mi.mesh
-	if src == null or src.get_surface_count() < 1:
-		return null
-	var mdt: MeshDataTool = MeshDataTool.new()
-	if mdt.create_from_surface(src, 0) != OK:
-		return null
-	var topos: Array = _triangle_topo.get(guid, []) as Array
-	var fc: int = mdt.get_face_count()
-	var nt2: int = topos.size()
-	var n_faces2: int = fc if fc < nt2 else nt2
-	var verts: PackedVector3Array = PackedVector3Array()
-	var norms: PackedVector3Array = PackedVector3Array()
-	var idx: PackedInt32Array = PackedInt32Array()
-	var inv_pv: Transform3D = global_transform.affine_inverse()
-	var xf: Transform3D = mi.global_transform
-	for fi: int in range(n_faces2):
-		if str(topos[fi]) != topo_id:
-			continue
-		var iv0: int = mdt.get_face_vertex(fi, 0)
-		var iv1: int = mdt.get_face_vertex(fi, 1)
-		var iv2: int = mdt.get_face_vertex(fi, 2)
-		var v0: Vector3 = mdt.get_vertex(iv0)
-		var v1: Vector3 = mdt.get_vertex(iv1)
-		var v2: Vector3 = mdt.get_vertex(iv2)
-		var nloc: Vector3 = (v1 - v0).cross(v2 - v0)
-		if nloc.length_squared() < 1e-12:
-			continue
-		nloc = nloc.normalized()
-		var n_world_geom: Vector3 = (xf.basis * nloc).normalized()
-		var hit_n: Vector3 = hit_normal_world.normalized()
-		if hit_n.length_squared() > 1e-12 and n_world_geom.dot(hit_n) < 0.0:
-			nloc = -nloc
-		v0 += nloc * FACE_HOVER_OFFSET_M
-		v1 += nloc * FACE_HOVER_OFFSET_M
-		v2 += nloc * FACE_HOVER_OFFSET_M
-		var g0: Vector3 = xf * v0
-		var g1: Vector3 = xf * v1
-		var g2: Vector3 = xf * v2
-		var gn: Vector3 = xf.basis * nloc
-		if gn.length_squared() > 1e-12:
-			gn = gn.normalized()
-		var l0: Vector3 = inv_pv * g0
-		var l1: Vector3 = inv_pv * g1
-		var l2: Vector3 = inv_pv * g2
-		var ln: Vector3 = inv_pv.basis * gn
-		if ln.length_squared() > 1e-12:
-			ln = ln.normalized()
-		var b: int = verts.size()
-		verts.push_back(l0)
-		verts.push_back(l1)
-		verts.push_back(l2)
-		norms.push_back(ln)
-		norms.push_back(ln)
-		norms.push_back(ln)
-		idx.push_back(b)
-		idx.push_back(b + 1)
-		idx.push_back(b + 2)
-		var g0t: Vector3 = g0 + extrusion_world
-		var g1t: Vector3 = g1 + extrusion_world
-		var g2t: Vector3 = g2 + extrusion_world
-		var l0t: Vector3 = inv_pv * g0t
-		var l1t: Vector3 = inv_pv * g1t
-		var l2t: Vector3 = inv_pv * g2t
-		var bt: int = verts.size()
-		verts.push_back(l0t)
-		verts.push_back(l1t)
-		verts.push_back(l2t)
-		norms.push_back(ln)
-		norms.push_back(ln)
-		norms.push_back(ln)
-		idx.push_back(bt)
-		idx.push_back(bt + 1)
-		idx.push_back(bt + 2)
-	if verts.is_empty():
-		return null
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = norms
-	arrays[Mesh.ARRAY_INDEX] = idx
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
 	var out: ArrayMesh = ArrayMesh.new()
 	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return out
@@ -446,6 +353,55 @@ func entity_count() -> int:
 
 func has_entity(guid: String) -> bool:
 	return _entities.has(guid)
+
+
+## Dimensiones de la caja alineada a **ejes mundiales** que envuelve la malla (metros).
+func get_entity_mesh_world_aabb_size(guid: String) -> Vector3:
+	if not _entities.has(guid):
+		return Vector3.ZERO
+	var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
+	var src: Mesh = mi.mesh
+	if src == null or src.get_surface_count() < 1:
+		return Vector3.ZERO
+	var mdt: MeshDataTool = MeshDataTool.new()
+	if mdt.create_from_surface(src, 0) != OK:
+		return Vector3.ZERO
+	var xf: Transform3D = mi.global_transform
+	var vmin: Vector3 = Vector3(INF, INF, INF)
+	var vmax: Vector3 = Vector3(-INF, -INF, -INF)
+	var vc: int = mdt.get_vertex_count()
+	for i in range(vc):
+		var wv: Vector3 = xf * mdt.get_vertex(i)
+		vmin = vmin.min(wv)
+		vmax = vmax.max(wv)
+	return vmax - vmin
+
+
+## AABB mundial de todas las entidades visibles. Si no hay entidades, size=Vector3.ZERO.
+func get_scene_world_aabb() -> AABB:
+	var has_points: bool = false
+	var vmin: Vector3 = Vector3(INF, INF, INF)
+	var vmax: Vector3 = Vector3(-INF, -INF, -INF)
+	for guid in _entities.keys():
+		var mi: MeshInstance3D = _entities[guid] as MeshInstance3D
+		if mi == null:
+			continue
+		var src: Mesh = mi.mesh
+		if src == null or src.get_surface_count() < 1:
+			continue
+		var mdt: MeshDataTool = MeshDataTool.new()
+		if mdt.create_from_surface(src, 0) != OK:
+			continue
+		var xf: Transform3D = mi.global_transform
+		var vc: int = mdt.get_vertex_count()
+		for i in range(vc):
+			var wv: Vector3 = xf * mdt.get_vertex(i)
+			vmin = vmin.min(wv)
+			vmax = vmax.max(wv)
+			has_points = true
+	if not has_points:
+		return AABB(Vector3.ZERO, Vector3.ZERO)
+	return AABB(vmin, vmax - vmin)
 
 
 func selected_guid() -> String:
@@ -541,8 +497,9 @@ func _guid_from_collider(collider: Variant) -> String:
 
 func _default_material() -> StandardMaterial3D:
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.82, 0.78, 0.70)
-	mat.roughness = 0.75
+	mat.albedo_color = Color(0.58, 0.56, 0.52)
+	mat.roughness = 0.86
+	mat.metallic = 0.0
 	return mat
 
 

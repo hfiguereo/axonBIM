@@ -29,6 +29,17 @@ Atajo recomendado en Linux: `./start` o `make start` (backend + Godot según el 
 
 Si el backend no está disponible, la interfaz puede mostrar avisos de conexión; la barra o el registro de la aplicación suelen indicar el fallo en lenguaje claro.
 
+### 2.1 Si el puente RPC falla (runbook breve)
+
+| Síntoma | Qué comprobar |
+|---------|----------------|
+| **Conexión rechazada** / timeout | ¿Está el backend en marcha? Puerto **5799** TCP (o el que hayas puesto con `--tcp-port`). Nada debe bloquear `127.0.0.1` en loopback (firewall local raro en Linux de escritorio). |
+| **Puerto ya en uso** | Otro proceso usa `5799`. Cierra la otra instancia o arranca con otro puerto y exporta `AXONBIM_RPC_PORT` / equivalente en Godot si tu flujo lo soporta. |
+| **Flatpak / sandbox** | Si ejecutas Godot empaquetado, el sandbox puede no ver el mismo loopback o variables; revisa permisos de red **loopback** y documentación del empaquetado que uses. |
+| **Historial raro al cambiar de archivo** | Tras **Guardar IFC…**, el historial (deshacer) queda asociado a la **ruta de ese archivo**; un proyecto sin guardar usa un ámbito interno distinto. Abrir otro IFC en el futuro debería alinear el ámbito cuando exista `project.open` en el producto. |
+
+Variables útiles (desarrollo): `AXONBIM_HISTORY_DB` (ruta del SQLite de deshacer), `AXONBIM_RPC_PORT`, `AXONBIM_SPAWN_GODOT_WORKER`, `AXONBIM_WORKER_PORT` (worker opcional, ver protocolo §5.7).
+
 ---
 
 ## 3. Ventana principal
@@ -51,12 +62,19 @@ Patrón de entrada 3D (SubViewport embebido): ver [`docs/architecture/app-gui-vi
 | Elemento | Uso |
 |----------|-----|
 | **Ping backend** | Comprueba que el frontend llega al servidor JSON-RPC; suele mostrar tiempo de ida y vuelta (RTT). |
+| **Navegación 3D** | Convención **Z arriba** (plano XY). **1–3** = ortogonales; **4** (o órbita desde orto) = perspectiva. **Fondo** plano único sin domo celeste. Órbita (MMB / **Alt+clic**), zoom y pan (**Mayús+MMB**). Sin marco interior que coma píxeles del 3D; splits sin agarrador visible. **HUD** esquina superior izquierda: **±X · ±Y** en planta (**medias** del espacio IFC, se **amplían** proporcionalmente al dibujar muros) más pista de encuadre (ortográfica vs perspectiva). **Teclado numérico** 7/1/3/0; botones esquina **Planta … Inicio**. **Tonemap ACEs**, **MSAA**; rejilla según ángulo. |
 | **Selección** | Elige una entidad en el modelo para inspeccionarla o combinarla con otras acciones. |
-| **Crear muro** | Flujo en dos clics en el suelo (inicio y fin del eje del muro); el backend genera la malla y el IFC. |
-| **Push/Pull** | Modelado directo: tras **fijar una cara** (modo edición), arrastrar o introducir **distancia numérica** en Propiedades para extruir según el vector indicado. |
+| **Crear muro** | **Nivel base** por ahora fijo (00); más adelante habrá **niveles** y **desfases**. En **vista 3D** el muro se define en el **plano horizontal** (eje **Z** arriba; huella en **X/Y**). En **vista 2D OCC** el trazo usa **esa misma huella en X/Y** leyendo la geometría de la vista, **sin** tomar la **cámara 3D** como referencia del dibujo. El **primer** segmento pide clic **P1** y clic **P2**; cada muro válido sigue desde el **final (P2) del anterior**, de modo que el siguiente trazo suele ser **solo un clic (P2)**. **Alt + clic** fuerza **nuevo P1** (también reinicia el anclaje de **cierre de habitación**). Al volver con el último **P2** cerca del **primer vértice** del trazo, el editor **acopla** ese punto y el backend cierra la esquina como en el resto de la cadena. **Esc** o el mismo botón cierran la herramienta. Inferencia a ejes **X/Y** desde P1 y a **X=0 / Y=0**. **Altura y espesor** en **Propiedades** (tipología/familia). La pista bajo el visor muestra **largo en planta**, altura/espesor, etc., al mover el ratón durante el trazo. |
+| **Push/Pull** | Modelado directo: tras **fijar una cara** (modo edición), arrastrar o introducir **distancia numérica** en Propiedades para extruir según el vector indicado. Con el ratón sobre el modelo, el resaltado de hover agrupa la **cara lógica** (todos los triángulos que comparten el mismo `topo_id`), no solo el triángulo bajo el cursor. |
 | **Editar elemento** | Modo de edición acotado a un elemento (doble clic en un elemento seleccionado o acción equivalente en Propiedades). **Esc** o el mismo control suelen salir del modo. Push/Pull queda limitado a ese elemento mientras dure el modo. |
+| **Eliminar muro** | Con **un muro IFC** seleccionado (viewport o árbol del proyecto): botón **Eliminar muro** en **Propiedades**, o tecla **Supr** cuando el ratón está **sobre el viewport** y no tienes foco en un campo de texto. Elimina la entidad en la sesión IFC y la quita del árbol y del visor 3D. |
 | **Guardar IFC…** | Escribe el modelo activo en disco en formato IFC (ruta según el flujo implementado en esa versión). |
-| **Deshacer / Rehacer** | Operaciones mutantes recientes (p. ej. extrusiones) vía historial; atajos habituales **Ctrl+Z** y **Ctrl+Shift+Z** cuando estén cableados en la escena. |
+| **Generar vistas 2D…** | Con OCC 2D habilitado, exporta `top/front/right` desde `draw.ortho_snapshot` a PNG técnico raster; si OCC falla, cae a la ruta legacy (captura ortográfica del viewport) sin bloquear la UI. |
+| **Exportar muros DXF (planta)…** | Guarda un `.dxf` con la huella de los muros de la sesión en **planta** (`view: top`), geometría en capa `WALLS` y **registro** de capas reservadas (`AXON_*`, ver manual de arquitectura / `draw-delivery-layers.md`), unidades en metros (proyección analítica en backend). Requiere al menos un muro en el modelo. |
+| **Modo 2D: Auto / Plano vectorial / Modelo ortográfico** | Cambia el ruteo de visualización en pestañas 2D. **Auto** intenta plano vectorial (`draw.ortho_snapshot`, analítico) y hace fallback a ortográfico de modelo si no hay líneas o hay error. **Plano vectorial** fuerza snapshot backend. **Modelo ortográfico** desactiva snapshot y usa la cámara ortográfica del viewport. |
+| **Vistas 2D en Project Browser** | En `Navegador de proyecto` aparece `Vistas 2D` (Planta/Frente/Derecha por defecto). Puedes crear nuevas con `+ Vista 2D` y borrar la seleccionada con `Eliminar vista`. Cada vista mantiene estado (`loading/ready/error/fallback`) y escala aproximada por vista durante la sesión activa; si OCC falla, vuelve automáticamente al preset ortográfico legacy. En OCC 2D: **rueda = zoom**, **MMB arrastre = pan**. |
+| **View Range (Planta 2D OCC)** | La planta OCC usa rango de vista configurable (`cut/top/bottom/depth`). Atajos iniciales: **PgUp/PgDn** ajustan el plano de corte (`cut_plane`) en pasos de 0,10 m. El HUD muestra zoom + valores activos del rango. |
+| **Deshacer / Rehacer** | Operaciones mutantes recientes: **extruir cara**, **cambiar tipología de muro**, **crear muro** y **eliminar muro** (el detalle técnico está en el SQLite de historial del backend). Atajos habituales **Ctrl+Z** y **Ctrl+Shift+Z** cuando estén cableados en la escena. Tras guardar el IFC a disco, el historial queda ligado a la ruta de ese archivo. |
 
 Los iconos y textos exactos siguen el tema e iconografía del proyecto (`frontend/assets/` y guías en ese directorio).
 
@@ -71,9 +89,12 @@ Los iconos y textos exactos siguen el tema e iconografía del proyecto (`fronten
 
 ### 5.2. Primer muro y archivo
 
-1. Activar **Crear muro**.
-2. Dos clics en la cuadrícula del viewport para definir el segmento.
-3. **Guardar IFC…** y abrir el archivo con otra herramienta BIM compatible (BlenderBIM, visores STEP/IFC, etc.).
+1. Activar **Crear muro**. En **Propiedades** elige **tipología / familia** (o **Personalizado**) y altura/espesor para el **siguiente trazo** (aparece el bloque aunque no haya muro seleccionado).
+2. Clic **P1** y clic **P2** en el suelo del viewport para el primer muro; aparece la pieza y el siguiente trazo suele usar **solo P2** (continúa desde el extremo del anterior). Para empezar en otro sitio pulsa **Alt + clic** (también descarta el anclaje de cierre de polígono). Para **cerrar una habitación** en planta ortogonal, acerca el último **P2** al **primer vértice**: si entra en el radio de acoplamiento, se manda el cierre al backend como el resto de esquinas.
+3. Sigue dibujando o pulsa **Esc** / el botón **Crear muro** otra vez para salir de la herramienta.
+4. Para cambiar altura/espesor de un **muro ya colocado** sin Push/Pull: selecciónalo, ajusta familia o valores en **Propiedades** y **Aplicar tipología al muro**.
+5. Para quitar un muro de la sesión: selecciónalo y **Eliminar muro** o **Supr** (ratón sobre el visor).
+6. **Guardar IFC…** y abrir el archivo con otra herramienta BIM compatible (BlenderBIM, visores IFC, etc.).
 
 ### 5.3. Extrusión de cara (Push/Pull)
 
@@ -89,6 +110,7 @@ Los iconos y textos exactos siguen el tema e iconografía del proyecto (`fronten
 - El **ROADMAP** del producto está en [`ROADMAP.md`](../ROADMAP.md): fases 3 en adelante incluyen planos 2D MIVED, estados ISO 19650 avanzados y empaquetado para usuario final sin terminal.
 - Lo que ya se cerró en fases anteriores se resume en [`docs/phase-reports/`](phase-reports/) (p. ej. informe de Fase 1).
 - No se documentan aquí valores normativos numéricos del CCRD u otras normas: usar [`docs/normativa/`](normativa/).
+- En 2D, el modo **Plano vectorial** hoy prioriza cobertura de muros caja; para geometría todavía no proyectada por reglas analíticas, usar **Auto** (con fallback) o **Modelo ortográfico**.
 
 ---
 

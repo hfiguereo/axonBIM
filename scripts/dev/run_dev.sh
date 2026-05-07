@@ -13,6 +13,9 @@
 #   AXONBIM_RPC_PORT   Puerto TCP (default 5799)
 #   AXONBIM_LOG_LEVEL  INFO, DEBUG, ...
 #   GODOT              Ruta al binario Godot (default: ~/.local/bin/godot si existe, si no `godot` en PATH)
+#   AXONBIM_GODOT_REQUIRED_VERSION  Version minima de Godot (default 4.6.2)
+#   AXONBIM_GODOT_AUTO_UPDATE       En Linux: 1 auto-instala/actualiza oficial, 0 desactiva (default 1)
+#   AXONBIM_FORCE_X11               En Linux: 1 para forzar X11 (default 0)
 
 set -euo pipefail
 
@@ -22,6 +25,33 @@ cd "$ROOT"
 PORT="${AXONBIM_RPC_PORT:-5799}"
 export AXONBIM_RPC_PORT="${PORT}"
 LOG_LEVEL="${AXONBIM_LOG_LEVEL:-INFO}"
+REQUIRED_GODOT_VERSION="${AXONBIM_GODOT_REQUIRED_VERSION:-4.6.2}"
+AUTO_UPDATE_GODOT="${AXONBIM_GODOT_AUTO_UPDATE:-1}"
+
+_is_linux=0
+if [[ "$(uname -s)" == "Linux" ]]; then
+	_is_linux=1
+fi
+
+if [[ "${_is_linux}" -eq 1 && -f "${ROOT}/scripts/dev/linux_profile.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${ROOT}/scripts/dev/linux_profile.sh"
+fi
+
+_extract_version() {
+	local raw="$1"
+	if [[ "${raw}" =~ ([0-9]+\.[0-9]+(\.[0-9]+)?) ]]; then
+		echo "${BASH_REMATCH[1]}"
+		return 0
+	fi
+	return 1
+}
+
+_version_lt() {
+	local a="$1"
+	local b="$2"
+	[[ "$(printf '%s\n%s\n' "${a}" "${b}" | sort -V | head -n1)" != "${b}" ]]
+}
 
 if [[ -n "${GODOT:-}" ]]; then
 	GODOT_BIN="${GODOT}"
@@ -31,14 +61,28 @@ else
 	GODOT_BIN="$(command -v godot || true)"
 fi
 if [[ -z "${GODOT_BIN}" ]]; then
-	echo "Godot no encontrado. Instala el binario oficial (p. ej. scripts/dev/install_godot_official.sh) o export GODOT=/ruta/al/godot" >&2
-	exit 1
+	if [[ "${_is_linux}" -eq 1 && "${AUTO_UPDATE_GODOT}" == "1" ]]; then
+		echo "AxonBIM: Godot no encontrado, instalando ${REQUIRED_GODOT_VERSION} oficial..."
+		GODOT_VERSION="${REQUIRED_GODOT_VERSION}" bash "${ROOT}/scripts/dev/install_godot_official.sh"
+		GODOT_BIN="${HOME}/.local/bin/godot"
+	else
+		echo "Godot no encontrado. Instala el binario oficial (p. ej. scripts/dev/install_godot_official.sh) o export GODOT=/ruta/al/godot" >&2
+		exit 1
+	fi
 fi
 
-# Portatil Intel + NVIDIA: sin DRI_PRIME, Mesa/Godot suelen intentar la dGPU y
-# mostrar "failed to load driver: nvidia-drm" aunque luego rendericen con Intel.
-if [[ -z "${DRI_PRIME:-}" ]]; then
-	export DRI_PRIME=0
+if [[ "${_is_linux}" -eq 1 ]]; then
+	_godot_raw_version="$("${GODOT_BIN}" --version 2>/dev/null || true)"
+	_godot_version="$(_extract_version "${_godot_raw_version}" || true)"
+	if [[ -n "${_godot_version}" ]] && _version_lt "${_godot_version}" "${REQUIRED_GODOT_VERSION}"; then
+		if [[ "${AUTO_UPDATE_GODOT}" == "1" ]]; then
+			echo "AxonBIM: Godot ${_godot_version} < ${REQUIRED_GODOT_VERSION}, actualizando..."
+			GODOT_VERSION="${REQUIRED_GODOT_VERSION}" bash "${ROOT}/scripts/dev/install_godot_official.sh"
+			GODOT_BIN="${HOME}/.local/bin/godot"
+		else
+			echo "AxonBIM: aviso: Godot ${_godot_version} < ${REQUIRED_GODOT_VERSION} (auto-update desactivado)." >&2
+		fi
+	fi
 fi
 
 _import_nonempty=0

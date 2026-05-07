@@ -63,6 +63,17 @@ uv run pre-commit install
 
 Trata `origin/develop` como fuente de verdad: `git pull` al empezar en un clone y, antes de cambiar de PC, commits pequeños verificados y `git push`. Convención detallada (incluida para agentes) en [`.cursor/rules/66-git-sincronizacion-solo-autor.mdc`](.cursor/rules/66-git-sincronizacion-solo-autor.mdc).
 
+### Sincronizar con el remoto (`pull`)
+
+El primer argumento de `git pull` es el **nombre del remoto** (`origin`, `upstream`, …), no el de la rama sola.
+
+```bash
+git fetch origin
+git pull origin develop
+```
+
+**Evita** `git pull develop`: Git interpreta `develop` como si fuera un remoto y suele responder `fatal: 'develop' does not appear to be a git repository`. Si trabajas sobre otra rama, cambia el segundo argumento (p. ej. `git pull origin main`).
+
 ### Commits
 
 Formato convencional, en **español imperativo**, ≤72 caracteres en la primera línea:
@@ -98,6 +109,11 @@ Motivación. Issue que resuelve, decisión arquitectónica, etc.
 - [ ] Tests añadidos o actualizados según [`.cursor/rules/40-testing.mdc`](.cursor/rules/40-testing.mdc).
 - [ ] Documentación actualizada si cambia API pública o protocolo RPC.
 - [ ] Aprobación del BDFL (Arq. Hector Figuereo) para cambios arquitectónicos.
+
+## Verificación local y plataforma
+
+- **Referencia del tronco:** Linux (CI en GitHub Actions). Comandos canónicos: `uv run pytest -q`, `uv run ruff check .`, `uv run mypy --strict src/`.
+- **Tests de integración RPC** (`tests/integration/test_rpc_*.py`, `test_wall_roundtrip.py`): usan **socket Unix** donde el SO lo permite. En **macOS** o **Windows** pueden fallar por timing o ausencia de `asyncio.start_unix_server`; no implican por sí solos regresión en Linux. Smoke sin integración: `uv run pytest -q tests/unit/`.
 
 ## Código
 

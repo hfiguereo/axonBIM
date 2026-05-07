@@ -171,6 +171,17 @@ make run-godot
 
 Si usas otro puerto: `AXONBIM_RPC_PORT=9000` en ambos lados o `AXONBIM_RPC_PORT=9000 make run` con el script ajustado vía variable.
 
+En Linux/Fedora, `./start` aplica un perfil de ejecución y valida versión de
+Godot al arrancar:
+
+- versión mínima por defecto: `4.6.2`
+- si falta o está por debajo, auto-instala/actualiza el binario oficial en
+  `~/.local/bin/godot`
+- puedes ajustar con:
+  - `AXONBIM_GODOT_REQUIRED_VERSION` (ej. `4.6.2`)
+  - `AXONBIM_GODOT_AUTO_UPDATE=0` para desactivar auto-actualización
+  - `AXONBIM_FORCE_X11=1` para forzar X11 (útil en algunos casos Wayland)
+
 **Flatpak** (la variable del shell no siempre entra al sandbox; usa `--env`):
 
 ```bash

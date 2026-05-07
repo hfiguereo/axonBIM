@@ -1,6 +1,6 @@
 [project]
 name = "axonbim"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Software BIM open-source para Linux, hibrido Godot (frontend) + Python (backend)."
 readme = "README.md"
 requires-python = ">=3.12"

@@ -75,7 +75,8 @@ Secciones del Título 3 que AxonBIM **debe** soportar al exportar planos:
 > Esta sección se llenará a medida que se extraigan valores específicos del PDF. Mientras una constante no esté aquí, **el código debe usar `# TODO(MIVED-CCRD): pendiente extracción §<sección>`**.
 
 ### 4.1 Capas DXF para planos arquitectónicos
-*Pendiente extracción de §3.7.3.*
+
+**Estado:** pendiente extracción literal de §3.7.3. **Convención de producto:** tabla interna y código en [`draw-delivery-layers.md`](../../architecture/draw-delivery-layers.md) + [`layer_ids.py`](../../../src/axonbim/drawing/layer_ids.py) (`DXF_ARCH_LAYER_SPECS`). Sustituir o alinear nombres cuando el extracto normativo esté redactado.
 
 ### 4.2 Grosores de línea
 *Pendiente extracción de §3.7.2.*

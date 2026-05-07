@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Instala el binario oficial de Godot (Linux x86_64) en ~/.local/bin/godot.
-# Misma version que CI (4.3-stable). Evita Flatpak cuando Vulkan/SIGABRT molesta.
+# Version objetivo por defecto: 4.6.2-stable.
 set -euo pipefail
 
-GODOT_VERSION="${GODOT_VERSION:-4.3}"
+GODOT_VERSION="${GODOT_VERSION:-4.6.2}"
 ZIP_NAME="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
 URL="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${ZIP_NAME}"
 DEST="${HOME}/.local/bin/godot"

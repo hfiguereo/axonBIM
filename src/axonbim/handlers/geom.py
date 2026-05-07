@@ -13,6 +13,7 @@ from axonbim.geometry.meshing import Mesh
 from axonbim.geometry.ocp_brep import wall_box_mesh_ocp
 from axonbim.geometry.wall_extrude import extrude_wall_face
 from axonbim.geometry.wall_spec import WallSpec
+from axonbim.history import recording
 from axonbim.history import sqlite_store as history_store
 from axonbim.ifc import wall as wall_module
 from axonbim.ifc.session import get_session
@@ -85,15 +86,16 @@ async def extrude_face(params: dict[str, Any]) -> dict[str, Any]:
     except ValueError as exc:
         raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
 
-    history_store.push_undo(
-        "extrude_face",
-        {
-            "guid": guid,
-            "wall_spec": old_spec.to_dict(),
-            "mesh": old_mesh.to_dict(),
-        },
-        clear_redo=True,
-    )
+    if not recording.is_suppressed():
+        history_store.push_undo(
+            "extrude_face",
+            {
+                "guid": guid,
+                "wall_spec": old_spec.to_dict(),
+                "mesh": old_mesh.to_dict(),
+            },
+            clear_redo=True,
+        )
 
     session = get_session()
     wall_module.update_wall_geometry(session, guid, new_spec)

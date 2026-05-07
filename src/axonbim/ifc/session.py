@@ -18,6 +18,7 @@ import ifcopenshell
 import ifcopenshell.api
 
 from axonbim.geometry import topo_registry
+from axonbim.geometry.workspace_xy import WorkspaceXYHalfExtents
 from axonbim.history import sqlite_store as history_store
 
 if TYPE_CHECKING:
@@ -43,6 +44,8 @@ class IfcSession:
     building: entity_instance
     storey: entity_instance
     body_context: entity_instance
+    workspace_xy: WorkspaceXYHalfExtents
+    view2d_states: dict[str, dict[str, float | str]]
 
     def __init__(
         self,
@@ -52,6 +55,7 @@ class IfcSession:
         building: entity_instance,
         storey: entity_instance,
         body_context: entity_instance,
+        workspace_xy: WorkspaceXYHalfExtents | None = None,
     ) -> None:
         """Construye la sesion con referencias ya creadas a las entidades espaciales."""
         self.file = file
@@ -60,6 +64,8 @@ class IfcSession:
         self.building = building
         self.storey = storey
         self.body_context = body_context
+        self.workspace_xy = workspace_xy if workspace_xy is not None else WorkspaceXYHalfExtents()
+        self.view2d_states = {}
 
     @classmethod
     def create_new(
@@ -108,6 +114,7 @@ def get_session() -> IfcSession:
     with _SESSION_LOCK:
         if _SESSION is None:
             _SESSION = IfcSession.create_new()
+            history_store.set_scope(history_store.SCOPE_UNSAVED)
         return _SESSION
 
 
@@ -118,3 +125,4 @@ def reset_session() -> None:
         _SESSION = None
     topo_registry.clear()
     history_store.clear()
+    history_store.set_scope(history_store.SCOPE_UNSAVED)
