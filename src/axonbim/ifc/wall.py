@@ -18,7 +18,7 @@ import ifcopenshell.api
 import numpy as np
 from ifcopenshell.util.shape_builder import ShapeBuilder
 
-from axonbim.geometry.meshing import Mesh, wall_box_mesh
+from axonbim.geometry.meshing import Mesh, wall_mesh_for_spec
 from axonbim.geometry.topology import Vec3
 from axonbim.geometry.wall_spec import WallSpec
 from axonbim.ifc.session import IfcSession
@@ -61,10 +61,13 @@ def create_wall(
     Returns:
         ``WallResult`` con ``guid`` y ``mesh`` para renderizar en Godot.
     """
-    mesh = wall_box_mesh(p1, p2, height, thickness)
-
     wall_name = name or _next_wall_name(session)
     wall = _run("root.create_entity", session.file, ifc_class="IfcWall", name=wall_name)
+    guid = str(wall.GlobalId)
+    mesh = wall_mesh_for_spec(
+        WallSpec(p1=p1, p2=p2, height=height, thickness=thickness),
+        parent_guid=guid,
+    )
     _run(
         "spatial.assign_container",
         session.file,
@@ -112,7 +115,7 @@ def restore_wall(
     """
     if _wall_by_guid(session, guid) is not None:
         raise ValueError(f"Ya existe IfcWall con GlobalId={guid!r}")
-    mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
+    mesh = wall_mesh_for_spec(spec, parent_guid=guid)
     wall_name = name or _next_wall_name(session)
     wall = session.file.create_entity("IfcWall", GlobalId=str(guid), Name=wall_name)
     _run(
@@ -136,13 +139,7 @@ def update_wall_geometry(session: IfcSession, guid: str, spec: WallSpec) -> Wall
     if wall is None:
         raise ValueError(f"No existe IfcWall con GlobalId={guid!r}")
 
-    mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
-    length = math.hypot(spec.p2[0] - spec.p1[0], spec.p2[1] - spec.p1[1])
-    _assign_box_representation(
-        session, wall, length=length, thickness=spec.thickness, height=spec.height
-    )
-    _place_wall(session, wall, p1=spec.p1, p2=spec.p2)
-    _log.info("Muro actualizado: guid=%s, length=%.3f, height=%.3f", guid, length, spec.height)
+    mesh = wall_mesh_for_spec(spec, parent_guid=guid)
     return WallResult(guid=guid, mesh=mesh)
 
 

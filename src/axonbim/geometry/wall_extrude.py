@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 from typing import Final
 
-from axonbim.geometry.meshing import Mesh, wall_box_mesh
+from axonbim.geometry.meshing import Mesh, wall_box_mesh, wall_mesh_for_spec
 from axonbim.geometry.topology import Vec3
 from axonbim.geometry.wall_spec import WallSpec
 
@@ -19,9 +19,12 @@ _FACE_END_P1: Final[int] = 5
 
 def face_index_for_topo_id(mesh: Mesh, topo_id: str) -> int:
     """Indice de cara lógica 0..5 (orden ``wall_box_mesh``) o ``-1``."""
-    for tri_base in range(0, len(mesh.topo_ids), 2):
-        if mesh.topo_ids[tri_base] == topo_id:
-            return tri_base // 2
+    for tri_i, tid in enumerate(mesh.topo_ids):
+        if tid != topo_id:
+            continue
+        if mesh.tri_logical_face and tri_i < len(mesh.tri_logical_face):
+            return mesh.tri_logical_face[tri_i]
+        return tri_i // 2
     return -1
 
 
@@ -103,13 +106,22 @@ def apply_extrusion(spec: WallSpec, face_index: int, distance_m: float) -> WallS
         p2=(float(p2[0]), float(p2[1]), float(p2[2])),
         height=float(h),
         thickness=float(t),
+        openings=(),
     )
 
 
 def extrude_wall_face(
-    spec: WallSpec, mesh: Mesh, topo_id: str, vector: Vec3
+    spec: WallSpec,
+    mesh: Mesh,
+    topo_id: str,
+    vector: Vec3,
+    *,
+    parent_guid: str,
 ) -> tuple[WallSpec, Mesh, dict[str, str]]:
-    """Calcula nueva especificacion y malla; ``topo_map`` por cara logica."""
+    """Calcula nueva especificacion y malla; ``topo_map`` por cara logica.
+
+    Tras extruir, los huecos previos se descartan (la caja cambia de forma global).
+    """
     fi = face_index_for_topo_id(mesh, topo_id)
     if fi < 0:
         raise ValueError(f"topo_id no pertenece a la malla: {topo_id!r}")
@@ -117,8 +129,15 @@ def extrude_wall_face(
     nx, ny, nz = normals[fi]
     d = vector[0] * nx + vector[1] * ny + vector[2] * nz
     old_table = face_topo_id_table(spec)
-    new_spec = apply_extrusion(spec, fi, d)
-    new_mesh = wall_box_mesh(new_spec.p1, new_spec.p2, new_spec.height, new_spec.thickness)
+    new_base = apply_extrusion(spec, fi, d)
+    new_spec = WallSpec(
+        p1=new_base.p1,
+        p2=new_base.p2,
+        height=new_base.height,
+        thickness=new_base.thickness,
+        openings=(),
+    )
+    new_mesh = wall_mesh_for_spec(new_spec, parent_guid=parent_guid)
     new_table = face_topo_id_table(new_spec)
     topo_map: dict[str, str] = {}
     for old_id, new_id in zip(old_table, new_table, strict=True):

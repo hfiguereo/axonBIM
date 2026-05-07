@@ -1,6 +1,6 @@
 # Fase 2 — Sub-hitos complementarios (modelado interactivo)
 
-**Referencia:** [`ROADMAP.md`](../../ROADMAP.md) §Fase 2 · **Cierre documental:** [`docs/phase-reports/phase-2-report.md`](../phase-reports/phase-2-report.md).
+**Referencia:** [`ROADMAP.md`](../../ROADMAP.md) §Fase 2 · **Cierre documental:** [`docs/phase-reports/phase-2-report.md`](../phase-reports/phase-2-report.md). Post-cierre: oleada «cáscara de vivienda» (**SH-F2-11…13**).
 
 ## Sub-hitos ya cubiertos (ROADMAP [x], cierre documental Fase 2)
 
@@ -115,3 +115,42 @@
 - **Por qué:** Evita que cada PR asuma que OCC es obligatorio para Fase 2.
 - **Hecho cuando:** Texto aceptado y enlazado desde README de geometría interna.
 - **Evidencia / enlaces:** [`docs/architecture/geometry-analytical-vs-ocp.md`](../architecture/geometry-analytical-vs-ocp.md), `AGENTS.md`.
+
+---
+
+## Oleada «cáscara de vivienda» (post-cierre Fase 2)
+
+Trabajo **posterior** al criterio de salida ya demostrado (50+ muros + extrusiones). Orden sugerido: **niveles → huecos → losas** (cada paso habilita el siguiente sin bloquear el anterior por completo, pero el datum estable simplifica cotas y vistas).
+
+**Referencia:** [`ROADMAP.md`](../../ROADMAP.md) §Fase 2 (bloque “Hacia paridad mínima…”). Simbología 2D de huecos sigue en Fase 3 — [`fase-03-subhitos.md`](fase-03-subhitos.md) (p. ej. SH-F3-04 / SH-F3-06).
+
+---
+
+### SH-F2-11 — Niveles de trabajo e `IfcBuildingStorey`
+
+- **Estado:** Cerrado (niveles + `project.open` + UI «Abrir IFC…» y recarga de mallas / árbol de muros; muros no-caja del IFC se omiten con contador `walls_skipped`).
+- **Qué:** Al menos un **forjado/nivel** explícito en producto (además del datum fijo actual), reflejado en IFC como `IfcBuildingStorey` coherente con trazo de muros y con vistas 2D/3D.
+- **Cómo:** Sesión IFC (`IfcSession.list_storeys_ordered`, `create_storey`, `set_active_storey`, `open_existing`), RPC `project.list_storeys` / `create_storey` / `set_active_storey` / `project.open`, UI Godot (Propiedades: lista + añadir nivel; cinta: Abrir/Guardar IFC); herramienta muro usa cota Z del nivel activo (`work_plane_elevation_m`).
+- **Por qué:** Sin niveles, la paridad **Revit-like** por planta y losas con sentido constructivo quedan artificialmente limitadas; reduce ambigüedad al añadir huecos y losas.
+- **Hecho cuando:** Usuario puede asignar o cambiar nivel activo, guardar `.ifc`, **abrir** otro `.ifc` y ver muros rehidratados; documentado en `jsonrpc-protocol.md` si hay RPC nuevo.
+- **Evidencia / enlaces:** `session.py`, `handlers/project.py`, `wall_import.py`, `tests/unit/test_handlers_project_storeys.py`, `tests/unit/test_handlers_project_open.py`, `jsonrpc-protocol.md` §5.5, escena principal + `create_wall_tool.gd` + `project_view.gd`.
+
+---
+
+### SH-F2-12 — Huecos hosteados en muro (puerta / ventana MVP)
+
+- **Estado:** Cerrado
+- **Qué:** Hueco rectangular en muro caja con ``IfcOpeningElement`` + ``IfcRelVoidsElement`` y malla con recorte analítico en caras ±n.
+- **Cómo:** ``ifc.create_wall_opening``, ``axonbim/ifc/opening.py``, ``wall_mesh_for_spec`` / ``tri_logical_face``; botón Propiedades «Hueco demo».
+- **Hecho cuando:** RPC + tests + protocolo; flujo manual en UI.
+- **Evidencia / enlaces:** ``tests/unit/test_handlers_mvp_shell.py``, ``jsonrpc-protocol.md`` §5.2.
+
+---
+
+### SH-F2-13 — Losas / forjado simple (MVP)
+
+- **Estado:** Cerrado
+- **Qué:** Losa prismática por polígono convexo CCW en planta, cara superior en cota configurable (por defecto nivel activo), ``IfcSlab`` + malla Godot.
+- **Cómo:** ``ifc.create_slab``, ``axonbim/ifc/slab.py``, ``slab_prism_mesh``; historial ``create_slab`` / ``delete_slab``; botón «Losa demo».
+- **Hecho cuando:** RPC + tests + protocolo; elemento en árbol IFC / visor.
+- **Evidencia / enlaces:** ``tests/unit/test_handlers_mvp_shell.py``, ``jsonrpc-protocol.md`` §5.2 / §5.5.

@@ -39,9 +39,21 @@ def test_normals_are_unit_length() -> None:
 
 
 def test_mesh_to_dict_has_expected_keys() -> None:
-    mesh = Mesh(vertices=[1.0], indices=[0], normals=[0.0], topo_ids=["x"])
+    mesh = Mesh(
+        vertices=[1.0],
+        indices=[0],
+        normals=[0.0],
+        topo_ids=["x"],
+        tri_logical_face=[0],
+    )
     data = mesh.to_dict()
-    assert set(data.keys()) == {"vertices", "indices", "normals", "topo_ids"}
+    assert set(data.keys()) == {
+        "vertices",
+        "indices",
+        "normals",
+        "topo_ids",
+        "tri_logical_face",
+    }
     assert data["indices"] == [0]
 
 

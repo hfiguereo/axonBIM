@@ -9,10 +9,14 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
-- Parámetro RPC opcional ``join_end_guid`` en ``ifc.create_wall``: ajuste de **cierre de habitación** (extiende ``p2`` cuando vuelve al primer muro del contorno, ortogonal). Herramienta Godot **Crear muro**: snap al primer vértice (~0,45 m) y envío de ``join_end_guid``.
+- RPC ``ifc.create_wall_opening``: hueco rectangular en muro (``IfcOpeningElement`` + ``IfcRelVoidsElement``) y malla con huecos en caras ±n; campo ``tri_logical_face`` en ``mesh`` para Push/Pull coherente.
+- RPC ``ifc.create_slab``: losa prismática convexa CCW (``IfcSlab``); historial ``create_slab`` / ``delete_slab``; UI Propiedades «Hueco demo» / «Losa demo»; ``ifc.delete`` borra muros o losas indexadas.
+- RPC `project.open` (`IfcSession.open_existing`): carga `.ifc` desde disco, rehidrata muros **caja** en `topo_registry`, vacía historial y fija ámbito SQLite a la ruta del archivo. UI cinta **Abrir IFC…**; muros no interpretables se omiten (`walls_skipped`).
+- RPC `project.list_storeys`, `project.create_storey`, `project.set_active_storey`; `IfcSession` con varios `IfcBuildingStorey`, cota `Elevation` y nivel activo para contener muros. UI Propiedades: selector de nivel + añadir nivel; herramienta muro y vista 2D usan la cota Z del nivel activo.
+- Ajuste de **cierre de habitación** (extiende ``p2`` cuando vuelve al primer muro del contorno, ortogonal). Herramienta Godot **Crear muro**: snap al primer vértice (~0,45 m) y envío de ``join_end_guid``.
 - Convención interna de **capas DXF** arquitectónicas (``DXF_ARCH_LAYER_SPECS``, prefijo ``AXON_*`` reservado); el export de muros **registra** todas las capas canónicas aunque solo escriba geometría en ``WALLS``; test de lectura DXF en ``test_handlers_draw.py``.
 - Historial SQLite por **ámbito** (`__unsaved__` hasta el primer `project.save`, luego ruta canónica del `.ifc`); migración automática columna `scope` en `session_history.db`.
-- Operaciones en **deshacer/rehacer**: `create_wall`, `delete_wall`, `set_wall_typology` además de `geom.extrude_face`; restauración de muro borrado con el mismo `GlobalId` (`restore_wall`).
+- Operaciones en **deshacer/rehacer**: `create_wall`, `delete_wall`, `set_wall_typology`, `create_slab`, `delete_slab` además de `geom.extrude_face`; restauración de muro borrado con el mismo `GlobalId` (`restore_wall`).
 - Módulo `axonbim.history.recording` (`suppressed`) para no re-apilar al aplicar historial.
 - Doc [`docs/architecture/draw-delivery-layers.md`](docs/architecture/draw-delivery-layers.md) (evolución Fase 3 capas).
 - Doc [`docs/architecture/geometry-analytical-vs-ocp.md`](docs/architecture/geometry-analytical-vs-ocp.md) para contribuyentes.
@@ -20,7 +24,9 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Documentación
 
-- Manual y [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md): `join_end_guid`, cierre de habitación en **Crear muro**; export DXF y capas `AXON_*`.
+- Manual y [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md): `join_end_guid`, cierre de habitación en **Crear muro**; export DXF y capas `AXON_*`; niveles IFC (`project.list_storeys`, etc.) y cota Z del nivel activo en **Crear muro**; `project.open` y nota de ámbito/historial; `ifc.create_wall_opening`, `ifc.create_slab` y campo `tri_logical_face` en mallas.
+- [`docs/ui/UI-inspiration-notes.md`](docs/ui/UI-inspiration-notes.md): trazabilidad diseño cinta / docks (ideas del boceto RTF y equivalencias en `develop`).
+- Sub-hitos **SH-F2-11…13** (niveles, huecos, losas) en [`docs/roadmap/fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md); enlace SH-F3-04 → SH-F2-12.
 - Manual: §2.1 **runbook** de fallos RPC / historial por archivo; tabla `project.save` y notas de `history.*` en [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) (plataforma e integración RPC).
 - Cierre documental **Fase 2** e inventario Fases 3–4: [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md), [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md); índice [`docs/phase-reports/README.md`](docs/phase-reports/README.md); desglose ROADMAP [`docs/roadmap/README.md`](docs/roadmap/README.md), plantilla [`docs/roadmap/00-guia-estructura-subhitos.md`](docs/roadmap/00-guia-estructura-subhitos.md). [`ROADMAP.md`](ROADMAP.md) alineado (SQLite, criterio 50+ muros).
 

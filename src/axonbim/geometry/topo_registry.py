@@ -11,6 +11,7 @@ from __future__ import annotations
 import threading
 
 from axonbim.geometry.meshing import Mesh
+from axonbim.geometry.slab_spec import SlabSpec
 from axonbim.geometry.wall_spec import WallSpec
 
 _LOCK = threading.Lock()
@@ -20,6 +21,8 @@ _BY_TOPO: dict[str, str] = {}
 _BY_GUID: dict[str, Mesh] = {}
 # guid -> parametros del muro caja (para ``geom.extrude_face``).
 _WALL_SPEC: dict[str, WallSpec] = {}
+# guid -> parametros de losa prismática (``ifc.create_slab``).
+_SLAB_SPEC: dict[str, SlabSpec] = {}
 
 
 def clear() -> None:
@@ -28,6 +31,7 @@ def clear() -> None:
         _BY_TOPO.clear()
         _BY_GUID.clear()
         _WALL_SPEC.clear()
+        _SLAB_SPEC.clear()
 
 
 def register_mesh(guid: str, mesh: Mesh) -> None:
@@ -40,6 +44,18 @@ def register_wall_spec(guid: str, spec: WallSpec) -> None:
     """Asocia parametros de muro caja al ``guid`` (tras ``ifc.create_wall``)."""
     with _LOCK:
         _WALL_SPEC[guid] = spec
+
+
+def register_slab_spec(guid: str, spec: SlabSpec) -> None:
+    """Asocia parametros de losa al ``guid`` (tras ``ifc.create_slab``)."""
+    with _LOCK:
+        _SLAB_SPEC[guid] = spec
+
+
+def get_slab_spec(guid: str) -> SlabSpec | None:
+    """Devuelve el ``SlabSpec`` registrado o ``None``."""
+    with _LOCK:
+        return _SLAB_SPEC.get(guid)
 
 
 def get_wall_spec(guid: str) -> WallSpec | None:
@@ -99,7 +115,7 @@ def mesh_for_guid(guid: str) -> Mesh | None:
 
 
 def unregister_guid(guid: str) -> None:
-    """Elimina ``guid``, su ``WallSpec`` y los ``topo_id`` derivados del registro."""
+    """Elimina ``guid``, su ``WallSpec`` o ``SlabSpec`` y los ``topo_id`` derivados."""
     with _LOCK:
         old = _BY_GUID.pop(guid, None)
         if old is not None:
@@ -107,6 +123,7 @@ def unregister_guid(guid: str) -> None:
                 if _BY_TOPO.get(tid) == guid:
                     del _BY_TOPO[tid]
         _WALL_SPEC.pop(guid, None)
+        _SLAB_SPEC.pop(guid, None)
 
 
 def has_topo_id(topo_id: str) -> bool:

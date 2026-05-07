@@ -8,6 +8,45 @@ Hoja de ruta estratégica. Asume una dedicación promedio de **10 horas semanale
 
 ---
 
+## Objetivo de producto (referentes SketchUp / Revit)
+
+La **funcionalidad mínima aspiracional** no es clonar Revit ni SketchUp: es combinar **gesto rápido y exploración espacial** (como SketchUp) con **semántica BIM, historial y export IFC** (como Revit en su núcleo documental), sin comprometer la arquitectura dual Godot/Python.
+
+| Referente | Qué adoptamos como brújula | Qué queda fuera del MVP honesto |
+|-----------|----------------------------|----------------------------------|
+| **SketchUp** | Trazo directo en vista, inferencias, pocos modos, feedback inmediato | Plugins masivos, geometría “suelta” sin IFC, layout de planos comercial |
+| **Revit** | Tipologías, propiedades por elemento, vistas derivadas del modelo, entrega documental | Familias paramétricas complejas, worksharing, MEP/estructura completos, render integrado |
+
+**Lectura honesta:** hoy AxonBIM cubre **muros + extrusión topológica + vistas 2D técnicas tempranas**; faltan **huecos en muro, losas, niveles/storey ricos, hojas con cajetín MIVED** y otras piezas de la tabla anterior para acercarse a un “mínimo habitable” frente a esos referentes. El inventario priorizado sigue en [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md) y en [`docs/roadmap/fase-03-subhitos.md`](docs/roadmap/fase-03-subhitos.md).
+
+---
+
+## Pipelines transversales
+
+Para no mezclar “herramienta suelta” con “entrega de obra”, el trabajo se agrupa en dos pipelines; el detalle vive en `docs/roadmap/` por fase.
+
+1. **Pipeline de modelado (3D / IFC)** — Herramientas que crean o mutan entidades con persistencia en sesión IFC: muros, extrusiones, (futuro) huecos, losas, estructura espacial. *Sub-hitos:* [`fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) y, donde toque geometría previa a plano, [`fase-03-subhitos.md`](docs/roadmap/fase-03-subhitos.md) (p. ej. huecos para simbología).
+2. **Pipeline de documentación 2D / anotación** — Proyección, capas, símbolos, cotas, textos, hojas, PDF/MIVED. *Sub-hitos:* [`fase-03-subhitos.md`](docs/roadmap/fase-03-subhitos.md).
+
+Los dos pipelines comparten **mismo backend autoritario** y contrato RPC documentado; la UI (incluida **multiventana** y nuevas paletas) solo orquesta llamadas y estado de herramienta.
+
+---
+
+## Puntos ciegos al crecer (UI y producto)
+
+Subventanas nativas, vistas 2D en paralelo y **nuevas herramientas** amplían la superficie donde suelen aparecer fallos de producto si no se planifican:
+
+- **Estado de herramienta vs foco:** una herramienta activa en el viewport principal debe definirse con claridad cuando el foco está en una **ventana flotante** o en un **canvas 2D** (quién recibe clic, quién muestra el preview, cómo se cancela).
+- **Un solo modelo, varias vistas:** sincronizar selección, undo y recarga de malla entre pestañas sin duplicar lógica normativa en GDScript.
+- **Atajos y modales:** riesgo de duplicar o contradecir atajos entre ventanas; conviene una tabla única de comandos por fase (documentar en el manual al añadir herramientas).
+- **Niveles y datum:** sin **storeys** y desfases explícitos en producto, el “SketchUp en planta” y el Revit-like **por nivel** siguen limitados aunque la geometría sea 3D.
+- **Huecos y losas:** sin ellos, la paridad con Revit en **envolvente de vivienda** y el flujo MIVED en **planta** siguen incompletos aunque el motor 2D mejore.
+- **Materiales:** coherencia entre apariencia 3D, hatch 2D y export vectorial es un punto ciego típico; conviene una sola fuente de verdad en backend cuando se aborde (Fase 3).
+
+Estos ítems **no** sustituyen sub-hitos numerados: sirven para alinear diseño de UI y priorización cuando se abra una nueva herramienta o ventana.
+
+---
+
 ## Principios de modelado
 
 AxonBIM busca **una sola metodología** que combine lo útil de herramientas conocidas —rapidez de gesto (SketchUp), precisión y trazabilidad (Revit), fluidez espacial (Blender)— sin repetir sus defectos sistémicos. Principios operativos:
@@ -32,7 +71,7 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 |------|-------------|--------|
 | **Puente RPC** | TCP `5799` + Unix socket; `RpcClient`; protocolo en `jsonrpc-protocol.md` | Base Fase 1. |
 | **OCC / 2D** | `draw.ortho_snapshot` con motor **analítico** u **OCP** (`projection_engine`); canvas 2D OCC en Godot con estados y fallback a ortográfico legacy | Cubre “motor 2D” operativo; **no** es aún plano MIVED completo (Fase 3). |
-| **DXF** | `draw.export_dxf_walls` (proyección analítica de muros, capa `WALLS`) | Distinto de planta normada CCRD §3.7. |
+| **DXF** | `draw.export_dxf_walls` (proyección analítica de muros; geometría en `WALLS`, registro de capas `AXON_*` en plantilla) | Distinto de planta normada CCRD §3.7. |
 | **Godot UI** | Cinta, pestañas de vista (modelado + 2D), docks desacoplables, vista flotante, tema `axon_theme.tres`, subventanas nativas (`embed_subwindows`), `EventBus` (piloto), `ViewportManager` (política de render del `SubViewport`) | Mejora producto sin cambiar la autoridad del backend. |
 | **Worker headless** | Proceso Godot opcional en **puerto auxiliar** (`5800` default), métodos `worker.*` piloto; `WorkerManager` en Python; **ADR-0003** | Solo tareas **auxiliares** serializables; **no** sustituye IfcOpenShell/OCP como fuente de verdad. |
 | **Modelado** | Crear muro, tipologías, Push/Pull, edición por elemento, `geom.extrude_face` con estadísticas OCP, `history.undo` / `history.redo`, malla analítica + ruta B-Rep en evolución | Fase 2: **cierre documental** en [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md) + test `test_fifty_five_walls_extrude_subset_stable`. |
@@ -72,6 +111,12 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 - [x] Undo/Redo con **persistencia** en SQLite (`session_history.db` en el directorio de datos de AxonBIM, o ruta `AXONBIM_HISTORY_DB`) entre reinicios del backend. *(El módulo `axonbim/persistence/` sigue reservado para metadatos de proyecto más amplios.)*
 - [x] Tests de regresión geométrica (snapshots con tolerancia 1e-6; suites RPC ampliadas).
 
+**Hacia paridad mínima “cáscara de vivienda” (siguiente oleada de modelado):** *no forman parte del criterio de salida ya cerrado de Fase 2; orden e IDs en* [`docs/roadmap/fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) §*Oleada «cáscara de vivienda»* *e inventario Fases 3–4.*
+
+- [x] **SH-F2-11** — Niveles / `IfcBuildingStorey` y forjado de trabajo en producto *(ver* [`fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) *SH-F2-11: RPC + UI + `project.open` + rehidratación de muros caja).*
+- [ ] **SH-F2-12** — Huecos en muro (puerta/ventana MVP), hosteados en IFC + malla.
+- [ ] **SH-F2-13** — Losas / forjado simple por contorno (MVP).
+
 **Criterio de salida:** un modelo de 50+ paredes editado interactivamente sin perder identidad topológica entre operaciones. **Demostración:** test de integración `tests/integration/test_phase2_many_walls_stress.py` (55 muros + extrusiones). Ver [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md).
 
 ---
@@ -89,6 +134,7 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 - [ ] Sustitución de proyecciones “planas” por **simbología técnica** completa (hatches, arcos de puerta, líneas de ventana) según norma.
 - [x] UI en Godot: pestañas de vista, modos 2D, export PNG, DXF muros, **Project Browser** con vistas 2D. *Pendiente:* secciones, PDF, checklist MIVED completo.
 - [ ] Cajetín y rotulación bajo plantillas MIVED.
+- [ ] **Anotación:** cotas ancladas a geometría, textos/etiquetas que lean propiedades IFC, **cortes/secciones 2D** derivados del modelo (además de planta alzado exportado actual).
 
 **Criterio de salida:** exportar una planta arquitectónica de un proyecto residencial cumpliendo MIVED, lista para presentación oficial.
 
@@ -119,3 +165,4 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 - Plugin system para normativas de otros países.
 - Mobile companion app para revisión en obra.
 - IA asistente para clasificación automática de elementos IFC.
+- Análisis energético y soleamiento básico (posible extensión de vistas y datos climáticos, sin sustituir normativa estructural).

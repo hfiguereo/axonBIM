@@ -61,6 +61,7 @@ def test_top_face_extrusion_mesh_matches_snapshot(fixtures_dir: Path) -> None:
         mesh,
         top_face_topo_id,
         (0.0, 0.0, 0.5),
+        parent_guid="",
     )
 
     _assert_mesh_matches_snapshot(

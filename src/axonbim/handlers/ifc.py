@@ -1,7 +1,7 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
 """Handlers del dominio ``ifc.*``: creacion y consulta de entidades IFC.
 
-Incluye ``ifc.create_wall``, lectura de ``WallSpec`` y actualizacion por tipologia.
+Incluye ``ifc.create_wall``, huecos en muro MVP, losas y lectura de ``WallSpec``.
 """
 
 from __future__ import annotations
@@ -12,12 +12,16 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from axonbim.geometry import topo_registry
+from axonbim.geometry.meshing import wall_mesh_for_spec
+from axonbim.geometry.slab_spec import SlabSpec
 from axonbim.geometry.topology import Vec3
-from axonbim.geometry.wall_spec import WallSpec
+from axonbim.geometry.wall_spec import WallOpeningSpec, WallSpec
 from axonbim.history import recording
 from axonbim.history import sqlite_store as history_store
+from axonbim.ifc import opening as opening_module
+from axonbim.ifc import slab as slab_module
 from axonbim.ifc import wall as wall_module
-from axonbim.ifc.session import get_session
+from axonbim.ifc.session import IfcSession, get_session
 from axonbim.rpc.dispatcher import Dispatcher, RpcError
 from axonbim.rpc.models import ErrorCode
 
@@ -73,6 +77,19 @@ def _wall_history_snapshot(guid: str) -> dict[str, Any]:
     return {
         "guid": guid,
         "wall_spec": spec.to_dict(),
+        "mesh": mesh.to_dict(),
+    }
+
+
+def _slab_history_snapshot(guid: str) -> dict[str, Any]:
+    """Serializa losa actual para deshacer (vacío si no está indexada)."""
+    spec = topo_registry.get_slab_spec(guid)
+    mesh = topo_registry.mesh_for_guid(guid)
+    if spec is None or mesh is None:
+        return {}
+    return {
+        "guid": guid,
+        "slab_spec": spec.to_dict(),
         "mesh": mesh.to_dict(),
     }
 
@@ -199,6 +216,41 @@ class DeleteParams(BaseModel):
     guid: str = Field(min_length=1, description="GlobalId del producto IFC a borrar.")
 
 
+class _Point2XY(BaseModel):
+    """Punto en planta (metros)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: float
+    y: float
+
+
+class CreateSlabParams(BaseModel):
+    """Parametros de ``ifc.create_slab`` (polígono convexo CCW en XY)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    polygon_xy: list[_Point2XY] = Field(min_length=3)
+    thickness_m: float = Field(gt=0.0, description="Espesor vertical en metros (> 0).")
+    z_top_m: float | None = Field(
+        default=None,
+        description="Cota de la cara superior; si es null se usa la elevación del nivel activo.",
+    )
+    name: str | None = None
+
+
+class CreateWallOpeningParams(BaseModel):
+    """Parametros de ``ifc.create_wall_opening`` (hueco rectangular en cara +n)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    wall_guid: str = Field(min_length=1, description="GlobalId del ``IfcWall`` anfitrión.")
+    along_start_m: float = Field(ge=0.0, description="Distancia del extremo p1 al borde izquierdo del hueco.")
+    width_m: float = Field(gt=0.0)
+    sill_height_m: float = Field(ge=0.0, description="Altura del dintel respecto a la base del muro.")
+    height_m: float = Field(gt=0.0, description="Altura del hueco.")
+
+
 class SetWallTypologyParams(BaseModel):
     """Parametros de ``ifc.set_wall_typology``: nueva familia dimensional sin mover el eje."""
 
@@ -301,6 +353,7 @@ async def set_wall_typology(params: dict[str, Any]) -> dict[str, Any]:
         p2=old.p2,
         height=args.height,
         thickness=args.thickness,
+        openings=old.openings,
     )
     session = get_session()
     if not recording.is_suppressed():
@@ -316,18 +369,110 @@ async def set_wall_typology(params: dict[str, Any]) -> dict[str, Any]:
 
 
 async def delete_product(params: dict[str, Any]) -> dict[str, Any]:
-    """Elimina un ``IfcWall`` (u otro producto soportado por ``remove_product``) de la sesion."""
+    """Elimina un ``IfcWall`` o ``IfcSlab`` indexado en la sesión actual."""
     args = DeleteParams.model_validate(params)
-    snap = _wall_history_snapshot(args.guid)
-    if snap and not recording.is_suppressed():
-        history_store.push_undo("delete_wall", snap, clear_redo=True)
     session = get_session()
+    if topo_registry.get_wall_spec(args.guid) is not None:
+        snap = _wall_history_snapshot(args.guid)
+        if snap and not recording.is_suppressed():
+            history_store.push_undo("delete_wall", snap, clear_redo=True)
+        try:
+            wall_module.delete_wall(session, args.guid)
+        except ValueError as exc:
+            raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
+        topo_registry.unregister_guid(args.guid)
+        return {"ok": True}
+    if topo_registry.get_slab_spec(args.guid) is not None:
+        snap = _slab_history_snapshot(args.guid)
+        if snap and not recording.is_suppressed():
+            history_store.push_undo("delete_slab", snap, clear_redo=True)
+        try:
+            slab_module.delete_slab(session, args.guid)
+        except ValueError as exc:
+            raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
+        topo_registry.unregister_guid(args.guid)
+        return {"ok": True}
+    raise RpcError(
+        ErrorCode.INVALID_PARAMS,
+        f"No hay muro ni losa indexados con guid {args.guid!r} en esta sesión.",
+    )
+
+
+async def create_wall_opening(params: dict[str, Any]) -> dict[str, Any]:
+    """Añade un hueco rectangular que atraviesa el grosor y crea ``IfcOpeningElement``."""
+    args = CreateWallOpeningParams.model_validate(params)
+    spec = topo_registry.get_wall_spec(args.wall_guid)
+    if spec is None:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            f"No hay WallSpec para el guid {args.wall_guid!r}.",
+        )
+    if topo_registry.mesh_for_guid(args.wall_guid) is None:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            f"No hay malla registrada para el guid {args.wall_guid!r}.",
+        )
+    op = WallOpeningSpec(
+        along_start_m=args.along_start_m,
+        width_m=args.width_m,
+        sill_height_m=args.sill_height_m,
+        height_m=args.height_m,
+    )
+    new_spec = WallSpec(
+        p1=spec.p1,
+        p2=spec.p2,
+        height=spec.height,
+        thickness=spec.thickness,
+        openings=(*spec.openings, op),
+    )
     try:
-        wall_module.delete_wall(session, args.guid)
+        mesh = wall_mesh_for_spec(new_spec, parent_guid=args.wall_guid)
     except ValueError as exc:
         raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
-    topo_registry.unregister_guid(args.guid)
-    return {"ok": True}
+
+    session = get_session()
+    host = WallSpec(p1=spec.p1, p2=spec.p2, height=spec.height, thickness=spec.thickness, openings=())
+    try:
+        opening_guid = opening_module.create_wall_opening(session, args.wall_guid, op, host)
+    except ValueError as exc:
+        raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
+
+    topo_registry.replace_mesh(args.wall_guid, mesh)
+    topo_registry.update_wall_spec(args.wall_guid, new_spec)
+    return {
+        "wall_guid": args.wall_guid,
+        "opening_guid": opening_guid,
+        "mesh": mesh.to_dict(),
+    }
+
+
+def _active_storey_elevation_m(session: IfcSession) -> float:
+    raw = getattr(session.storey, "Elevation", None)
+    return float(raw) if raw is not None else 0.0
+
+
+async def create_slab(params: dict[str, Any]) -> dict[str, Any]:
+    """Crea ``IfcSlab`` tipo forjado y registra malla prismática."""
+    args = CreateSlabParams.model_validate(params)
+    session = get_session()
+    z_top = args.z_top_m if args.z_top_m is not None else _active_storey_elevation_m(session)
+    poly: tuple[tuple[float, float], ...] = tuple((p.x, p.y) for p in args.polygon_xy)
+    for x, y in poly:
+        session.workspace_xy.ensure_contains_point_plan(x, y)
+    spec = SlabSpec(polygon_xy=poly, z_top_m=z_top, thickness_m=args.thickness_m)
+    try:
+        result = slab_module.create_slab(session, spec, name=args.name)
+    except ValueError as exc:
+        raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
+    topo_registry.register_mesh(result.guid, result.mesh)
+    topo_registry.register_slab_spec(result.guid, spec)
+    if not recording.is_suppressed():
+        history_store.push_undo("create_slab", {"guid": result.guid}, clear_redo=True)
+    return {
+        "guid": result.guid,
+        "mesh": result.mesh.to_dict(),
+        "workspace_xy_half_m": session.workspace_xy.as_half_list_m(),
+    }
 
 
 def register(dispatcher: Dispatcher) -> None:
@@ -336,3 +481,5 @@ def register(dispatcher: Dispatcher) -> None:
     dispatcher.register("ifc.get_wall_spec", get_wall_spec)
     dispatcher.register("ifc.set_wall_typology", set_wall_typology)
     dispatcher.register("ifc.delete", delete_product)
+    dispatcher.register("ifc.create_wall_opening", create_wall_opening)
+    dispatcher.register("ifc.create_slab", create_slab)

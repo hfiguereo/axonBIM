@@ -19,7 +19,9 @@ def test_top_face_extrusion_increases_wall_height() -> None:
     mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
     topo_id = _face_topo_id(mesh, 1)
 
-    new_spec, new_mesh, topo_map = extrude_wall_face(spec, mesh, topo_id, (0.0, 0.0, 0.5))
+    new_spec, new_mesh, topo_map = extrude_wall_face(
+        spec, mesh, topo_id, (0.0, 0.0, 0.5), parent_guid=""
+    )
 
     assert new_spec.height == pytest.approx(3.5)
     assert new_spec.p1 == spec.p1
@@ -38,6 +40,7 @@ def test_side_face_extrusion_updates_wall_thickness_symmetrically() -> None:
         mesh,
         positive_y_face,
         (0.0, 0.05, 0.0),
+        parent_guid="",
     )
 
     assert new_spec.thickness == pytest.approx(0.3)
@@ -50,7 +53,9 @@ def test_end_face_extrusion_extends_wall_axis() -> None:
     mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
     p2_end_face = _face_topo_id(mesh, 4)
 
-    new_spec, new_mesh, topo_map = extrude_wall_face(spec, mesh, p2_end_face, (1.0, 0.0, 0.0))
+    new_spec, new_mesh, topo_map = extrude_wall_face(
+        spec, mesh, p2_end_face, (1.0, 0.0, 0.0), parent_guid=""
+    )
 
     assert new_spec.p1 == spec.p1
     assert new_spec.p2 == pytest.approx((5.0, 0.0, 0.0))
@@ -77,4 +82,4 @@ def test_extrude_wall_face_rejects_unknown_topo_id() -> None:
     mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
 
     with pytest.raises(ValueError, match="topo_id no pertenece"):
-        extrude_wall_face(spec, mesh, "missing-topo-id", (0.0, 0.0, 0.5))
+        extrude_wall_face(spec, mesh, "missing-topo-id", (0.0, 0.0, 0.5), parent_guid="")

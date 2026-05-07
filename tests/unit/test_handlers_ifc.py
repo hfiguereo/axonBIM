@@ -274,4 +274,8 @@ async def test_project_save_rejects_unknown_fields(tmp_path) -> None:  # type: i
 async def test_register_project_handlers_exposes_save() -> None:
     disp = Dispatcher()
     project_handlers.register(disp)
-    assert "project.save" in disp.registered_methods()
+    methods = disp.registered_methods()
+    assert "project.save" in methods
+    assert "project.list_storeys" in methods
+    assert "project.create_storey" in methods
+    assert "project.open" in methods

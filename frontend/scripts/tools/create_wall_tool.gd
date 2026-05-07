@@ -2,8 +2,8 @@
 extends Node
 
 ## Herramienta **crear muro**: encadena segmentos P1→P2 sobre el **plano horizontal del nivel base**
-## (referencia **X/Y** en planta; cota vertical del forjado de trabajo = ``BASE_STOREY_ELEVATION_M``,
-## nivel 00 hasta que exista sistema de plantas y **desfases**). En **vista 3D** el punto en planta se
+## (referencia **X/Y** en planta; cota Z del forjado = ``work_plane_elevation_m``, sincronizada con el
+## nivel IFC activo desde la escena principal).
 ## obtiene por intersección de rayo con ese plano (la cámara solo proyecta, no redefine el mundo). En
 ## **vista 2D OCC** la referencia inmediata es la geometría de la propia vista (suelo/forjado de ese
 ## datum), no el raycast de la cámara 3D. Inverencia tipo Revit/SketchUp (snap **X/Y**; **Alt+clic** =
@@ -25,9 +25,11 @@ const SNAP_MIN_LOCK_DISTANCE_M: float = 0.22
 ## Radio en planta para acoplar el **último** P2 al primer vértice del contorno (cierre de habitación).
 const CLOSE_LOOP_SNAP_M: float = 0.45
 
-## Cota Z del forjado de nivel base (00). Sin sistema de niveles ni desfases aún; debe coincidir con
-## la constante homónima en ``main_scene.gd``.
+## Cota Z por defecto antes de sincronizar RPC (debe coincidir con ``main_scene.gd``).
 const BASE_STOREY_ELEVATION_M: float = 0.0
+
+## Cota del forjado activo (nivel IFC seleccionado en Propiedades).
+var work_plane_elevation_m: float = BASE_STOREY_ELEVATION_M
 
 @export var default_height: float = 3.0
 @export var default_thickness: float = 0.2
@@ -94,6 +96,10 @@ func activate() -> void:
 	hint_viewport_shortcuts()
 
 
+func set_work_plane_elevation_m(z: float) -> void:
+	work_plane_elevation_m = z
+
+
 func hint_viewport_shortcuts() -> void:
 	pass
 
@@ -119,7 +125,7 @@ func has_first_point() -> bool:
 	return _has_first
 
 
-## Posición **X/Y** en planta del trazo en curso (cota Z = ``BASE_STOREY_ELEVATION_M``); para alzados
+## Posición **X/Y** en planta del trazo en curso (cota Z = ``work_plane_elevation_m``); para alzados
 ## OCC donde un eje no se ve, se reutiliza el otro eje de la cadena.
 func get_chain_floor_reference_xy() -> Vector2:
 	if _has_first:
@@ -165,7 +171,7 @@ func handle_viewport_motion(screen_pos: Vector2) -> void:
 func handle_viewport_motion_world_floor(point_world_xy: Vector3) -> void:
 	if not _active or not _has_first:
 		return
-	var raw := Vector3(point_world_xy.x, point_world_xy.y, BASE_STOREY_ELEVATION_M)
+	var raw := Vector3(point_world_xy.x, point_world_xy.y, work_plane_elevation_m)
 	var snapped: Vector3 = _snap_second_point(_first_point, raw)
 	_preview_end_world = _maybe_snap_loop_close_xy(snapped)
 	_redraw_overlay()
@@ -235,7 +241,7 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 	if not _active:
 		return
-	var point_raw: Vector3 = Vector3(point_world_xy.x, point_world_xy.y, BASE_STOREY_ELEVATION_M)
+	var point_raw: Vector3 = Vector3(point_world_xy.x, point_world_xy.y, work_plane_elevation_m)
 	var alt_restart: bool = Input.is_physical_key_pressed(KEY_ALT)
 	if not _has_first:
 		var point_start: Vector3 = _snap_origin_axes(point_raw)
@@ -298,8 +304,8 @@ func _submit_wall_and_chain(p1: Vector3, p2: Vector3, join_with_guid: String, jo
 			_loop_anchor_world = Vector3.ZERO
 		elif was_establishing_loop:
 			_loop_first_wall_guid = _last_created_guid
-			_loop_anchor_world = Vector3(p1.x, p1.y, BASE_STOREY_ELEVATION_M)
-		_first_point = Vector3(p2.x, p2.y, BASE_STOREY_ELEVATION_M)
+			_loop_anchor_world = Vector3(p1.x, p1.y, work_plane_elevation_m)
+		_first_point = Vector3(p2.x, p2.y, work_plane_elevation_m)
 		_has_first = true
 		_axis_lock = ""
 		_preview_end_world = _first_point
@@ -317,7 +323,7 @@ func _project_ray_to_z_plane(screen_pos: Vector2) -> Variant:
 	var direction: Vector3 = _camera.project_ray_normal(screen_pos)
 	if abs(direction.z) < 1e-6:
 		return null
-	var t: float = (BASE_STOREY_ELEVATION_M - origin.z) / direction.z
+	var t: float = (work_plane_elevation_m - origin.z) / direction.z
 	if t < 0.0:
 		return null
 	return origin + direction * t
@@ -338,7 +344,7 @@ func _maybe_snap_loop_close_xy(candidate: Vector3) -> Vector3:
 	var anchor_xy := Vector2(_loop_anchor_world.x, _loop_anchor_world.y)
 	var cand_xy := Vector2(candidate.x, candidate.y)
 	if anchor_xy.distance_to(cand_xy) <= CLOSE_LOOP_SNAP_M:
-		return Vector3(_loop_anchor_world.x, _loop_anchor_world.y, BASE_STOREY_ELEVATION_M)
+		return Vector3(_loop_anchor_world.x, _loop_anchor_world.y, work_plane_elevation_m)
 	return candidate
 
 
@@ -403,8 +409,8 @@ func _emit_length_hint() -> void:
 
 func _submit_wall(p1: Vector3, p2: Vector3, join_with_guid: String, join_end_guid: String) -> bool:
 	var params: Dictionary = {
-		"p1": {"x": p1.x, "y": p1.y, "z": BASE_STOREY_ELEVATION_M},
-		"p2": {"x": p2.x, "y": p2.y, "z": BASE_STOREY_ELEVATION_M},
+		"p1": {"x": p1.x, "y": p1.y, "z": work_plane_elevation_m},
+		"p2": {"x": p2.x, "y": p2.y, "z": work_plane_elevation_m},
 		"height": default_height,
 		"thickness": default_thickness,
 	}

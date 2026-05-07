@@ -89,7 +89,7 @@ Esto **no** cierra la fase: es la base técnica sobre la que se construye la cap
 - **Cómo:** `ifc.create_*` incremental o importación; decidir MVP (rectángulo + eje + ancho/alto).
 - **Por qué:** Arcos de puerta y líneas de ventana **no tienen anclaje** si el modelo solo tiene muros caja.
 - **Hecho cuando:** Al menos un tipo de hueco en modelo de prueba aparece en 2D con convención acordada.
-- **Evidencia / enlaces:** —
+- **Evidencia / enlaces:** Dependencia lógica de modelado 3D: **SH-F2-12** ([`fase-02-subhitos.md`](fase-02-subhitos.md)).
 
 ---
 

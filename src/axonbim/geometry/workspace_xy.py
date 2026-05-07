@@ -20,6 +20,10 @@ class WorkspaceXYHalfExtents:
     half_x_m: float = 50.0
     half_y_m: float = 50.0
 
+    def ensure_contains_point_plan(self, x: float, y: float) -> None:
+        """Garantiza que un punto en planta quede dentro del rectángulo simétrico."""
+        self.ensure_contains_segment_plan(x, y, x, y)
+
     def ensure_contains_segment_plan(self, x1: float, y1: float, x2: float, y2: float) -> None:
         """Garantiza que ambos extremos del segmento en planta queden dentro del rectangulo.
 

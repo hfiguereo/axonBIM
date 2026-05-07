@@ -152,9 +152,11 @@ Solo del backend al frontend. Eventos asíncronos:
 |--------|--------|--------|
 | `ifc.open` | `{ "path": "<file>" }` | `{ "project_guid": "...", "stats": {...} }` |
 | `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m>, "join_with_guid": "<opcional>", "join_end_guid": "<opcional>" }` | `{ "guid": "...", "mesh": {...}, "workspace_xy_half_m": [halfX_m, halfY_m] }` (medias en planta desde origen; crecen con margen **~12%** cuando el trazo las excede). Si `join_with_guid` refiere el muro previo y el ángulo es ~90°, el backend retrocede `p1` medio espesor para cerrar la esquina en cadena. Si `join_end_guid` refiere el **primer** muro del contorno y `p2` coincide con su `p1` en planta con esquina ~90°, el backend **extiende** `p2` medio espesor sobre el eje del tramo (cierre de habitación, simétrico al ajuste de cadena). |
-| `ifc.get_wall_spec` | `{ "guid": "<GlobalId>" }` | `{ "wall_spec": { "p1": {...}, "p2": {...}, "height": <m>, "thickness": <m> } }` |
-| `ifc.set_wall_typology` | `{ "guid": "<GlobalId>", "height": <m>, "thickness": <m>, "typology_id": "<opcional>" }` | `{ "guid": "...", "mesh": {...} }` |
-| `ifc.delete` | `{ "guid": "..." }` | `{ "ok": true }` |
+| `ifc.get_wall_spec` | `{ "guid": "<GlobalId>" }` | `{ "wall_spec": { "p1": {...}, "p2": {...}, "height": <m>, "thickness": <m>, "openings": [ { "along_start_m", "width_m", "sill_height_m", "height_m" }, ... ] } }` |
+| `ifc.set_wall_typology` | `{ "guid": "<GlobalId>", "height": <m>, "thickness": <m>, "typology_id": "<opcional>" }` | `{ "guid": "...", "mesh": {...} }` (conserva la lista ``openings`` del muro). |
+| `ifc.delete` | `{ "guid": "..." }` | `{ "ok": true }` — acepta ``IfcWall`` o ``IfcSlab`` creados en la sesión (indexados en ``topo_registry``). |
+| `ifc.create_wall_opening` | `{ "wall_guid": "...", "along_start_m": <m>, "width_m": <m>, "sill_height_m": <m>, "height_m": <m> }` | `{ "wall_guid": "...", "opening_guid": "...", "mesh": {...} }` — hueco rectangular en la cara ``+n`` que atraviesa el grosor; añade ``IfcOpeningElement`` + ``IfcRelVoidsElement``. No apila historial SQLite en el MVP actual. |
+| `ifc.create_slab` | `{ "polygon_xy": [ {"x","y"}, ... ], "thickness_m": <m>, "z_top_m": <m opcional> }` | `{ "guid": "...", "mesh": {...}, "workspace_xy_half_m": [ ... ] }` — polígono **convexo CCW** en planta; si ``z_top_m`` se omite, usa ``Elevation`` del nivel IFC activo. |
 | `ifc.get_properties` | `{ "guid": "..." }` | `{ "properties": {...} }` |
 
 *(lista no exhaustiva — se completa en Fase 1)*
@@ -184,12 +186,16 @@ El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 
 | Método | Params | Result |
 |--------|--------|--------|
+| `project.open` | `{ "path": "..." }` | `{ "path": "...", "wall_count": <int>, "walls_skipped": <int>, "walls": [ { "guid": "...", "mesh": {...} }, ... ], "storeys": [ ... como list_storeys ... ], "workspace_xy_half_m": [ <float>, <float> ] }` — reemplaza la sesión IFC, vacía historial SQLite y fija el ámbito a la ruta canónica del archivo. Muros cuya geometría no sea caja extruida verticalmente se cuentan en ``walls_skipped``. |
 | `project.save` | `{ "path": "..." }` | `{ "path": "...", "bytes": <int> }` |
+| `project.list_storeys` | `{}` | `{ "storeys": [ { "guid": "...", "name": "...", "elevation_m": <float>, "is_active": <bool> }, ... ] }` — niveles ``IfcBuildingStorey`` del edificio; el activo recibe nuevos muros. |
+| `project.create_storey` | `{ "name": "...", "elevation_m": <float> }` | `{ "guid": "...", "name": "...", "elevation_m": <float> }` |
+| `project.set_active_storey` | `{ "guid": "<GlobalId IfcBuildingStorey>" }` | `{ "ok": true, "guid": "...", "elevation_m": <float> }` |
 | `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...} \| null, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" \| "unsupported:..." }` |
 | `history.redo` | `{}` | Igual criterio que `history.undo`. |
 | `project.set_state` | `{ "state": "WIP\|Shared\|Published", "comment": "..." }` | `{ "ok": true, "snapshot_path": "..." }` |
 
-**Historial persistente (SQLite):** tipos de operación reversibles en el tronco: `extrude_face`, `set_wall_typology`, `delete_wall`, `create_wall` (la pila de redo usa además `recreate_wall` y `redo_delete_wall` de forma interna). **Ámbito:** hasta el primer `project.save` en la sesión del proceso, la pila usa el ámbito `__unsaved__`; tras guardar, el ámbito pasa a la **ruta absoluta canónica** del `.ifc` guardado, de modo que pilas de distintos archivos no se mezclan. Variable de entorno `AXONBIM_HISTORY_DB` fija el fichero SQLite (desarrollo/tests).
+**Historial persistente (SQLite):** tipos de operación reversibles en el tronco: `extrude_face`, `set_wall_typology`, `delete_wall`, `create_wall`, `delete_slab`, `create_slab` (la pila de redo usa además `recreate_wall`, `recreate_slab`, `redo_delete_wall` y `redo_delete_slab` de forma interna). **Ámbito:** hasta el primer `project.save` en la sesión del proceso, la pila usa el ámbito `__unsaved__`; tras guardar **o** tras `project.open`, el ámbito pasa a la **ruta absoluta canónica** del `.ifc` correspondiente, de modo que pilas de distintos archivos no se mezclan. `project.open` además **vacía** las pilas undo/redo. Variable de entorno `AXONBIM_HISTORY_DB` fija el fichero SQLite (desarrollo/tests).
 
 ### 5.6 Notificaciones del backend
 

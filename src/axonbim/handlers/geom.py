@@ -66,12 +66,24 @@ async def extrude_face(params: dict[str, Any]) -> dict[str, Any]:
             data={"guid": guid},
         )
 
-    old_spec = WallSpec(spec.p1, spec.p2, spec.height, spec.thickness)
+    old_spec = WallSpec(
+        spec.p1,
+        spec.p2,
+        spec.height,
+        spec.thickness,
+        openings=spec.openings,
+    )
     old_mesh = Mesh.from_dict(mesh.to_dict())
     vec = (args.vector[0], args.vector[1], args.vector[2])
 
     try:
-        new_spec, new_mesh, topo_map = extrude_wall_face(old_spec, mesh, args.topo_id, vec)
+        new_spec, new_mesh, topo_map = extrude_wall_face(
+            old_spec,
+            mesh,
+            args.topo_id,
+            vec,
+            parent_guid=guid,
+        )
     except ValueError as exc:
         raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
 

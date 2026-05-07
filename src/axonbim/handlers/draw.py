@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from axonbim.drawing.dxf_walls import write_wall_projection_dxf
 from axonbim.geometry import topo_registry
-from axonbim.geometry.meshing import Mesh, wall_box_mesh
+from axonbim.geometry.meshing import Mesh, wall_mesh_for_spec
 from axonbim.geometry.ocp_brep import wall_box_mesh_ocp
 from axonbim.geometry.wall_spec import WallSpec
 from axonbim.geometry.workspace_xy import WorkspaceXYHalfExtents
@@ -162,13 +162,9 @@ def _build_lines_world(
                 linear_deflection_m=0.03,
             )
         else:
-            mesh = wall_box_mesh(
-                spec.p1,
-                spec.p2,
-                spec.height,
-                spec.thickness,
+            mesh = wall_mesh_for_spec(
+                spec,
                 parent_guid=guid,
-                op_signature=f"draw.ortho_snapshot:{view}:analytical",
             )
         _append_edges_from_tri_mesh(view, mesh, view_range, lines, seen)
     return lines

@@ -7,9 +7,11 @@ from typing import Any
 
 from axonbim.geometry import topo_registry
 from axonbim.geometry.meshing import Mesh
+from axonbim.geometry.slab_spec import SlabSpec
 from axonbim.geometry.wall_spec import WallSpec
 from axonbim.history import recording
 from axonbim.history import sqlite_store as history_store
+from axonbim.ifc import slab as slab_module
 from axonbim.ifc import wall as wall_module
 from axonbim.ifc.session import get_session
 from axonbim.rpc.dispatcher import Dispatcher
@@ -77,7 +79,35 @@ def _restore_wall_core(data: dict[str, Any]) -> dict[str, Any]:
     return {"applied": True, "guid": guid, "mesh": mesh.to_dict(), "topo_map": {}}
 
 
-async def undo(_params: dict[str, Any]) -> dict[str, Any]:
+def _restore_slab_core(data: dict[str, Any]) -> dict[str, Any]:
+    guid = str(data["guid"])
+    spec = SlabSpec.from_dict(data["slab_spec"])
+    session = get_session()
+    result = slab_module.restore_slab(session, guid, spec)
+    topo_registry.register_mesh(result.guid, result.mesh)
+    topo_registry.register_slab_spec(result.guid, spec)
+    return {"applied": True, "guid": guid, "mesh": result.mesh.to_dict(), "topo_map": {}}
+
+
+def _delete_slab_core(guid: str) -> None:
+    session = get_session()
+    slab_module.delete_slab(session, guid)
+    topo_registry.unregister_guid(guid)
+
+
+def _snapshot_current_slab(guid: str) -> dict[str, Any]:
+    spec = topo_registry.get_slab_spec(guid)
+    mesh = topo_registry.mesh_for_guid(guid)
+    if spec is None or mesh is None:
+        return {}
+    return {
+        "guid": guid,
+        "slab_spec": spec.to_dict(),
+        "mesh": mesh.to_dict(),
+    }
+
+
+async def undo(_params: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0911
     """Deshace la ultima operacion apilada para el ámbito de historial activo."""
     popped = history_store.pop_undo()
     if popped is None:
@@ -106,10 +136,25 @@ async def undo(_params: dict[str, Any]) -> dict[str, Any]:
         history_store.push_redo("recreate_wall", snap)
         return {"applied": True, "guid": guid, "mesh": None, "topo_map": {}}
 
+    if kind == "create_slab":
+        guid = str(data["guid"])
+        snap = _snapshot_current_slab(guid)
+        if not snap:
+            return {"applied": False, "reason": "missing_slab", "guid": guid}
+        with recording.suppressed():
+            _delete_slab_core(guid)
+        history_store.push_redo("recreate_slab", snap)
+        return {"applied": True, "guid": guid, "mesh": None, "topo_map": {}}
+
+    if kind == "delete_slab":
+        result = _restore_slab_core(data)
+        history_store.push_redo("redo_delete_slab", {"guid": str(data["guid"])})
+        return result
+
     return {"applied": False, "reason": f"unsupported:{kind}"}
 
 
-async def redo(_params: dict[str, Any]) -> dict[str, Any]:
+async def redo(_params: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0911
     """Reaplica la ultima operacion deshecha."""
     popped = history_store.pop_redo()
     if popped is None:
@@ -141,6 +186,21 @@ async def redo(_params: dict[str, Any]) -> dict[str, Any]:
             clear_redo=False,
         )
         return result
+
+    if kind == "recreate_slab":
+        result = _restore_slab_core(data)
+        history_store.push_undo("create_slab", {"guid": str(data["guid"])}, clear_redo=False)
+        return result
+
+    if kind == "redo_delete_slab":
+        guid = str(data["guid"])
+        snap = _snapshot_current_slab(guid)
+        if not snap:
+            return {"applied": False, "reason": "missing_slab", "guid": guid}
+        with recording.suppressed():
+            _delete_slab_core(guid)
+        history_store.push_undo("delete_slab", snap, clear_redo=False)
+        return {"applied": True, "guid": guid, "mesh": None, "topo_map": {}}
 
     return {"applied": False, "reason": f"unsupported:{kind}"}
 

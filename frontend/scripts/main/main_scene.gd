@@ -46,9 +46,7 @@ const KB_WALL_STEP_FINE_M: float = 0.10
 const KB_WALL_STEP_COARSE_M: float = 0.50
 const FLOAT_SNAP_THRESHOLD_PX: int = 36
 
-## Cota del forjado de nivel base (00). Sin niveles ni desfases aún; trazado 2D OCC proyecta a **X/Y**
-## sobre este datum — la cámara 3D no es la referencia geométrica del trazo en vista 2D.
-## Debe coincidir con ``create_wall_tool.gd`` (misma constante).
+## Cota Z del forjado por defecto (00) hasta que ``project.list_storeys`` sincronice el nivel IFC activo.
 const BASE_STOREY_ELEVATION_M: float = 0.0
 
 ## Familias / tipologías de muro (altura y espesor en m). El id es trazabilidad en RPC.
@@ -64,11 +62,15 @@ var _experimental_rpc_tree: Tree = null
 var _wall_tool: Node
 var _push_pull_tool: Node
 var _muros_tree_parent: TreeItem
+var _slabs_tree_parent: TreeItem
 var _wall_tree_items: Dictionary = {}  # guid -> TreeItem
+var _slab_tree_items: Dictionary = {}  # guid -> TreeItem
 var _edit_mode_guid: String = ""
 var _trace_wall_height: float = 3.0
 var _trace_wall_thickness: float = 0.2
 var _typology_spin_suppress: bool = false
+var _work_plane_elevation_m: float = BASE_STOREY_ELEVATION_M
+var _storey_option_signal_suppress: bool = false
 
 @onready var _ribbon_tabs: TabBar = $%RibbonTabs
 @onready var _ribbon_tools_inicio: Control = $%RibbonToolsInicio
@@ -78,6 +80,7 @@ var _typology_spin_suppress: bool = false
 @onready var _ping_button: Button = $%PingButton
 @onready var _wall_button: Button = $%CreateWallButton
 @onready var _push_pull_button: Button = $%PushPullButton
+@onready var _open_ifc_button: Button = $%OpenIfcButton
 @onready var _save_button: Button = $%SaveButton
 @onready var _export_2d_views_button: Button = $%Export2DViewsButton
 @onready var _export_wall_dxf_button: Button = $%ExportWallDxfButton
@@ -115,7 +118,12 @@ var _typology_spin_suppress: bool = false
 @onready var _wall_props_thickness_spin: SpinBox = %WallPropsThicknessSpin
 @onready var _wall_apply_typology_button: Button = %WallApplyTypologyButton
 @onready var _delete_wall_button: Button = %DeleteWallButton
+@onready var _mvp_wall_opening_button: Button = %MvpWallOpeningButton
+@onready var _mvp_slab_button: Button = %MvpSlabButton
 @onready var _wall_trace_typology_hint: Label = %WallTraceTypologyHint
+@onready var _storey_level_option: OptionButton = %StoreyLevelOption
+@onready var _new_storey_elevation_spin: SpinBox = %NewStoreyElevationSpin
+@onready var _add_storey_button: Button = %AddStoreyButton
 @onready var _workspace_main_split: HSplitContainer = $UI/Root/Workspace/MainSplit
 @onready var _workspace_inner_split: HSplitContainer = $UI/Root/Workspace/MainSplit/InnerSplit
 @onready var _workspace_hud: Label = %WorkspaceHud
@@ -243,6 +251,10 @@ func _ready() -> void:
 	_wall_props_thickness_spin.value_changed.connect(_on_wall_props_typology_spin_changed)
 	_wall_apply_typology_button.pressed.connect(_on_wall_apply_typology_pressed)
 	_delete_wall_button.pressed.connect(_on_delete_wall_pressed)
+	_mvp_wall_opening_button.pressed.connect(_on_mvp_wall_opening_pressed)
+	_mvp_slab_button.pressed.connect(_on_mvp_slab_pressed)
+	_storey_level_option.item_selected.connect(_on_storey_level_option_item_selected)
+	_add_storey_button.pressed.connect(_on_add_storey_button_pressed)
 	_sync_trace_defaults_to_wall_tool()
 
 	_push_pull_tool = PushPullTool.new()
@@ -259,6 +271,7 @@ func _ready() -> void:
 	_ping_button.pressed.connect(_on_ping_pressed)
 	_wall_button.pressed.connect(_on_create_wall_pressed)
 	_push_pull_button.pressed.connect(_on_push_pull_pressed)
+	_open_ifc_button.pressed.connect(_on_open_ifc_pressed)
 	_save_button.pressed.connect(_on_save_pressed)
 	_export_2d_views_button.pressed.connect(_on_export_2d_views_pressed)
 	_export_wall_dxf_button.pressed.connect(_on_export_wall_dxf_pressed)
@@ -292,6 +305,8 @@ func _ready() -> void:
 	_on_view_tabs_changed(_view_tabs_bar.current_tab)
 	_refresh_ribbon_compact_mode()
 	_setup_experimental_eventbus_inspector()
+	if RpcClient.is_connected_to_backend():
+		call_deferred("_deferred_pull_storeys_on_ready")
 
 
 func _physics_process(_delta: float) -> void:
@@ -1457,13 +1472,13 @@ func _tab_to_preset(tab: int) -> String:
 			return "persp"
 
 
-## Convierte ``(u,v)`` del snapshot OCC a mundiales **X/Y** en el plano del nivel base (``BASE_STOREY_ELEVATION_M``).
+## Convierte ``(u,v)`` del snapshot OCC a mundiales **X/Y** en el plano del nivel activo (``_work_plane_elevation_m``).
 func _occ_uv_to_floor_point_world(uv: Vector2) -> Vector3:
 	var preset: String = _tab_to_preset(_active_view_tab)
 	var ref: Vector2 = Vector2.ZERO
 	if _wall_tool != null and _wall_tool.has_method("get_chain_floor_reference_xy"):
 		ref = _wall_tool.call("get_chain_floor_reference_xy") as Vector2
-	var zb: float = BASE_STOREY_ELEVATION_M
+	var zb: float = _work_plane_elevation_m
 	match preset:
 		"top":
 			return Vector3(uv.x, uv.y, zb)
@@ -1621,6 +1636,7 @@ func _apply_ui_polish() -> void:
 	_apply_button_style(_ping_button, UI_ACCENT_BLUE)
 	_apply_button_style(_wall_button, UI_ACCENT_BLUE)
 	_apply_button_style(_push_pull_button, UI_ACCENT_AMBER)
+	_apply_button_style(_open_ifc_button, UI_ACCENT_BLUE)
 	_apply_button_style(_save_button, UI_ACCENT_BLUE)
 	_apply_button_style(_export_2d_views_button, UI_ACCENT_BLUE)
 	_apply_button_style(_export_wall_dxf_button, UI_ACCENT_BLUE)
@@ -1632,6 +1648,8 @@ func _apply_ui_polish() -> void:
 	_apply_button_style(_edit_mode_button, UI_ACCENT_AMBER)
 	_apply_button_style(_push_pull_apply_distance_button, UI_ACCENT_AMBER)
 	_apply_button_style(_delete_wall_button, UI_ACCENT_DANGER)
+	_apply_button_style(_mvp_wall_opening_button, UI_ACCENT_AMBER)
+	_apply_button_style(_mvp_slab_button, UI_ACCENT_BLUE)
 	_apply_spinbox_style(_push_pull_distance)
 	_apply_spinbox_style(_wall_props_height_spin)
 	_apply_spinbox_style(_wall_props_thickness_spin)
@@ -1919,7 +1937,7 @@ func _init_keyboard_wall_cursor_if_needed() -> void:
 	var ref := Vector2.ZERO
 	if _wall_tool != null and _wall_tool.has_method("get_chain_floor_reference_xy"):
 		ref = _wall_tool.call("get_chain_floor_reference_xy") as Vector2
-	_kb_wall_cursor_world = Vector3(ref.x, ref.y, BASE_STOREY_ELEVATION_M)
+	_kb_wall_cursor_world = Vector3(ref.x, ref.y, _work_plane_elevation_m)
 	_kb_wall_cursor_ready = true
 	_wall_tool.handle_viewport_motion_world_floor(_kb_wall_cursor_world)
 
@@ -2040,6 +2058,7 @@ func _refresh_ribbon_compact_mode() -> void:
 func _build_project_tree() -> void:
 	_project_tree.clear()
 	_wall_tree_items.clear()
+	_slab_tree_items.clear()
 	_view2d_items.clear()
 	_view2d_defs.clear()
 	_view2d_runtime_state.clear()
@@ -2062,6 +2081,9 @@ func _build_project_tree() -> void:
 	_muros_tree_parent = _project_tree.create_item(ifc)
 	_muros_tree_parent.set_text(0, "Muros")
 	_muros_tree_parent.set_metadata(0, "CATEGORY_MUROS")
+	_slabs_tree_parent = _project_tree.create_item(ifc)
+	_slabs_tree_parent.set_text(0, "Losas")
+	_slabs_tree_parent.set_metadata(0, "CATEGORY_LOSAS")
 
 
 func _on_project_tree_item_selected() -> void:
@@ -2100,6 +2122,11 @@ func _sync_tree_selection(guid: String) -> void:
 		var it: TreeItem = _wall_tree_items[guid]
 		it.select(0)
 		_project_tree.scroll_to_item(it)
+		return
+	if _slab_tree_items.has(guid):
+		var it_s: TreeItem = _slab_tree_items[guid]
+		it_s.select(0)
+		_project_tree.scroll_to_item(it_s)
 
 
 func _register_view2d_tree_item(label: String, preset: String) -> String:
@@ -2204,6 +2231,7 @@ func _close_view_tab(tab: int) -> void:
 
 func _refresh_properties_panel() -> void:
 	var guid: String = _project_view.selected_guid()
+	var backend_ok: bool = RpcClient.is_connected_to_backend()
 	if guid == "":
 		_prop_guid_label.text = "GlobalId: —"
 		_prop_type_label.text = "Tipo: —"
@@ -2213,30 +2241,39 @@ func _refresh_properties_panel() -> void:
 		_push_pull_distance.editable = false
 		_push_pull_apply_distance_button.disabled = true
 		_delete_wall_button.visible = false
+		_mvp_wall_opening_button.visible = false
+		_mvp_slab_button.disabled = not backend_ok
 		if _wall_tool.is_active():
 			_show_wall_typology_trace_mode()
 		else:
 			_hide_wall_typology_panel()
 		return
+	var is_wall: bool = _wall_tree_items.has(guid)
+	var is_slab: bool = _slab_tree_items.has(guid)
 	_prop_guid_label.text = "GlobalId: %s" % guid
-	_prop_type_label.text = "Tipo: IfcWall"
+	_prop_type_label.text = "Tipo: IfcWall" if is_wall else ("Tipo: IfcSlab" if is_slab else "Tipo: —")
 	var ext: Vector3 = _project_view.get_entity_mesh_world_aabb_size(guid)
 	if ext != Vector3.ZERO:
 		_prop_dims_label.text = "Envolvente aprox. (m): ΔX=%.2f  ΔY=%.2f  ΔZ=%.2f" % [ext.x, ext.y, ext.z]
 	else:
 		_prop_dims_label.text = "Geometría: —"
-	_edit_mode_button.disabled = false
+	_edit_mode_button.disabled = not is_wall
 	_edit_mode_button.text = "Salir de edición" if _edit_mode_guid == guid else "Editar elemento"
 	_push_pull_distance.editable = _is_edit_mode_active()
 	_push_pull_apply_distance_button.disabled = not (
 		_is_edit_mode_active() and _push_pull_tool.is_active()
 	)
-	if _is_wall_guid(guid):
-		_delete_wall_button.visible = true
+	_delete_wall_button.visible = is_wall or is_slab
+	_mvp_wall_opening_button.visible = is_wall
+	_mvp_slab_button.disabled = not backend_ok
+	if is_wall:
 		_show_wall_typology_edit_wall_mode()
 		call_deferred("_load_wall_spec_into_panel_async", guid)
+	elif is_slab:
+		_hide_wall_typology_panel()
 	else:
 		_delete_wall_button.visible = false
+		_mvp_wall_opening_button.visible = false
 		_hide_wall_typology_panel()
 
 
@@ -2254,7 +2291,9 @@ func _delete_wall_shortcut_allowed() -> bool:
 	var mp := Vector2(DisplayServer.mouse_get_position())
 	if not _viewport_container.get_global_rect().has_point(mp):
 		return false
-	return _is_wall_guid(_project_view.selected_guid())
+	return _wall_tree_items.has(_project_view.selected_guid()) or _slab_tree_items.has(
+		_project_view.selected_guid()
+	)
 
 
 func _gui_focus_is_text_field() -> bool:
@@ -2358,6 +2397,7 @@ func _on_wall_props_typology_spin_changed(_value: float) -> void:
 func _sync_trace_defaults_to_wall_tool() -> void:
 	_wall_tool.default_height = _trace_wall_height
 	_wall_tool.default_thickness = _trace_wall_thickness
+	_apply_work_plane_elevation_m(_work_plane_elevation_m)
 
 
 func _load_wall_spec_into_panel_async(guid: String) -> void:
@@ -2382,13 +2422,13 @@ func _load_wall_spec_into_panel_async(guid: String) -> void:
 
 func _delete_selected_wall_async() -> void:
 	var guid: String = _project_view.selected_guid()
-	if not _is_wall_guid(guid):
+	if not (_wall_tree_items.has(guid) or _slab_tree_items.has(guid)):
 		return
 	var resp: Dictionary = await RpcClient.call_rpc("ifc.delete", {"guid": guid})
 	if not is_inside_tree():
 		return
 	if not bool(resp.get("ok", false)):
-		_log_label.text = "Eliminar muro: %s" % str(resp.get("error", {}))
+		_log_label.text = "Eliminar elemento: %s" % str(resp.get("error", {}))
 		return
 	if _edit_mode_guid == guid:
 		_exit_edit_mode("")
@@ -2398,11 +2438,82 @@ func _delete_selected_wall_async() -> void:
 		var it: TreeItem = _wall_tree_items[guid] as TreeItem
 		it.free()
 		_wall_tree_items.erase(guid)
+	if _slab_tree_items.has(guid):
+		var it_s: TreeItem = _slab_tree_items[guid] as TreeItem
+		it_s.free()
+		_slab_tree_items.erase(guid)
 	if _wall_tool.is_active():
 		_wall_tool.reset_draft()
 	_project_tree.deselect_all()
 	_refresh_properties_panel()
-	_log_label.text = "Muro eliminado: %s" % guid
+	_log_label.text = "Elemento eliminado: %s" % guid
+
+
+func _on_mvp_wall_opening_pressed() -> void:
+	var guid: String = _project_view.selected_guid()
+	if not _wall_tree_items.has(guid):
+		return
+	if not RpcClient.is_connected_to_backend():
+		return
+	var resp: Dictionary = await RpcClient.call_rpc(
+		"ifc.create_wall_opening",
+		{
+			"wall_guid": guid,
+			"along_start_m": 0.8,
+			"width_m": 1.0,
+			"sill_height_m": 0.9,
+			"height_m": 2.0,
+		},
+	)
+	if not is_inside_tree():
+		return
+	if not resp.get("ok", false):
+		_log_label.text = "Hueco: %s" % str(resp.get("error", ""))
+		return
+	var r: Dictionary = resp["result"] as Dictionary
+	_project_view.replace_entity_mesh(guid, r["mesh"] as Dictionary)
+	_refresh_properties_panel()
+	_log_label.text = "Hueco IFC: %s" % str(r.get("opening_guid", ""))
+
+
+func _on_mvp_slab_pressed() -> void:
+	if not RpcClient.is_connected_to_backend():
+		return
+	var ztop: float = _work_plane_elevation_m
+	var resp: Dictionary = await RpcClient.call_rpc(
+		"ifc.create_slab",
+		{
+			"polygon_xy": [
+				{"x": 0.0, "y": 0.0},
+				{"x": 4.0, "y": 0.0},
+				{"x": 4.0, "y": 3.0},
+				{"x": 0.0, "y": 3.0},
+			],
+			"thickness_m": 0.25,
+			"z_top_m": ztop,
+		},
+	)
+	if not is_inside_tree():
+		return
+	if not resp.get("ok", false):
+		_log_label.text = "Losa: %s" % str(resp.get("error", ""))
+		return
+	var r: Dictionary = resp["result"] as Dictionary
+	var ng: String = str(r["guid"])
+	_project_view.add_entity(ng, r["mesh"] as Dictionary)
+	var wh: Array = r.get("workspace_xy_half_m", []) as Array
+	if wh.size() >= 2:
+		_workspace_xy_half_cached = Vector2(float(wh[0]), float(wh[1]))
+	_refresh_workspace_hud()
+	var item: TreeItem = _project_tree.create_item(_slabs_tree_parent)
+	var short_id: String = ng.substr(0, 8) if ng.length() >= 8 else ng
+	item.set_text(0, "Losa %s…" % short_id)
+	item.set_metadata(0, ng)
+	_slab_tree_items[ng] = item
+	item.select(0)
+	_project_view.set_selection(ng)
+	_refresh_properties_panel()
+	_log_label.text = "Losa creada: %s" % ng
 
 
 func _on_wall_apply_typology_pressed() -> void:
@@ -2439,10 +2550,109 @@ func _refresh_status() -> void:
 
 func _on_rpc_connected() -> void:
 	_refresh_status()
+	call_deferred("_deferred_pull_storeys_on_ready")
 
 
 func _on_rpc_disconnected() -> void:
 	_refresh_status()
+
+
+func _deferred_pull_storeys_on_ready() -> void:
+	await _refresh_storey_controls_from_backend()
+
+
+func _apply_work_plane_elevation_m(z: float) -> void:
+	_work_plane_elevation_m = z
+	if _wall_tool != null and _wall_tool.has_method("set_work_plane_elevation_m"):
+		_wall_tool.set_work_plane_elevation_m(z)
+
+
+func _populate_storey_option_from_storeys_array(storeys: Array) -> void:
+	_storey_option_signal_suppress = true
+	_storey_level_option.clear()
+	var max_el: float = -1e9
+	for item in storeys:
+		if not (item is Dictionary):
+			continue
+		var s: Dictionary = item as Dictionary
+		var el: float = float(s.get("elevation_m", 0.0))
+		if el > max_el:
+			max_el = el
+		var nm: String = str(s.get("name", ""))
+		var guid: String = str(s.get("guid", ""))
+		var idx: int = _storey_level_option.get_item_count()
+		_storey_level_option.add_item("%s (%.2f m)" % [nm, el])
+		_storey_level_option.set_item_metadata(idx, guid)
+		if bool(s.get("is_active", false)):
+			_storey_level_option.select(idx)
+			_apply_work_plane_elevation_m(el)
+	_storey_option_signal_suppress = false
+	if max_el > -1e8:
+		_new_storey_elevation_spin.value = max_el + 3.0
+
+
+func _refresh_storey_controls_from_backend() -> void:
+	if not RpcClient.is_connected_to_backend():
+		return
+	var resp: Dictionary = await RpcClient.call_rpc("project.list_storeys", {})
+	if not is_inside_tree():
+		return
+	if not resp.get("ok", false):
+		_log_label.text = "Niveles IFC: %s" % str(resp.get("error", "error RPC"))
+		return
+	var res: Variant = resp.get("result", {})
+	if not (res is Dictionary):
+		return
+	var storeys: Array = (res as Dictionary).get("storeys", []) as Array
+	_populate_storey_option_from_storeys_array(storeys)
+	_log_label.text = "Niveles IFC: %d nivel(es)." % _storey_level_option.get_item_count()
+
+
+func _on_storey_level_option_item_selected(idx: int) -> void:
+	if _storey_option_signal_suppress:
+		return
+	if not RpcClient.is_connected_to_backend():
+		return
+	var g: Variant = _storey_level_option.get_item_metadata(idx)
+	if g == null:
+		return
+	call_deferred("_co_set_active_storey", str(g))
+
+
+func _co_set_active_storey(guid: String) -> void:
+	var resp: Dictionary = await RpcClient.call_rpc("project.set_active_storey", {"guid": guid})
+	if not is_inside_tree():
+		return
+	if not resp.get("ok", false):
+		_log_label.text = "Nivel activo: %s" % str(resp.get("error", ""))
+		return
+	var res: Variant = resp.get("result", {})
+	if res is Dictionary:
+		_apply_work_plane_elevation_m(float((res as Dictionary).get("elevation_m", 0.0)))
+	_log_label.text = "Nivel IFC activo (cota Z trabajo %.2f m)." % _work_plane_elevation_m
+
+
+func _on_add_storey_button_pressed() -> void:
+	if not RpcClient.is_connected_to_backend():
+		return
+	var el: float = _new_storey_elevation_spin.value
+	var nm: String = "Nivel %.2f m" % el
+	var resp: Dictionary = await RpcClient.call_rpc(
+		"project.create_storey", {"name": nm, "elevation_m": el}
+	)
+	if not is_inside_tree():
+		return
+	if not resp.get("ok", false):
+		_log_label.text = "Añadir nivel: %s" % str(resp.get("error", ""))
+		return
+	var res: Variant = resp.get("result", {})
+	var ng: String = ""
+	if res is Dictionary:
+		ng = str((res as Dictionary).get("guid", ""))
+	if ng != "":
+		await RpcClient.call_rpc("project.set_active_storey", {"guid": ng})
+	await _refresh_storey_controls_from_backend()
+	_log_label.text = "Nivel creado: %s" % nm
 
 
 func _on_ping_pressed() -> void:
@@ -2537,6 +2747,88 @@ func _save_to_path(path: String, dialog: FileDialog) -> void:
 		_log_label.text = "Guardado: %s (%d bytes)" % [path, int(resp["result"].get("bytes", 0))]
 	else:
 		_log_label.text = "Error al guardar: %s" % str(resp.get("error"))
+
+
+func _clear_wall_tree_items() -> void:
+	for guid in _wall_tree_items.keys():
+		var it: TreeItem = _wall_tree_items[guid] as TreeItem
+		if it != null:
+			it.free()
+	_wall_tree_items.clear()
+
+
+func _clear_slab_tree_items() -> void:
+	for guid in _slab_tree_items.keys():
+		var it: TreeItem = _slab_tree_items[guid] as TreeItem
+		if it != null:
+			it.free()
+	_slab_tree_items.clear()
+
+
+func _apply_project_open_result(res: Dictionary) -> void:
+	_wall_tool.deactivate()
+	_restore_view2d_mode_after_wall()
+	_set_wall_trace_mode(false)
+	_push_pull_tool.deactivate()
+	_exit_edit_mode("")
+	_kb_wall_cursor_ready = false
+	_project_view.clear_all_entities()
+	_clear_wall_tree_items()
+	_clear_slab_tree_items()
+	var walls: Array = res.get("walls", []) as Array
+	for w in walls:
+		if not (w is Dictionary):
+			continue
+		var d: Dictionary = w as Dictionary
+		var guid: String = str(d.get("guid", ""))
+		var mesh_dict: Dictionary = d.get("mesh", {}) as Dictionary
+		if guid == "" or mesh_dict.is_empty():
+			continue
+		_project_view.add_entity(guid, mesh_dict)
+		var item: TreeItem = _project_tree.create_item(_muros_tree_parent)
+		var short_id: String = guid.substr(0, 8) if guid.length() >= 8 else guid
+		item.set_text(0, "Muro %s…" % short_id)
+		item.set_metadata(0, guid)
+		_wall_tree_items[guid] = item
+	var ws: Array = res.get("workspace_xy_half_m", []) as Array
+	if ws.size() >= 2:
+		_workspace_xy_half_cached = Vector2(float(ws[0]), float(ws[1]))
+	_refresh_workspace_hud()
+	var storeys: Array = res.get("storeys", []) as Array
+	_populate_storey_option_from_storeys_array(storeys)
+	_sync_trace_defaults_to_wall_tool()
+	_project_view.clear_selection()
+	_refresh_properties_panel()
+	_refresh_ribbon_compact_mode()
+
+
+func _on_open_ifc_pressed() -> void:
+	var dialog: FileDialog = FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.filters = PackedStringArray(["*.ifc ; IFC files"])
+	dialog.title = "Abrir proyecto IFC"
+	dialog.file_selected.connect(_finish_open_ifc_from_path.bind(dialog))
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(640, 400))
+
+
+func _finish_open_ifc_from_path(path: String, dialog: FileDialog) -> void:
+	dialog.queue_free()
+	var resp: Dictionary = await RpcClient.call_rpc("project.open", {"path": path}, 120000)
+	if not is_inside_tree():
+		return
+	if not resp.get("ok"):
+		_log_label.text = "Abrir IFC: %s" % str(resp.get("error"))
+		return
+	var res: Dictionary = resp["result"] as Dictionary
+	_apply_project_open_result(res)
+	_log_label.text = "Abierto: %s (%d muro(s); %d omitidos)" % [
+		str(res.get("path", path)),
+		int(res.get("wall_count", 0)),
+		int(res.get("walls_skipped", 0)),
+	]
 
 
 func _on_export_2d_views_pressed() -> void:

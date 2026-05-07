@@ -67,6 +67,15 @@ func replace_entity_mesh(guid: String, mesh_dict: Dictionary) -> void:
 	_refresh_entity_overlay(guid)
 
 
+func clear_all_entities() -> void:
+	## Elimina todas las mallas del proyecto (p. ej. tras ``project.open``).
+	clear_face_hover()
+	clear_edit_target()
+	var guids: Array = _entities.keys()
+	for g in guids:
+		remove_entity(str(g))
+
+
 func remove_entity(guid: String) -> void:
 	if not _entities.has(guid):
 		return

@@ -3,8 +3,9 @@
 
 La ``IfcSession`` mantiene el archivo IFC cargado en memoria + referencias a las
 entidades espaciales mas usadas (``project``, ``site``, ``building``, ``storey``,
-``body_context``). Sprint 1.4 solo expone un proyecto vacio con un storey por
-defecto; la apertura de archivos existentes llega en Fase 2.
+``body_context``). El atributo ``storey`` es el **IfcBuildingStorey activo**: los
+productos nuevos (p. ej. muros) se contienen en ese nivel hasta que se cambie con
+:meth:`IfcSession.set_active_storey`.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import ifcopenshell
 import ifcopenshell.api
@@ -98,14 +99,137 @@ class IfcSession:
         _run("aggregate.assign_object", file, relating_object=site, products=[building])
         _run("aggregate.assign_object", file, relating_object=building, products=[storey])
 
+        storey.Elevation = 0.0
+
         _log.info("Sesion IFC creada (schema=%s, project=%r)", schema, project_name)
         return cls(file, project, site, building, storey, body_context)
+
+    @classmethod
+    def open_existing(cls, path: Path) -> IfcSession:
+        """Carga un ``.ifc`` desde disco y enlaza proyecto, sitio, edificio y niveles.
+
+        El primer ``IfcBuildingStorey`` por cota (empate por nombre) queda como
+        **nivel activo** para nuevos elementos.
+
+        Args:
+            path: Ruta a un archivo STEP físico existente.
+
+        Returns:
+            Sesión lista para ``save`` y operaciones geométricas.
+
+        Raises:
+            FileNotFoundError: Si ``path`` no apunta a un fichero.
+            ValueError: Si falta jerarquía espacial mínima o contexto Body.
+        """
+        resolved = path.expanduser().resolve()
+        if not resolved.is_file():
+            raise FileNotFoundError(str(resolved))
+        file: ifc_file_type = ifcopenshell.open(str(resolved))
+        projects = file.by_type("IfcProject")
+        if not projects:
+            raise ValueError("IFC sin IfcProject")
+        project = projects[0]
+        sites = _aggregated_children(project, "IfcSite")
+        if not sites:
+            raise ValueError("IFC sin IfcSite bajo el proyecto")
+        site = sites[0]
+        buildings = _aggregated_children(site, "IfcBuilding")
+        if not buildings:
+            raise ValueError("IFC sin IfcBuilding bajo el sitio")
+        building = buildings[0]
+        storeys = _aggregated_children(building, "IfcBuildingStorey")
+        if not storeys:
+            raise ValueError("IFC sin IfcBuildingStorey bajo el edificio")
+        storeys_sorted = sorted(storeys, key=_storey_sort_key)
+        storey0 = storeys_sorted[0]
+        body_ctx = _find_body_model_subcontext(file)
+        _log.info("Sesion IFC abierta desde %s", resolved)
+        return cls(file, project, site, building, storey0, body_ctx)
+
+    def list_storeys_ordered(self) -> list[entity_instance]:
+        """Lista ``IfcBuildingStorey`` bajo ``building``, ordenados por cota y nombre."""
+        found: list[entity_instance] = []
+        for rel in self.building.IsDecomposedBy or []:
+            for obj in rel.RelatedObjects or []:
+                if obj.is_a("IfcBuildingStorey"):
+                    found.append(obj)
+        return sorted(found, key=_storey_sort_key)
+
+    def create_storey(self, name: str, elevation_m: float) -> entity_instance:
+        """Crea un nivel, lo agrega al edificio y fija ``Elevation`` en metros."""
+        storey = _run(
+            "root.create_entity",
+            self.file,
+            ifc_class="IfcBuildingStorey",
+            name=name,
+        )
+        storey.Elevation = float(elevation_m)
+        _run(
+            "aggregate.assign_object",
+            self.file,
+            relating_object=self.building,
+            products=[storey],
+        )
+        return cast("entity_instance", storey)
+
+    def set_active_storey(self, guid: str) -> None:
+        """Apunta ``self.storey`` al ``IfcBuildingStorey`` con ``GlobalId`` dado.
+
+        Raises:
+            ValueError: Si el GUID no corresponde a un nivel del edificio activo.
+        """
+        for st in self.list_storeys_ordered():
+            if str(st.GlobalId) == guid:
+                self.storey = st
+                return
+        raise ValueError(f"No hay IfcBuildingStorey bajo el edificio con GlobalId={guid!r}")
 
     def save(self, path: Path) -> None:
         """Serializa la sesion a ``path`` como texto ISO 10303-21 (``.ifc``)."""
         path.parent.mkdir(parents=True, exist_ok=True)
         self.file.write(str(path))
         _log.info("IFC guardado en %s (%d bytes)", path, path.stat().st_size)
+
+
+def _storey_sort_key(st: Any) -> tuple[float, str]:
+    raw = getattr(st, "Elevation", None)
+    ez: float = float(raw) if raw is not None else 0.0
+    return (ez, str(st.Name or ""))
+
+
+def _aggregated_children(parent: Any, ifc_class: str) -> list[Any]:
+    """Hijos directos vía ``IfcRelAggregates`` con la clase dada."""
+    found: list[Any] = []
+    for rel in parent.IsDecomposedBy or []:
+        for obj in rel.RelatedObjects or []:
+            if obj.is_a(ifc_class):
+                found.append(obj)
+    return found
+
+
+def _find_body_model_subcontext(ifc_file: ifcopenshell.file) -> Any:
+    """Localiza el subcontexto ``Body`` / ``MODEL_VIEW`` para asignar geometría."""
+    for ctx in ifc_file.by_type("IfcGeometricRepresentationSubContext"):
+        if getattr(ctx, "ContextIdentifier", None) == "Body" and getattr(
+            ctx, "TargetView", None
+        ) == "MODEL_VIEW":
+            return ctx
+    raise ValueError("IFC sin IfcGeometricRepresentationSubContext Body / MODEL_VIEW")
+
+
+def install_session(session: IfcSession, *, history_scope: str) -> None:
+    """Sustituye la sesión global, limpia topo/historial y fija el ámbito SQLite.
+
+    Args:
+        session: Nueva sesión (p. ej. tras ``IfcSession.open_existing``).
+        history_scope: Clave de ámbito para la pila undo (ruta canónica del ``.ifc``).
+    """
+    global _SESSION  # noqa: PLW0603
+    with _SESSION_LOCK:
+        _SESSION = session
+    topo_registry.clear()
+    history_store.clear()
+    history_store.set_scope(history_scope)
 
 
 def get_session() -> IfcSession:
