@@ -63,6 +63,17 @@ uv run pre-commit install
 
 Trata `origin/develop` como fuente de verdad: `git pull` al empezar en un clone y, antes de cambiar de PC, commits pequeños verificados y `git push`. Convención detallada (incluida para agentes) en [`.cursor/rules/66-git-sincronizacion-solo-autor.mdc`](.cursor/rules/66-git-sincronizacion-solo-autor.mdc).
 
+### Sincronizar con el remoto (`pull`)
+
+El primer argumento de `git pull` es el **nombre del remoto** (`origin`, `upstream`, …), no el de la rama sola.
+
+```bash
+git fetch origin
+git pull origin develop
+```
+
+**Evita** `git pull develop`: Git interpreta `develop` como si fuera un remoto y suele responder `fatal: 'develop' does not appear to be a git repository`. Si trabajas sobre otra rama, cambia el segundo argumento (p. ej. `git pull origin main`).
+
 ### Commits
 
 Formato convencional, en **español imperativo**, ≤72 caracteres en la primera línea:

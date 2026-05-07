@@ -43,6 +43,9 @@ uv sync                          # instalar dependencias
 uv run pytest -q                 # tests
 uv run ruff check . && uv run mypy --strict src/
 
+# Worker Godot headless (opcional, ADR-0003): mismo JSON-RPC en puerto auxiliar (default 5800).
+# AXONBIM_SPAWN_GODOT_WORKER=1 AXONBIM_GODOT_BIN=/ruta/godot4 uv run python -m axonbim --tcp
+
 # App (Godot + backend RPC en un solo comando)
 ./start                          # uv sync + backend TCP + Godot (un comando)
 

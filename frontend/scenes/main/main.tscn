@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/main_scene.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/project_view.gd" id="2"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/viewport_3d/nav_viewport_gizmo.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/workspace_floor_grid.gd" id="10"]
 [ext_resource type="Script" path="res://scripts/viewport_2d/ortho_occ_canvas.gd" id="11"]
+[ext_resource type="Theme" path="res://themes/axon_theme.tres" id="12"]
 
 [sub_resource type="Sky" id="Sky_3d"]
 sky_material = null
@@ -43,6 +44,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("12")
 theme_override_constants/separation = 0
 
 [node name="Ribbon" type="VBoxContainer" parent="UI/Root"]

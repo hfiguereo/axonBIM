@@ -30,6 +30,7 @@ from pathlib import Path
 
 from axonbim.rpc.dispatcher import Dispatcher
 from axonbim.rpc.framing import FramingError, read_message, write_message
+from axonbim.worker_manager import WorkerManager
 
 _log = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ async def serve(
     tcp_host: str | None = None,
     tcp_port: int | None = None,
     install_signal_handlers: bool = True,
+    worker_manager: WorkerManager | None = None,
 ) -> None:
     """Arranca servidor(es) RPC. Bloquea hasta ``shutdown_event`` o senal.
 
@@ -106,6 +108,11 @@ async def serve(
     tcp_host, tcp_port
         Si ``tcp_port`` se especifica, se abre tambien un listener TCP en
         ``tcp_host:tcp_port`` (default host: ``127.0.0.1``).
+    install_signal_handlers
+        Si es ``True``, registra SIGINT/SIGTERM para activar ``shutdown_event``.
+    worker_manager
+        Si no es ``None``, se llama a :meth:`axonbim.worker_manager.WorkerManager.stop`
+        en el ``finally`` al cerrar el servidor (p. ej. subproceso Godot headless).
 
     En plataformas sin ``asyncio.start_unix_server`` (p. ej. Windows), solo
     se arranca TCP; hace falta ``tcp_port`` no nulo.
@@ -150,6 +157,8 @@ async def serve(
     try:
         await _wait_servers(servers, dispatcher.shutdown_event)
     finally:
+        if worker_manager is not None:
+            await worker_manager.stop()
         if unix_path is not None:
             try:
                 unix_path.unlink(missing_ok=True)

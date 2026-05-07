@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from axonbim.handlers import system as system_handlers
 from axonbim.logging_config import configure as configure_logging
 from axonbim.rpc.dispatcher import Dispatcher
 from axonbim.rpc.server import default_socket_path, serve
+from axonbim.worker_manager import WorkerManager
 
 _log = logging.getLogger(__name__)
 
@@ -103,6 +105,27 @@ def _build_dispatcher() -> Dispatcher:
     return dispatcher
 
 
+async def _async_main(
+    dispatcher: Dispatcher,
+    socket_path: Path | None,
+    tcp_host: str,
+    tcp_port: int | None,
+) -> None:
+    """Arranca worker opcional y bloquea en el servidor RPC."""
+    worker_mgr: WorkerManager | None = None
+    if os.environ.get("AXONBIM_SPAWN_GODOT_WORKER", "").lower() in ("1", "true", "yes"):
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        worker_mgr = WorkerManager(frontend_dir=repo_root / "frontend")
+        await worker_mgr.start()
+    await serve(
+        dispatcher,
+        socket_path,
+        tcp_host=tcp_host,
+        tcp_port=tcp_port,
+        worker_manager=worker_mgr,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Punto de entrada CLI. Devuelve codigo de salida."""
     args = _build_parser().parse_args(argv if argv is not None else sys.argv[1:])
@@ -120,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         asyncio.run(
-            serve(
+            _async_main(
                 dispatcher,
                 socket_path,
                 tcp_host=args.tcp_host,

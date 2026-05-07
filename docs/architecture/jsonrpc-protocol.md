@@ -3,7 +3,7 @@
 Spec viva del puente entre Godot (frontend) y Python (backend).
 
 > **Versión del protocolo:** `0.1.0` (alpha)
-> **Última revisión:** 2026-04
+> **Última revisión:** 2026-05
 > **Estado:** propuesta inicial — sujeto a cambios mientras estemos en Fase 1.
 
 ---
@@ -196,6 +196,31 @@ El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 | `project.autosave_done` | `{ "timestamp": <int>, "path": "..." }` |
 | `project.state_changed` | `{ "state": "...", "by": "..." }` |
 | `system.warning` | `{ "message": "...", "level": "info\|warn" }` |
+
+### 5.7 Puerto auxiliar — proceso Godot Worker (headless)
+
+> **ADR:** [`0003-godot-worker-headless-auxiliar.md`](decisions/0003-godot-worker-headless-auxiliar.md)
+
+El **backend Python** (`python -m axonbim`, puerto TCP default `5799`) sigue siendo el **único** canal JSON-RPC para el frontend de producto (`RpcClient`) y la verdad IFC.
+
+Además puede existir un **segundo listener** en el mismo host: un proceso **Godot 4.x `--headless`** que expone JSON-RPC con **idéntico framing** (§2) pero en **otro puerto**, para tareas **auxiliares** (no mutan el IFC; no sustituyen IfcOpenShell/OCP salvo ADR futuro).
+
+| Concepto | Valor / notas |
+|----------|----------------|
+| Host | `127.0.0.1` (loopback) |
+| Puerto default | `5800` (no colisiona con `5799`) |
+| Variable de entorno | `AXONBIM_WORKER_PORT` — si está vacía, se usa el default `5800` en el worker; Python puede fijarla al spawnear el subproceso. |
+| Quién escucha | **Godot worker** (servidor TCP). |
+| Quién conecta | **Python** (`WorkerManager`, tests) u otras herramientas; el frontend Godot con UI **no** reemplaza su conexión principal por este puerto en la fase piloto. |
+
+#### Métodos `worker.*` (piloto)
+
+| Método | Params | Result |
+|--------|--------|--------|
+| `worker.ping` | `{}` | `{ "pong": true, "engine": "<string>" }` |
+| `worker.aabb_intersects` | `{ "a_min": [x,y,z], "a_max": [x,y,z], "b_min": [x,y,z], "b_max": [x,y,z] }` (metros, mundo alineado a ejes) | `{ "intersects": <bool> }` |
+
+Errores: mismos códigos JSON-RPC estándar; parámetros mal formados → `-32602` (`Invalid params`).
 
 ## 6. Timeouts
 

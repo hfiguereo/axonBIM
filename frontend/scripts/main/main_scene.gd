@@ -6,6 +6,7 @@ extends Node
 const OrbitRig := preload("res://scripts/viewport_3d/orbit_camera_rig.gd")
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
 const PushPullTool := preload("res://scripts/tools/push_pull_tool.gd")
+const _ViewportManagerGd := preload("res://scripts/viewport_3d/viewport_manager.gd")
 
 const UI_SHELL: Color = Color(0.055, 0.071, 0.096, 1.0)
 const UI_PANEL: Color = Color(0.078, 0.102, 0.137, 1.0)
@@ -24,6 +25,8 @@ const VIEWPORT_PERSP_AMBIENT_ENERGY: float = 0.48
 const VIEWPORT_ORTHO_AMBIENT_ENERGY: float = 0.40
 const UI_ACCENT_DANGER: Color = Color(0.93, 0.32, 0.26, 1.0)
 const USE_OCC_2D_VIEWS: bool = false
+## Árbol de diagnóstico RPC (EventBus). Desactivado por defecto; activar solo en desarrollo.
+const EXPERIMENTAL_EVENTBUS_RPC_INSPECTOR: bool = false
 const VIEW2D_STATE_LOADING: String = "loading"
 const VIEW2D_STATE_READY: String = "ready"
 const VIEW2D_STATE_ERROR: String = "error"
@@ -56,6 +59,8 @@ const WALL_FAMILIES: Array = [
 	{"id": "M-ALT-032-025", "label": "Muro alto 3,2 m / 0,25 m", "h": 3.2, "t": 0.25},
 ]
 
+var _viewport_manager: _ViewportManagerGd
+var _experimental_rpc_tree: Tree = null
 var _wall_tool: Node
 var _push_pull_tool: Node
 var _muros_tree_parent: TreeItem
@@ -161,7 +166,57 @@ func _log_info(message: String) -> void:
 		print("[INFO ] ", message)
 
 
+func _on_eventbus_system_warning(message: String, level: String) -> void:
+	if message.is_empty():
+		return
+	var prefix: String = "[backend %s] " % level
+	_log_info(prefix + message)
+	if _status_label != null:
+		_status_label.tooltip_text = prefix + message
+
+
+func _on_eventbus_backend_info(message: String) -> void:
+	if message.is_empty():
+		return
+	_log_info("[backend info] " + message)
+
+
+func _on_eventbus_backend_notification(method: String, params: Dictionary) -> void:
+	if method == "project.state_changed":
+		_log_info("Estado proyecto (notificación): %s" % str(params.get("state", params)))
+
+
+func _setup_experimental_eventbus_inspector() -> void:
+	if not EXPERIMENTAL_EVENTBUS_RPC_INSPECTOR:
+		return
+	var host: Node = _prop_guid_label.get_parent()
+	if host == null:
+		return
+	host.add_child(HSeparator.new())
+	var caption := Label.new()
+	caption.text = "RPC notificaciones (experimental)"
+	host.add_child(caption)
+	_experimental_rpc_tree = Tree.new()
+	_experimental_rpc_tree.custom_minimum_size = Vector2(0, 140)
+	_experimental_rpc_tree.columns = 2
+	_experimental_rpc_tree.hide_root = true
+	host.add_child(_experimental_rpc_tree)
+	EventBus.backend_notification.connect(_on_experimental_inspector_notification)
+
+
+func _on_experimental_inspector_notification(method: String, params: Dictionary) -> void:
+	if _experimental_rpc_tree == null:
+		return
+	_experimental_rpc_tree.clear()
+	var hidden_root: TreeItem = _experimental_rpc_tree.create_item()
+	var row: TreeItem = _experimental_rpc_tree.create_item(hidden_root)
+	row.set_text(0, method)
+	row.set_text(1, JSON.stringify(params))
+
+
 func _ready() -> void:
+	_viewport_manager = _ViewportManagerGd.new()
+	_viewport_manager.setup(_subviewport, USE_OCC_2D_VIEWS)
 	_log_info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
 	_log_label.text = (
 		"Vista: 1-3 orto | 4 persp — ambos fondo plano sin horizonte artefacto | "
@@ -198,6 +253,9 @@ func _ready() -> void:
 
 	RpcClient.connected.connect(_on_rpc_connected)
 	RpcClient.disconnected.connect(_on_rpc_disconnected)
+	EventBus.system_warning.connect(_on_eventbus_system_warning)
+	EventBus.backend_info.connect(_on_eventbus_backend_info)
+	EventBus.backend_notification.connect(_on_eventbus_backend_notification)
 	_ping_button.pressed.connect(_on_ping_pressed)
 	_wall_button.pressed.connect(_on_create_wall_pressed)
 	_push_pull_button.pressed.connect(_on_push_pull_pressed)
@@ -233,6 +291,7 @@ func _ready() -> void:
 	_update_view2d_mode_button_text()
 	_on_view_tabs_changed(_view_tabs_bar.current_tab)
 	_refresh_ribbon_compact_mode()
+	_setup_experimental_eventbus_inspector()
 
 
 func _physics_process(_delta: float) -> void:
@@ -304,15 +363,11 @@ func _refresh_workspace_hud() -> void:
 
 
 ## Con vista 2D OCC a pantalla completa, el 3D no se redibuja cada fotograma (menos lag).
-func _apply_subviewport_render_policy() -> void:
-	if _subviewport == null:
+func _sync_main_subviewport_render_policy() -> void:
+	if _viewport_manager == null:
 		return
-	var modelado: bool = _active_view_tab == 0
-	var occ_covers: bool = USE_OCC_2D_VIEWS and not modelado
-	if occ_covers:
-		_subviewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	else:
-		_subviewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+	var occluded: bool = _floating_views.has(_active_view_tab)
+	_viewport_manager.update_main_canvas_render_policy(_active_view_tab, occluded)
 
 
 func _schedule_occ_view2d_refresh_after_wall(view2d_id: String) -> void:
@@ -336,7 +391,7 @@ func _on_view_tabs_changed(tab: int) -> void:
 	_active_view_tab = tab
 	_has_last_valid_occ_uv = false
 	var modelado: bool = tab == 0
-	_apply_subviewport_render_policy()
+	_sync_main_subviewport_render_policy()
 	_workspace_hud.visible = true
 	_view_2d_placeholder.visible = false
 	%NavGizmo.visible = modelado
@@ -1036,10 +1091,10 @@ func _on_visual_style_selected(idx: int) -> void:
 
 
 func _apply_visual_style(style_id: String) -> void:
-	if style_id == VIS_STYLE_WIREFRAME:
-		_subviewport.debug_draw = Viewport.DEBUG_DRAW_WIREFRAME
-	else:
-		_subviewport.debug_draw = Viewport.DEBUG_DRAW_DISABLED
+	if _viewport_manager != null:
+		_viewport_manager.set_debug_draw(
+			Viewport.DEBUG_DRAW_WIREFRAME if style_id == VIS_STYLE_WIREFRAME else Viewport.DEBUG_DRAW_DISABLED
+		)
 	var env: Environment = _world_environment.environment
 	if env == null:
 		return
@@ -1144,16 +1199,28 @@ func _on_float_active_view_pressed() -> void:
 		"rig": floating_rig,
 		"host": vp_host,
 	}
-	if _view_state_by_tab.has(idx):
-		var row_state: Dictionary = _view_state_by_tab[idx] as Dictionary
-		var cam_state: Dictionary = row_state.get("camera", {}) as Dictionary
-		if not cam_state.is_empty():
-			floating_rig.apply_view_state(cam_state)
-		var snap: Dictionary = row_state.get("camera_snapshot", {}) as Dictionary
-		_apply_camera_snapshot_to_camera(floating_cam, snap)
 	win.popup_centered()
 	_snap_window_to_zone(win, "right")
 	_refresh_main_viewport_docked_state()
+	call_deferred("_sync_floating_view_camera_from_tab_state", idx)
+
+
+func _sync_floating_view_camera_from_tab_state(tab_idx: int) -> void:
+	if not _floating_viewports.has(tab_idx) or not _view_state_by_tab.has(tab_idx):
+		return
+	var slot: Dictionary = _floating_viewports[tab_idx] as Dictionary
+	var floating_rig: OrbitRig = slot.get("rig") as OrbitRig
+	var floating_cam: Camera3D = slot.get("camera") as Camera3D
+	if floating_rig == null or floating_cam == null:
+		return
+	if not floating_rig.is_inside_tree():
+		return
+	var row_state: Dictionary = _view_state_by_tab[tab_idx] as Dictionary
+	var cam_state: Dictionary = row_state.get("camera", {}) as Dictionary
+	if not cam_state.is_empty():
+		floating_rig.apply_view_state(cam_state)
+	var snap: Dictionary = row_state.get("camera_snapshot", {}) as Dictionary
+	_apply_camera_snapshot_to_camera(floating_cam, snap)
 
 
 func _on_snap_floating_view(tab_idx: int, zone: String) -> void:
@@ -1283,7 +1350,7 @@ func _refresh_main_viewport_docked_state() -> void:
 		return
 	var active_is_floating: bool = _floating_views.has(_active_view_tab)
 	if active_is_floating:
-		_subviewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		_sync_main_subviewport_render_policy()
 		_view_2d_placeholder.visible = true
 		_view_2d_placeholder_title.text = "Vista activa desacoplada"
 		_view_2d_placeholder_hint.text = (
@@ -1293,7 +1360,7 @@ func _refresh_main_viewport_docked_state() -> void:
 		)
 		%NavGizmo.visible = false
 		return
-	_apply_subviewport_render_policy()
+	_sync_main_subviewport_render_policy()
 	_view_2d_placeholder.visible = false
 	%NavGizmo.visible = _active_view_tab == 0
 
@@ -1640,7 +1707,8 @@ func _apply_viewport_polish() -> void:
 	_light.light_color = Color(0.82, 0.90, 1.0, 1.0)
 	_light.light_energy = 1.08
 	_grid.material_override = _grid_material()
-	_subviewport.msaa_3d = SubViewport.MSAA_4X
+	if _viewport_manager != null:
+		_viewport_manager.apply_msaa(SubViewport.MSAA_4X)
 	var nav: PanelContainer = %NavGizmo as PanelContainer
 	var nav_style := StyleBoxFlat.new()
 	nav_style.bg_color = Color(0.10, 0.11, 0.13, 0.62)
