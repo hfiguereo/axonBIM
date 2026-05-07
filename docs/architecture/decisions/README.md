@@ -34,5 +34,6 @@ Ver regla [`60-documentation.mdc`](../../../.cursor/rules/60-documentation.mdc),
 | 0001 | Adoptar ortogonales OCC con multi-viewport | Proposed | 2026-05-05 |
 | 0002 | Estrategia combinada 2D analítica + ortográfica + DXF | Accepted | 2026-05-06 |
 | 0003 | Proceso Godot headless auxiliar (Worker) | Accepted | 2026-05-07 |
+| 0004 | Datums de nivel y marcas de vista (paridad mínima tipo Revit) | Proposed | 2026-05-07 |
 
 > ADRs propuestos deben discutirse y, al aceptarse, mantenerse inmutables.
