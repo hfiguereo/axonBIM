@@ -184,6 +184,39 @@ class IfcSession:
                 return
         raise ValueError(f"No hay IfcBuildingStorey bajo el edificio con GlobalId={guid!r}")
 
+    def update_storey(
+        self,
+        guid: str,
+        *,
+        name: str | None = None,
+        elevation_m: float | None = None,
+    ) -> entity_instance:
+        """Actualiza ``Name`` y/o ``Elevation`` (metros, cota Z del forjado) de un nivel.
+
+        Args:
+            guid: ``GlobalId`` del ``IfcBuildingStorey``.
+            name: Nuevo nombre visible; ``None`` = no cambiar.
+            elevation_m: Nueva cota; ``None`` = no cambiar.
+
+        Returns:
+            La instancia IFC modificada.
+
+        Raises:
+            ValueError: Si el GUID no existe, o si ``name`` y ``elevation_m`` son ambos
+                ``None``.
+        """
+        if name is None and elevation_m is None:
+            raise ValueError("Debe indicarse al menos name o elevation_m")
+        for st in self.list_storeys_ordered():
+            if str(st.GlobalId) != guid:
+                continue
+            if name is not None:
+                st.Name = str(name)
+            if elevation_m is not None:
+                st.Elevation = float(elevation_m)
+            return st
+        raise ValueError(f"No hay IfcBuildingStorey bajo el edificio con GlobalId={guid!r}")
+
     def save(self, path: Path) -> None:
         """Serializa la sesion a ``path`` como texto ISO 10303-21 (``.ifc``)."""
         path.parent.mkdir(parents=True, exist_ok=True)

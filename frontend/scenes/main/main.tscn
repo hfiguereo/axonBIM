@@ -474,6 +474,51 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Añadir nivel"
 
+[node name="StoreyDatumEditPanel" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StoreyDatumEditTitle" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.72, 0.8, 0.92, 1)
+text = "Nivel seleccionado (datum 3D)"
+
+[node name="StoreyDatumNameEdit" type="LineEdit" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Nombre del nivel"
+
+[node name="LblStoreyDatumZ" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Cota forjado Z (m)"
+
+[node name="StoreyDatumElevationEdit" type="SpinBox" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = -50.0
+max_value = 500.0
+step = 0.01
+
+[node name="StoreyDatumBtnRow" type="HBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StoreyDatumApplyButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel/StoreyDatumBtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Aplicar al IFC"
+
+[node name="StoreyDatumSetActiveButton" type="Button" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox/StoreyDatumEditPanel/StoreyDatumBtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Nivel activo"
+
 [node name="WallTypologyTitle" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
 unique_name_in_owner = true
 visible = false

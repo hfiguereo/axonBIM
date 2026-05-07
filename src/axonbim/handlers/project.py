@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from axonbim.geometry import topo_registry
 from axonbim.history import sqlite_store as history_store
@@ -57,6 +57,31 @@ class SetActiveStoreyParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     guid: str = Field(min_length=1, description="GlobalId del IfcBuildingStorey.")
+
+
+class UpdateStoreyParams(BaseModel):
+    """Parametros de ``project.update_storey``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    guid: str = Field(min_length=1, description="GlobalId del IfcBuildingStorey.")
+    name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        description="Nuevo nombre; omitir o null para no cambiar.",
+    )
+    elevation_m: float | None = Field(
+        default=None,
+        description="Nueva cota Z del forjado en metros; omitir o null para no cambiar.",
+    )
+
+    @model_validator(mode="after")
+    def _at_least_one_mutation(self) -> UpdateStoreyParams:
+        """Exige al menos un campo mutable distinto de null."""
+        if self.name is None and self.elevation_m is None:
+            raise ValueError("Indique name y/o elevation_m")
+        return self
 
 
 class OpenParams(BaseModel):
@@ -134,6 +159,25 @@ async def set_active_storey(params: dict[str, Any]) -> dict[str, Any]:
         "ok": True,
         "guid": str(session.storey.GlobalId),
         "elevation_m": _storey_elevation_m(session.storey),
+    }
+
+
+async def update_storey(params: dict[str, Any]) -> dict[str, Any]:
+    """Actualiza nombre y/o cota de un ``IfcBuildingStorey`` existente."""
+    args = UpdateStoreyParams.model_validate(params)
+    session = get_session()
+    try:
+        st = session.update_storey(
+            args.guid,
+            name=args.name,
+            elevation_m=args.elevation_m,
+        )
+    except ValueError as exc:
+        raise RpcError(ErrorCode.INVALID_PARAMS, str(exc), {}) from exc
+    return {
+        "guid": str(st.GlobalId),
+        "name": str(st.Name or ""),
+        "elevation_m": _storey_elevation_m(st),
     }
 
 
@@ -221,3 +265,4 @@ def register(dispatcher: Dispatcher) -> None:
     dispatcher.register("project.list_storeys", list_storeys)
     dispatcher.register("project.create_storey", create_storey)
     dispatcher.register("project.set_active_storey", set_active_storey)
+    dispatcher.register("project.update_storey", update_storey)

@@ -7,6 +7,8 @@ const OrbitRig := preload("res://scripts/viewport_3d/orbit_camera_rig.gd")
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
 const PushPullTool := preload("res://scripts/tools/push_pull_tool.gd")
 const _ViewportManagerGd := preload("res://scripts/viewport_3d/viewport_manager.gd")
+const StoreyDatumOverlayGd := preload("res://scripts/viewport_3d/storey_datum_overlay.gd")
+const IFC_STOREY_TREE_META: String = "IFC_STOREY:"
 
 const UI_SHELL: Color = Color(0.055, 0.071, 0.096, 1.0)
 const UI_PANEL: Color = Color(0.078, 0.102, 0.137, 1.0)
@@ -71,6 +73,11 @@ var _trace_wall_thickness: float = 0.2
 var _typology_spin_suppress: bool = false
 var _work_plane_elevation_m: float = BASE_STOREY_ELEVATION_M
 var _storey_option_signal_suppress: bool = false
+var _storey_datum_overlay: Node3D
+var _selected_storey_guid: String = ""
+var _storey_row_by_guid: Dictionary = {}
+var _storeys_tree_parent: TreeItem
+var _storey_tree_items: Dictionary = {}
 
 @onready var _ribbon_tabs: TabBar = $%RibbonTabs
 @onready var _ribbon_tools_inicio: Control = $%RibbonToolsInicio
@@ -124,6 +131,11 @@ var _storey_option_signal_suppress: bool = false
 @onready var _storey_level_option: OptionButton = %StoreyLevelOption
 @onready var _new_storey_elevation_spin: SpinBox = %NewStoreyElevationSpin
 @onready var _add_storey_button: Button = %AddStoreyButton
+@onready var _storey_datum_edit_panel: Control = %StoreyDatumEditPanel
+@onready var _storey_datum_name: LineEdit = %StoreyDatumNameEdit
+@onready var _storey_datum_elev: SpinBox = %StoreyDatumElevationEdit
+@onready var _storey_datum_apply: Button = %StoreyDatumApplyButton
+@onready var _storey_datum_active_btn: Button = %StoreyDatumSetActiveButton
 @onready var _workspace_main_split: HSplitContainer = $UI/Root/Workspace/MainSplit
 @onready var _workspace_inner_split: HSplitContainer = $UI/Root/Workspace/MainSplit/InnerSplit
 @onready var _workspace_hud: Label = %WorkspaceHud
@@ -255,6 +267,11 @@ func _ready() -> void:
 	_mvp_slab_button.pressed.connect(_on_mvp_slab_pressed)
 	_storey_level_option.item_selected.connect(_on_storey_level_option_item_selected)
 	_add_storey_button.pressed.connect(_on_add_storey_button_pressed)
+	_storey_datum_apply.pressed.connect(_on_storey_datum_apply_pressed)
+	_storey_datum_active_btn.pressed.connect(_on_storey_datum_set_active_pressed)
+	_storey_datum_overlay = StoreyDatumOverlayGd.new()
+	_storey_datum_overlay.name = "StoreyDatumOverlay"
+	_project_view.add_child(_storey_datum_overlay)
 	_sync_trace_defaults_to_wall_tool()
 
 	_push_pull_tool = PushPullTool.new()
@@ -2059,6 +2076,7 @@ func _build_project_tree() -> void:
 	_project_tree.clear()
 	_wall_tree_items.clear()
 	_slab_tree_items.clear()
+	_storey_tree_items.clear()
 	_view2d_items.clear()
 	_view2d_defs.clear()
 	_view2d_runtime_state.clear()
@@ -2078,6 +2096,9 @@ func _build_project_tree() -> void:
 	_register_view2d_tree_item("Derecha", "right")
 	var ifc: TreeItem = _project_tree.create_item(proyecto)
 	ifc.set_text(0, "IFC")
+	_storeys_tree_parent = _project_tree.create_item(ifc)
+	_storeys_tree_parent.set_text(0, "Niveles")
+	_storeys_tree_parent.set_metadata(0, "CATEGORY_STOREYS")
 	_muros_tree_parent = _project_tree.create_item(ifc)
 	_muros_tree_parent.set_text(0, "Muros")
 	_muros_tree_parent.set_metadata(0, "CATEGORY_MUROS")
@@ -2091,10 +2112,16 @@ func _on_project_tree_item_selected() -> void:
 	if item == null:
 		return
 	var md: Variant = item.get_metadata(0)
+	if md is String and String(md).begins_with(IFC_STOREY_TREE_META):
+		var g: String = String(md).substr(IFC_STOREY_TREE_META.length())
+		_select_storey_datum_in_view(g)
+		_log_label.text = "Nivel IFC (árbol): %s" % g
+		return
 	if md is String and String(md) == "VIEW_3D":
 		_view_tabs_bar.current_tab = 0
 		_on_view_tabs_changed(0)
 		_project_view.clear_selection()
+		_clear_storey_datum_ui_only()
 		_refresh_properties_panel()
 		_log_label.text = "Vista activa: Modelado 3D"
 		return
@@ -2117,7 +2144,9 @@ func _is_wall_guid(s: String) -> bool:
 func _sync_tree_selection(guid: String) -> void:
 	if guid == "":
 		_project_tree.deselect_all()
+		_clear_storey_datum_ui_only()
 		return
+	_clear_storey_datum_ui_only()
 	if _wall_tree_items.has(guid):
 		var it: TreeItem = _wall_tree_items[guid]
 		it.select(0)
@@ -2247,7 +2276,16 @@ func _refresh_properties_panel() -> void:
 			_show_wall_typology_trace_mode()
 		else:
 			_hide_wall_typology_panel()
+		var show_datum: bool = _selected_storey_guid != ""
+		_storey_datum_edit_panel.visible = show_datum
+		if show_datum:
+			_prop_guid_label.text = "GlobalId: %s" % _selected_storey_guid
+			_prop_type_label.text = "Tipo: IfcBuildingStorey (datum)"
+			_prop_dims_label.text = "Cota Z forjado y nombre (edición vía RPC)."
+			_fill_storey_datum_fields_from_cache()
 		return
+	_storey_datum_edit_panel.visible = false
+	_clear_storey_datum_ui_only()
 	var is_wall: bool = _wall_tree_items.has(guid)
 	var is_slab: bool = _slab_tree_items.has(guid)
 	_prop_guid_label.text = "GlobalId: %s" % guid
@@ -2568,6 +2606,7 @@ func _apply_work_plane_elevation_m(z: float) -> void:
 
 
 func _populate_storey_option_from_storeys_array(storeys: Array) -> void:
+	_storey_row_by_guid.clear()
 	_storey_option_signal_suppress = true
 	_storey_level_option.clear()
 	var max_el: float = -1e9
@@ -2580,6 +2619,8 @@ func _populate_storey_option_from_storeys_array(storeys: Array) -> void:
 			max_el = el
 		var nm: String = str(s.get("name", ""))
 		var guid: String = str(s.get("guid", ""))
+		if not guid.is_empty():
+			_storey_row_by_guid[guid] = (s as Dictionary).duplicate()
 		var idx: int = _storey_level_option.get_item_count()
 		_storey_level_option.add_item("%s (%.2f m)" % [nm, el])
 		_storey_level_option.set_item_metadata(idx, guid)
@@ -2605,7 +2646,107 @@ func _refresh_storey_controls_from_backend() -> void:
 		return
 	var storeys: Array = (res as Dictionary).get("storeys", []) as Array
 	_populate_storey_option_from_storeys_array(storeys)
+	_sync_storey_tree_branch(storeys)
+	_storey_datum_overlay.rebuild(storeys, _workspace_xy_half_cached)
 	_log_label.text = "Niveles IFC: %d nivel(es)." % _storey_level_option.get_item_count()
+
+
+func _sync_storey_tree_branch(storeys: Array) -> void:
+	if _storeys_tree_parent == null:
+		return
+	var ch: TreeItem = _storeys_tree_parent.get_first_child()
+	while ch != null:
+		var nx: TreeItem = ch.get_next()
+		ch.free()
+		ch = nx
+	_storey_tree_items.clear()
+	for item in storeys:
+		if not (item is Dictionary):
+			continue
+		var s: Dictionary = item as Dictionary
+		var guid: String = str(s.get("guid", ""))
+		if guid.is_empty():
+			continue
+		var nm: String = str(s.get("name", ""))
+		var el: float = float(s.get("elevation_m", 0.0))
+		var it: TreeItem = _project_tree.create_item(_storeys_tree_parent)
+		it.set_text(0, "%s (%.2f m)" % [nm, el])
+		it.set_metadata(0, IFC_STOREY_TREE_META + guid)
+		_storey_tree_items[guid] = it
+
+
+func _clear_storey_datum_ui_only() -> void:
+	_selected_storey_guid = ""
+	if _storey_datum_overlay != null:
+		_storey_datum_overlay.set_selected("")
+
+
+func _sync_tree_storey_selection(guid: String) -> void:
+	if guid == "" or not _storey_tree_items.has(guid):
+		return
+	var it: TreeItem = _storey_tree_items[guid] as TreeItem
+	if it != null:
+		it.select(0)
+		_project_tree.scroll_to_item(it)
+
+
+func _select_storey_datum_in_view(guid: String) -> void:
+	if guid == "":
+		return
+	if _wall_tool.is_active():
+		_wall_tool.deactivate()
+		_kb_wall_cursor_ready = false
+		_restore_view2d_mode_after_wall()
+		_set_wall_trace_mode(false)
+	_selected_storey_guid = guid
+	_project_view.clear_selection()
+	if _is_edit_mode_active():
+		_exit_edit_mode("")
+	if _storey_datum_overlay != null:
+		_storey_datum_overlay.set_selected(guid)
+	_sync_tree_storey_selection(guid)
+	_refresh_properties_panel()
+
+
+func _fill_storey_datum_fields_from_cache() -> void:
+	var row: Variant = _storey_row_by_guid.get(_selected_storey_guid)
+	if row == null or not (row is Dictionary):
+		return
+	var d: Dictionary = row as Dictionary
+	_storey_datum_name.text = str(d.get("name", ""))
+	_storey_datum_elev.value = float(d.get("elevation_m", 0.0))
+
+
+func _on_storey_datum_apply_pressed() -> void:
+	if _selected_storey_guid == "" or not RpcClient.is_connected_to_backend():
+		return
+	call_deferred("_co_storey_datum_apply")
+
+
+func _co_storey_datum_apply() -> void:
+	var g: String = _selected_storey_guid
+	var nm: String = _storey_datum_name.text.strip_edges()
+	if nm.is_empty():
+		_log_label.text = "Nivel: el nombre no puede estar vacío."
+		return
+	var el: float = float(_storey_datum_elev.value)
+	var resp: Dictionary = await RpcClient.call_rpc(
+		"project.update_storey", {"guid": g, "name": nm, "elevation_m": el}
+	)
+	if not is_inside_tree():
+		return
+	if not resp.get("ok", false):
+		_log_label.text = "Actualizar nivel: %s" % str(resp.get("error", ""))
+		return
+	await _refresh_storey_controls_from_backend()
+	_select_storey_datum_in_view(g)
+	_log_label.text = "Nivel IFC actualizado (nombre / cota)."
+
+
+func _on_storey_datum_set_active_pressed() -> void:
+	if _selected_storey_guid == "" or not RpcClient.is_connected_to_backend():
+		return
+	call_deferred("_co_set_active_storey", _selected_storey_guid)
 
 
 func _on_storey_level_option_item_selected(idx: int) -> void:
@@ -2630,6 +2771,7 @@ func _co_set_active_storey(guid: String) -> void:
 	if res is Dictionary:
 		_apply_work_plane_elevation_m(float((res as Dictionary).get("elevation_m", 0.0)))
 	_log_label.text = "Nivel IFC activo (cota Z trabajo %.2f m)." % _work_plane_elevation_m
+	await _refresh_storey_controls_from_backend()
 
 
 func _on_add_storey_button_pressed() -> void:
@@ -2795,7 +2937,13 @@ func _apply_project_open_result(res: Dictionary) -> void:
 		_workspace_xy_half_cached = Vector2(float(ws[0]), float(ws[1]))
 	_refresh_workspace_hud()
 	var storeys: Array = res.get("storeys", []) as Array
+	_selected_storey_guid = ""
+	if _storey_datum_overlay != null:
+		_storey_datum_overlay.set_selected("")
 	_populate_storey_option_from_storeys_array(storeys)
+	_sync_storey_tree_branch(storeys)
+	if _storey_datum_overlay != null:
+		_storey_datum_overlay.rebuild(storeys, _workspace_xy_half_cached)
 	_sync_trace_defaults_to_wall_tool()
 	_project_view.clear_selection()
 	_refresh_properties_panel()
@@ -3060,6 +3208,12 @@ func _on_viewport_container_gui_input(event: InputEvent) -> void:
 				_push_pull_tool.handle_viewport_click(pos)
 			else:
 				var picked: String = _project_view.pick_entity_at_screen(_camera, pos)
+				if picked == "":
+					var sg: String = _storey_datum_overlay.pick_grip_at_screen(_camera, pos)
+					if sg != "":
+						_select_storey_datum_in_view(sg)
+						_viewport_container.get_viewport().set_input_as_handled()
+						return
 				var is_double_click: bool = mb.double_click and picked != ""
 				_sync_tree_selection(picked)
 				if _is_edit_mode_active() and picked != _edit_mode_guid:

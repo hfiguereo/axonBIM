@@ -72,7 +72,7 @@ Adoptamos un **MVP en dos frentes** que deben compartir el mismo modelo de datos
 
 ## Plan de implementación (opcional)
 
-- [ ] Fase datum: RPC de lectura/actualización de `IfcBuildingStorey` ya existente; añadir representación 2D/3D + selección + grips; ampliar Propiedades y Browser.
+- [x] Fase datum (MVP): RPC ``project.update_storey``; representación 3D + grip seleccionable; panel Propiedades y rama **Niveles** en el Project Browser. (Pendiente: grips en alzado/vistas 2D y edición por arrastre.)
 - [ ] Fase marca: esquema de `ViewMarker` (o nombre acordado) en estado de proyecto; UI en planta; creación/actualización de vista ortográfica vinculada; documentar en protocolo RPC.
 - [ ] Tests: unitarios backend para validación de elevación/nombre; GUT o pruebas manuales de flujo en Godot según `AGENTS.md`.
 - [ ] Revisión post-MVP: si las marcas deben exportarse a IFC, ADR de seguimiento o extensión de este documento.

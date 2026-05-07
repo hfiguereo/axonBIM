@@ -117,7 +117,8 @@ func clear_edit_target() -> void:
 
 
 func pick_entity_at_screen(camera: Camera3D, screen_pos: Vector2) -> String:
-	var hit: Dictionary = _raycast_hit(camera, screen_pos)
+	## Solo capa 1 (mallas IFC); los grips de nivel usan otra capa (ver ``storey_datum_overlay.gd``).
+	var hit: Dictionary = _raycast_hit(camera, screen_pos, 1)
 	if hit.is_empty():
 		set_selection("")
 		return ""
@@ -128,7 +129,7 @@ func pick_entity_at_screen(camera: Camera3D, screen_pos: Vector2) -> String:
 
 ## ``{ "ok", "guid", "topo_id", "normal", "position", "face_index" }`` o ``{ "ok": false }``.
 func pick_face_at_screen(camera: Camera3D, screen_pos: Vector2) -> Dictionary:
-	var hit: Dictionary = _raycast_hit(camera, screen_pos)
+	var hit: Dictionary = _raycast_hit(camera, screen_pos, 1)
 	if hit.is_empty():
 		return {"ok": false}
 	var guid: String = _guid_from_collider(hit.get("collider"))
@@ -456,7 +457,9 @@ func _strip_physics_children(mi: MeshInstance3D) -> void:
 		c.queue_free()
 
 
-func _raycast_hit(camera: Camera3D, screen_pos: Vector2) -> Dictionary:
+func _raycast_hit(
+	camera: Camera3D, screen_pos: Vector2, collision_mask: int = 0xFFFFFFFF
+) -> Dictionary:
 	if camera == null:
 		return {}
 	var w3d: World3D = get_world_3d()
@@ -467,6 +470,7 @@ func _raycast_hit(camera: Camera3D, screen_pos: Vector2) -> Dictionary:
 	var target: Vector3 = origin + camera.project_ray_normal(screen_pos) * PICK_RAY_LENGTH_M
 	var pq: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, target)
 	pq.collide_with_bodies = true
+	pq.collision_mask = collision_mask
 	return space.intersect_ray(pq)
 
 

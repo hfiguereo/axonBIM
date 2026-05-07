@@ -9,6 +9,7 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Añadido
 
+- RPC ``project.update_storey`` (nombre y/o cota de ``IfcBuildingStorey``). En Godot: datums de nivel en vista 3D (perímetro en plano XY, etiqueta, grip seleccionable), rama **Niveles** en el Project Browser y panel de edición en Propiedades.
 - RPC ``ifc.create_wall_opening``: hueco rectangular en muro (``IfcOpeningElement`` + ``IfcRelVoidsElement``) y malla con huecos en caras ±n; campo ``tri_logical_face`` en ``mesh`` para Push/Pull coherente.
 - RPC ``ifc.create_slab``: losa prismática convexa CCW (``IfcSlab``); historial ``create_slab`` / ``delete_slab``; UI Propiedades «Hueco demo» / «Losa demo»; ``ifc.delete`` borra muros o losas indexadas.
 - RPC `project.open` (`IfcSession.open_existing`): carga `.ifc` desde disco, rehidrata muros **caja** en `topo_registry`, vacía historial y fija ámbito SQLite a la ruta del archivo. UI cinta **Abrir IFC…**; muros no interpretables se omiten (`walls_skipped`).
@@ -24,6 +25,7 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Documentación
 
+- [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md): método ``project.update_storey``; [`docs/manual-de-axonbim.md`](docs/manual-de-axonbim.md): fila **Datums de nivel (3D)**.
 - Manual y [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md): `join_end_guid`, cierre de habitación en **Crear muro**; export DXF y capas `AXON_*`; niveles IFC (`project.list_storeys`, etc.) y cota Z del nivel activo en **Crear muro**; `project.open` y nota de ámbito/historial; `ifc.create_wall_opening`, `ifc.create_slab` y campo `tri_logical_face` en mallas.
 - [`docs/ui/UI-inspiration-notes.md`](docs/ui/UI-inspiration-notes.md): trazabilidad diseño cinta / docks (ideas del boceto RTF y equivalencias en `develop`).
 - Sub-hitos **SH-F2-11…13** (niveles, huecos, losas) en [`docs/roadmap/fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md); enlace SH-F3-04 → SH-F2-12.

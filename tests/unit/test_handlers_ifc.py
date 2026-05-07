@@ -279,3 +279,4 @@ async def test_register_project_handlers_exposes_save() -> None:
     assert "project.list_storeys" in methods
     assert "project.create_storey" in methods
     assert "project.open" in methods
+    assert "project.update_storey" in methods

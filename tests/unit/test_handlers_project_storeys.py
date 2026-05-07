@@ -1,5 +1,5 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
-"""Tests de ``project.list_storeys`` / ``create_storey`` / ``set_active_storey``."""
+"""Tests de ``project.list_storeys`` / ``create_storey`` / ``set_active_storey`` / ``update_storey``."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from axonbim.handlers import ifc as ifc_handlers
 from axonbim.handlers import project as project_handlers
 from axonbim.ifc.session import get_session, reset_session
+from axonbim.rpc.dispatcher import RpcError
 
 
 @pytest.fixture(autouse=True)
@@ -75,3 +76,39 @@ async def test_storeys_survive_ifc_roundtrip_on_disk(tmp_path) -> None:  # type:
     assert len(storeys) == 2
     assert abs(float(storeys[0].Elevation or 0.0)) < 1e-6
     assert abs(float(storeys[1].Elevation or 0.0) - 6.0) < 1e-6
+
+
+async def test_update_storey_name_and_elevation() -> None:
+    lst = await project_handlers.list_storeys({})
+    guid = str(lst["storeys"][0]["guid"])
+    out = await project_handlers.update_storey(
+        {"guid": guid, "name": "Rebautizado", "elevation_m": 0.55}
+    )
+    assert out["guid"] == guid
+    assert out["name"] == "Rebautizado"
+    assert out["elevation_m"] == 0.55
+    lst2 = await project_handlers.list_storeys({})
+    row = next(s for s in lst2["storeys"] if str(s["guid"]) == guid)
+    assert row["name"] == "Rebautizado"
+    assert row["elevation_m"] == 0.55
+
+
+async def test_update_storey_name_only() -> None:
+    lst = await project_handlers.list_storeys({})
+    guid = str(lst["storeys"][0]["guid"])
+    await project_handlers.update_storey({"guid": guid, "name": "Sólo etiqueta"})
+    lst2 = await project_handlers.list_storeys({})
+    row = next(s for s in lst2["storeys"] if str(s["guid"]) == guid)
+    assert row["name"] == "Sólo etiqueta"
+
+
+async def test_update_storey_rejects_empty_mutation() -> None:
+    lst = await project_handlers.list_storeys({})
+    guid = str(lst["storeys"][0]["guid"])
+    with pytest.raises(ValidationError):
+        await project_handlers.update_storey({"guid": guid})
+
+
+async def test_update_storey_unknown_guid_raises() -> None:
+    with pytest.raises(RpcError):
+        await project_handlers.update_storey({"guid": "0" * 22, "name": "X"})

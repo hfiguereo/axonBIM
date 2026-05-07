@@ -191,6 +191,7 @@ El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 | `project.list_storeys` | `{}` | `{ "storeys": [ { "guid": "...", "name": "...", "elevation_m": <float>, "is_active": <bool> }, ... ] }` — niveles ``IfcBuildingStorey`` del edificio; el activo recibe nuevos muros. |
 | `project.create_storey` | `{ "name": "...", "elevation_m": <float> }` | `{ "guid": "...", "name": "...", "elevation_m": <float> }` |
 | `project.set_active_storey` | `{ "guid": "<GlobalId IfcBuildingStorey>" }` | `{ "ok": true, "guid": "...", "elevation_m": <float> }` |
+| `project.update_storey` | `{ "guid": "<GlobalId>", "name": "<opcional>", "elevation_m": <opcional> }` — al menos uno de ``name`` o ``elevation_m`` (no ambos omitidos). | `{ "guid": "...", "name": "...", "elevation_m": <float> }` |
 | `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...} \| null, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" \| "unsupported:..." }` |
 | `history.redo` | `{}` | Igual criterio que `history.undo`. |
 | `project.set_state` | `{ "state": "WIP\|Shared\|Published", "comment": "..." }` | `{ "ok": true, "snapshot_path": "..." }` |
