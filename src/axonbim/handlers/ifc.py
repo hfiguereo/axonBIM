@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from axonbim.geometry import topo_registry
 from axonbim.geometry.topology import Vec3
 from axonbim.geometry.wall_spec import WallSpec
+from axonbim.history import recording
+from axonbim.history import sqlite_store as history_store
 from axonbim.ifc import wall as wall_module
 from axonbim.ifc.session import get_session
 from axonbim.rpc.dispatcher import Dispatcher, RpcError
@@ -48,11 +50,31 @@ class CreateWallParams(BaseModel):
         default=None,
         description="GUID previo opcional para auto-cierre de esquina en cadena.",
     )
+    join_end_guid: str | None = Field(
+        default=None,
+        description=(
+            "GUID del primer muro del contorno cuando ``p2`` cierra el polígono en su ``p1``; "
+            "ajuste simétrico al de ``join_with_guid`` en el extremo final."
+        ),
+    )
 
 
 _CHAIN_JOIN_EPS_M: float = 1e-4
 _CHAIN_PERP_DOT_MAX: float = 0.15
 _DIR_NORM_EPS_M: float = 1e-9
+
+
+def _wall_history_snapshot(guid: str) -> dict[str, Any]:
+    """Serializa muro actual para la pila de deshacer (vacío si no está indexado)."""
+    spec = topo_registry.get_wall_spec(guid)
+    mesh = topo_registry.mesh_for_guid(guid)
+    if spec is None or mesh is None:
+        return {}
+    return {
+        "guid": guid,
+        "wall_spec": spec.to_dict(),
+        "mesh": mesh.to_dict(),
+    }
 
 
 def _normalize_xy(dx: float, dy: float) -> tuple[float, float] | None:
@@ -103,6 +125,64 @@ def _adjust_corner_closure_if_chain(
     return (p1_adjusted, p2)
 
 
+def _adjust_loop_closure_at_p2(
+    p1: Vec3,
+    p2: Vec3,
+    args: CreateWallParams,
+) -> tuple[Vec3, Vec3]:
+    """Extiende ``p2`` medio espesor en giros ~90° al coincidir con el ``p1`` del muro inicial.
+
+    Cierra el hueco visual en la última esquina al volver al primer vértice del contorno
+    (habitación rectangular u poligonal ortogonal). Requiere ``join_end_guid`` registrado y
+    ``p2`` alineado con ``first.p1`` en planta.
+
+    Args:
+        p1: Inicio del muro nuevo (posiblemente ya ajustado por cadena).
+        p2: Fin nominal del muro nuevo (debe coincidir con el ``p1`` del muro de cierre).
+        args: Parámetros RPC; usa ``join_end_guid`` y ``thickness``.
+
+    Returns:
+        ``(p1, p2)`` con ``p2`` extendido sobre el eje del segmento si aplica.
+
+    Raises:
+        RpcError: Si ``join_end_guid`` no resuelve un muro o ``p2`` no encaja en el cierre.
+    """
+    if not args.join_end_guid:
+        return (p1, p2)
+    first: WallSpec | None = topo_registry.get_wall_spec(args.join_end_guid)
+    if first is None:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            f"join_end_guid no registrado: {args.join_end_guid!r}",
+        )
+    if abs(first.p1[0] - p2[0]) > _CHAIN_JOIN_EPS_M or abs(first.p1[1] - p2[1]) > _CHAIN_JOIN_EPS_M:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            "join_end_guid: p2 debe coincidir con el p1 del muro indicado (cierre de contorno).",
+        )
+    first_dir = _normalize_xy(first.p2[0] - first.p1[0], first.p2[1] - first.p1[1])
+    new_dir = _normalize_xy(p2[0] - p1[0], p2[1] - p1[1])
+    if first_dir is None or new_dir is None:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            "join_end_guid: dirección del segmento o del muro inicial degenerada.",
+        )
+    dot_abs: float = abs(first_dir[0] * new_dir[0] + first_dir[1] * new_dir[1])
+    if dot_abs > _CHAIN_PERP_DOT_MAX:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            "join_end_guid: el cierre requiere esquina ~90° respecto al primer muro.",
+        )
+    effective_t: float = max(0.01, min(args.thickness, first.thickness))
+    back: float = effective_t * 0.5
+    p2_adjusted: Vec3 = (
+        p2[0] + new_dir[0] * back,
+        p2[1] + new_dir[1] * back,
+        p2[2],
+    )
+    return (p1, p2_adjusted)
+
+
 class GetWallSpecParams(BaseModel):
     """Parametros de ``ifc.get_wall_spec``."""
 
@@ -146,6 +226,7 @@ async def create_wall(params: dict[str, Any]) -> dict[str, Any]:
     args = CreateWallParams.model_validate(params)
 
     p1, p2 = _adjust_corner_closure_if_chain(args)
+    p1, p2 = _adjust_loop_closure_at_p2(p1, p2, args)
     session = get_session()
     session.workspace_xy.ensure_contains_segment_plan(p1[0], p1[1], p2[0], p2[1])
     try:
@@ -170,6 +251,12 @@ async def create_wall(params: dict[str, Any]) -> dict[str, Any]:
             thickness=args.thickness,
         ),
     )
+    if not recording.is_suppressed():
+        history_store.push_undo(
+            "create_wall",
+            {"guid": result.guid},
+            clear_redo=True,
+        )
     return {
         "guid": result.guid,
         "mesh": result.mesh.to_dict(),
@@ -198,6 +285,17 @@ async def set_wall_typology(params: dict[str, Any]) -> dict[str, Any]:
             ErrorCode.INVALID_PARAMS,
             f"No hay WallSpec para el guid {args.guid!r}.",
         )
+    mesh0 = topo_registry.mesh_for_guid(args.guid)
+    if mesh0 is None:
+        raise RpcError(
+            ErrorCode.INVALID_PARAMS,
+            f"No hay malla registrada para el guid {args.guid!r}.",
+        )
+    old_payload: dict[str, Any] = {
+        "guid": args.guid,
+        "wall_spec": old.to_dict(),
+        "mesh": mesh0.to_dict(),
+    }
     new_spec = WallSpec(
         p1=old.p1,
         p2=old.p2,
@@ -205,6 +303,8 @@ async def set_wall_typology(params: dict[str, Any]) -> dict[str, Any]:
         thickness=args.thickness,
     )
     session = get_session()
+    if not recording.is_suppressed():
+        history_store.push_undo("set_wall_typology", old_payload, clear_redo=True)
     try:
         result = wall_module.update_wall_geometry(session, args.guid, new_spec)
     except ValueError as exc:
@@ -218,6 +318,9 @@ async def set_wall_typology(params: dict[str, Any]) -> dict[str, Any]:
 async def delete_product(params: dict[str, Any]) -> dict[str, Any]:
     """Elimina un ``IfcWall`` (u otro producto soportado por ``remove_product``) de la sesion."""
     args = DeleteParams.model_validate(params)
+    snap = _wall_history_snapshot(args.guid)
+    if snap and not recording.is_suppressed():
+        history_store.push_undo("delete_wall", snap, clear_redo=True)
     session = get_session()
     try:
         wall_module.delete_wall(session, args.guid)

@@ -8,6 +8,7 @@ from typing import Any
 from axonbim.geometry import topo_registry
 from axonbim.geometry.meshing import Mesh
 from axonbim.geometry.wall_spec import WallSpec
+from axonbim.history import recording
 from axonbim.history import sqlite_store as history_store
 from axonbim.ifc import wall as wall_module
 from axonbim.ifc.session import get_session
@@ -57,38 +58,91 @@ def _apply_wall_snapshot(data: dict[str, Any]) -> dict[str, Any]:
     return {"applied": True, "guid": guid, "mesh": mesh.to_dict(), "topo_map": topo_map}
 
 
+def _delete_wall_core(guid: str) -> None:
+    session = get_session()
+    wall_module.delete_wall(session, guid)
+    topo_registry.unregister_guid(guid)
+
+
+def _restore_wall_core(data: dict[str, Any]) -> dict[str, Any]:
+    guid = str(data["guid"])
+    spec = WallSpec.from_dict(data["wall_spec"])
+    session = get_session()
+    name = data.get("name")
+    name_str: str | None = str(name) if isinstance(name, str) else None
+    result = wall_module.restore_wall(session, guid, spec, name=name_str)
+    topo_registry.register_mesh(result.guid, result.mesh)
+    topo_registry.register_wall_spec(result.guid, spec)
+    mesh = result.mesh
+    return {"applied": True, "guid": guid, "mesh": mesh.to_dict(), "topo_map": {}}
+
+
 async def undo(_params: dict[str, Any]) -> dict[str, Any]:
-    """Deshace la ultima operacion apilada (hoy: ``extrude_face``)."""
+    """Deshace la ultima operacion apilada para el ámbito de historial activo."""
     popped = history_store.pop_undo()
     if popped is None:
         return {"applied": False, "reason": "empty"}
 
     kind, data = popped
-    if kind != "extrude_face":
-        return {"applied": False, "reason": f"unsupported:{kind}"}
+    if kind in {"extrude_face", "set_wall_typology"}:
+        redo_payload = _snapshot_current_wall(str(data["guid"]))
+        result = _apply_wall_snapshot(data)
+        if redo_payload:
+            history_store.push_redo(kind, redo_payload)
+        return result
 
-    redo_payload = _snapshot_current_wall(str(data["guid"]))
-    result = _apply_wall_snapshot(data)
-    if redo_payload:
-        history_store.push_redo(kind, redo_payload)
-    return result
+    if kind == "delete_wall":
+        result = _restore_wall_core(data)
+        history_store.push_redo("redo_delete_wall", {"guid": str(data["guid"])})
+        return result
+
+    if kind == "create_wall":
+        guid = str(data["guid"])
+        snap = _snapshot_current_wall(guid)
+        if not snap:
+            return {"applied": False, "reason": "missing_wall", "guid": guid}
+        with recording.suppressed():
+            _delete_wall_core(guid)
+        history_store.push_redo("recreate_wall", snap)
+        return {"applied": True, "guid": guid, "mesh": None, "topo_map": {}}
+
+    return {"applied": False, "reason": f"unsupported:{kind}"}
 
 
 async def redo(_params: dict[str, Any]) -> dict[str, Any]:
-    """Reaplica la ultima operacion deshecha (hoy: ``extrude_face``)."""
+    """Reaplica la ultima operacion deshecha."""
     popped = history_store.pop_redo()
     if popped is None:
         return {"applied": False, "reason": "empty"}
 
     kind, data = popped
-    if kind != "extrude_face":
-        return {"applied": False, "reason": f"unsupported:{kind}"}
+    if kind in {"extrude_face", "set_wall_typology"}:
+        undo_payload = _snapshot_current_wall(str(data["guid"]))
+        result = _apply_wall_snapshot(data)
+        if undo_payload:
+            history_store.push_undo(kind, undo_payload, clear_redo=False)
+        return result
 
-    undo_payload = _snapshot_current_wall(str(data["guid"]))
-    result = _apply_wall_snapshot(data)
-    if undo_payload:
-        history_store.push_undo(kind, undo_payload, clear_redo=False)
-    return result
+    if kind == "redo_delete_wall":
+        guid = str(data["guid"])
+        snap = _snapshot_current_wall(guid)
+        if not snap:
+            return {"applied": False, "reason": "missing_wall", "guid": guid}
+        with recording.suppressed():
+            _delete_wall_core(guid)
+        history_store.push_undo("delete_wall", snap, clear_redo=False)
+        return {"applied": True, "guid": guid, "mesh": None, "topo_map": {}}
+
+    if kind == "recreate_wall":
+        result = _restore_wall_core(data)
+        history_store.push_undo(
+            "create_wall",
+            {"guid": str(data["guid"])},
+            clear_redo=False,
+        )
+        return result
+
+    return {"applied": False, "reason": f"unsupported:{kind}"}
 
 
 def register(dispatcher: Dispatcher) -> None:

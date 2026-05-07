@@ -110,6 +110,11 @@ Motivación. Issue que resuelve, decisión arquitectónica, etc.
 - [ ] Documentación actualizada si cambia API pública o protocolo RPC.
 - [ ] Aprobación del BDFL (Arq. Hector Figuereo) para cambios arquitectónicos.
 
+## Verificación local y plataforma
+
+- **Referencia del tronco:** Linux (CI en GitHub Actions). Comandos canónicos: `uv run pytest -q`, `uv run ruff check .`, `uv run mypy --strict src/`.
+- **Tests de integración RPC** (`tests/integration/test_rpc_*.py`, `test_wall_roundtrip.py`): usan **socket Unix** donde el SO lo permite. En **macOS** o **Windows** pueden fallar por timing o ausencia de `asyncio.start_unix_server`; no implican por sí solos regresión en Linux. Smoke sin integración: `uv run pytest -q tests/unit/`.
+
 ## Código
 
 - Sigue las reglas en `.cursor/rules/`. No las repetimos aquí.

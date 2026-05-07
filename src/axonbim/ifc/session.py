@@ -114,6 +114,7 @@ def get_session() -> IfcSession:
     with _SESSION_LOCK:
         if _SESSION is None:
             _SESSION = IfcSession.create_new()
+            history_store.set_scope(history_store.SCOPE_UNSAVED)
         return _SESSION
 
 
@@ -124,3 +125,4 @@ def reset_session() -> None:
         _SESSION = None
     topo_registry.clear()
     history_store.clear()
+    history_store.set_scope(history_store.SCOPE_UNSAVED)

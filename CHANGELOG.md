@@ -7,6 +7,27 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Añadido
+
+- Parámetro RPC opcional ``join_end_guid`` en ``ifc.create_wall``: ajuste de **cierre de habitación** (extiende ``p2`` cuando vuelve al primer muro del contorno, ortogonal). Herramienta Godot **Crear muro**: snap al primer vértice (~0,45 m) y envío de ``join_end_guid``.
+- Convención interna de **capas DXF** arquitectónicas (``DXF_ARCH_LAYER_SPECS``, prefijo ``AXON_*`` reservado); el export de muros **registra** todas las capas canónicas aunque solo escriba geometría en ``WALLS``; test de lectura DXF en ``test_handlers_draw.py``.
+- Historial SQLite por **ámbito** (`__unsaved__` hasta el primer `project.save`, luego ruta canónica del `.ifc`); migración automática columna `scope` en `session_history.db`.
+- Operaciones en **deshacer/rehacer**: `create_wall`, `delete_wall`, `set_wall_typology` además de `geom.extrude_face`; restauración de muro borrado con el mismo `GlobalId` (`restore_wall`).
+- Módulo `axonbim.history.recording` (`suppressed`) para no re-apilar al aplicar historial.
+- Doc [`docs/architecture/draw-delivery-layers.md`](docs/architecture/draw-delivery-layers.md) (evolución Fase 3 capas).
+- Doc [`docs/architecture/geometry-analytical-vs-ocp.md`](docs/architecture/geometry-analytical-vs-ocp.md) para contribuyentes.
+- Tests unitarios `tests/unit/test_history_extended.py`; tests de persistencia/estrés de historial (entradas previas de esta sección).
+
+### Documentación
+
+- Manual y [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md): `join_end_guid`, cierre de habitación en **Crear muro**; export DXF y capas `AXON_*`.
+- Manual: §2.1 **runbook** de fallos RPC / historial por archivo; tabla `project.save` y notas de `history.*` en [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) (plataforma e integración RPC).
+- Cierre documental **Fase 2** e inventario Fases 3–4: [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md), [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md); índice [`docs/phase-reports/README.md`](docs/phase-reports/README.md); desglose ROADMAP [`docs/roadmap/README.md`](docs/roadmap/README.md), plantilla [`docs/roadmap/00-guia-estructura-subhitos.md`](docs/roadmap/00-guia-estructura-subhitos.md). [`ROADMAP.md`](ROADMAP.md) alineado (SQLite, criterio 50+ muros).
+
+### Cambiado
+
+- `project.save` actualiza el ámbito del historial a la ruta del IFC guardado.
+
 ## [0.1.0-alpha.2] — 2026-05-07
 
 Segunda alpha técnica: **vistas 2D** (`draw.ortho_snapshot` analítico u OCP, canvas OCC), **export DXF de muros**, **UI** (tema raíz, subventanas nativas, EventBus piloto, ViewportManager), **worker Godot headless** opcional (ADR-0003, puerto auxiliar) y **ROADMAP** actualizado frente al tronco real.

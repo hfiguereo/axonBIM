@@ -48,6 +48,77 @@ async def test_create_wall_expands_workspace_xy_half_extents() -> None:
     assert hy >= 50.0 - 1e-5
 
 
+async def test_create_wall_loop_close_adjusts_p2_at_first_wall() -> None:
+    """El último tramo perpendicular al primero extiende ``p2`` como en esquinas en cadena."""
+    first = await ifc_handlers.create_wall(
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.20,
+        }
+    )
+    first_guid = str(first["guid"])
+    second = await ifc_handlers.create_wall(
+        {
+            "p1": {"x": 4.0, "y": 0.0},
+            "p2": {"x": 4.0, "y": 3.0},
+            "height": 3.0,
+            "thickness": 0.20,
+            "join_with_guid": first_guid,
+        }
+    )
+    second_guid = str(second["guid"])
+    third = await ifc_handlers.create_wall(
+        {
+            "p1": {"x": 4.0, "y": 3.0},
+            "p2": {"x": 0.0, "y": 3.0},
+            "height": 3.0,
+            "thickness": 0.20,
+            "join_with_guid": second_guid,
+        }
+    )
+    third_guid = str(third["guid"])
+    fourth = await ifc_handlers.create_wall(
+        {
+            "p1": {"x": 0.0, "y": 3.0},
+            "p2": {"x": 0.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.20,
+            "join_with_guid": third_guid,
+            "join_end_guid": first_guid,
+        }
+    )
+    fourth_guid = str(fourth["guid"])
+    spec = await ifc_handlers.get_wall_spec({"guid": fourth_guid})
+    ws = spec["wall_spec"]
+    assert abs(float(ws["p2"]["x"]) - 0.0) < 1e-6
+    assert abs(float(ws["p2"]["y"]) + 0.1) < 1e-6
+
+
+async def test_create_wall_join_end_rejects_non_coincident_p2() -> None:
+    first = await ifc_handlers.create_wall(
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 2.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        }
+    )
+    first_guid = str(first["guid"])
+    with pytest.raises(RpcError) as exc_info:
+        await ifc_handlers.create_wall(
+            {
+                "p1": {"x": 0.0, "y": 2.0},
+                "p2": {"x": 0.0, "y": 0.5},
+                "height": 3.0,
+                "thickness": 0.2,
+                "join_end_guid": first_guid,
+            }
+        )
+    assert exc_info.value.code == ErrorCode.INVALID_PARAMS
+
+
 async def test_create_wall_chain_join_adjusts_p1_on_perpendicular_corner() -> None:
     first = await ifc_handlers.create_wall(
         {

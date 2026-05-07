@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import ezdxf
 import pytest
 from pydantic import ValidationError
 
+from axonbim.drawing.layer_ids import arch_layer_names
 from axonbim.handlers import draw as draw_handlers
 from axonbim.handlers import ifc as ifc_handlers
 from axonbim.ifc.session import reset_session
@@ -152,3 +154,6 @@ async def test_draw_export_dxf_walls_writes_file(tmp_path) -> None:
     assert out["segment_count"] > 0
     assert out_path.is_file()
     assert out_path.stat().st_size > 32
+    doc = ezdxf.readfile(str(out_path))
+    for layer_name in arch_layer_names():
+        assert layer_name in doc.layers

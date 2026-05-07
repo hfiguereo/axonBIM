@@ -7,7 +7,8 @@ extends Node
 ## obtiene por intersección de rayo con ese plano (la cámara solo proyecta, no redefine el mundo). En
 ## **vista 2D OCC** la referencia inmediata es la geometría de la propia vista (suelo/forjado de ese
 ## datum), no el raycast de la cámara 3D. Inverencia tipo Revit/SketchUp (snap **X/Y**; **Alt+clic** =
-## nuevo P1).
+## nuevo P1). Al acercar el último **P2** al **primer vértice** del trazo (≈0,45 m), se acopla el cierre
+## de habitación y el backend aplica el mismo tipo de ajuste de esquina que en la cadena (`join_end_guid`).
 
 signal wall_created(guid: String, workspace_half_xy: Vector2)
 signal tool_cancelled
@@ -21,6 +22,8 @@ const MIN_SEGMENT_M: float = 0.05
 const SNAP_LOCK_THRESHOLD_DEG: float = 14.0
 const SNAP_UNLOCK_THRESHOLD_DEG: float = 24.0
 const SNAP_MIN_LOCK_DISTANCE_M: float = 0.22
+## Radio en planta para acoplar el **último** P2 al primer vértice del contorno (cierre de habitación).
+const CLOSE_LOOP_SNAP_M: float = 0.45
 
 ## Cota Z del forjado de nivel base (00). Sin sistema de niveles ni desfases aún; debe coincidir con
 ## la constante homónima en ``main_scene.gd``.
@@ -41,6 +44,8 @@ var _mat_axes: StandardMaterial3D
 var _mat_preview: StandardMaterial3D
 var _last_created_guid: String = ""
 var _axis_lock: String = ""
+var _loop_first_wall_guid: String = ""
+var _loop_anchor_world: Vector3 = Vector3.ZERO
 
 
 func _log_info(message: String) -> void:
@@ -80,6 +85,8 @@ func activate() -> void:
 	_preview_end_world = Vector3.ZERO
 	_last_created_guid = ""
 	_axis_lock = ""
+	_loop_first_wall_guid = ""
+	_loop_anchor_world = Vector3.ZERO
 	_ensure_overlay()
 	_redraw_overlay()
 	_log_info("Crear muro: activo. P1+P2 primera vez; luego continuan desde ultimo extremo.")
@@ -97,6 +104,8 @@ func deactivate() -> void:
 	_preview_end_world = Vector3.ZERO
 	_last_created_guid = ""
 	_axis_lock = ""
+	_loop_first_wall_guid = ""
+	_loop_anchor_world = Vector3.ZERO
 	_destroy_overlay()
 	draft_hint_changed.emit("")
 	tool_cancelled.emit()
@@ -126,6 +135,8 @@ func reset_draft() -> void:
 	_preview_end_world = Vector3.ZERO
 	_last_created_guid = ""
 	_axis_lock = ""
+	_loop_first_wall_guid = ""
+	_loop_anchor_world = Vector3.ZERO
 	_ensure_overlay()
 	_redraw_overlay()
 	draft_hint_changed.emit(
@@ -144,7 +155,8 @@ func handle_viewport_motion(screen_pos: Vector2) -> void:
 	var raw: Variant = _project_ray_to_z_plane(screen_pos)
 	if raw == null:
 		return
-	_preview_end_world = _snap_second_point(_first_point, raw as Vector3)
+	var snapped: Vector3 = _snap_second_point(_first_point, raw as Vector3)
+	_preview_end_world = _maybe_snap_loop_close_xy(snapped)
 	_redraw_overlay()
 	_emit_length_hint()
 
@@ -154,7 +166,8 @@ func handle_viewport_motion_world_floor(point_world_xy: Vector3) -> void:
 	if not _active or not _has_first:
 		return
 	var raw := Vector3(point_world_xy.x, point_world_xy.y, BASE_STOREY_ELEVATION_M)
-	_preview_end_world = _snap_second_point(_first_point, raw)
+	var snapped: Vector3 = _snap_second_point(_first_point, raw)
+	_preview_end_world = _maybe_snap_loop_close_xy(snapped)
 	_redraw_overlay()
 	_emit_length_hint()
 
@@ -188,6 +201,8 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 		_preview_end_world = _first_point
 		_last_created_guid = ""
 		_axis_lock = ""
+		_loop_first_wall_guid = ""
+		_loop_anchor_world = Vector3.ZERO
 		_redraw_overlay()
 		draft_hint_changed.emit(
 			"P1 reiniciado (Alt) en (%0.2f, %0.2f). Clic siguiente = P2." % [_first_point.x, _first_point.y]
@@ -197,6 +212,10 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 
 	var point: Vector3 = _snap_origin_axes(point_raw)
 	var second_pt: Vector3 = _snap_second_point(_first_point, point)
+	second_pt = _maybe_snap_loop_close_xy(second_pt)
+	var join_end: String = ""
+	if _is_loop_close_snap(second_pt):
+		join_end = _loop_first_wall_guid
 	var seg_len: float = second_pt.distance_to(_first_point)
 	if seg_len < MIN_SEGMENT_M:
 		_log_warn("Segmento demasiado corto; elige P2 más lejos.")
@@ -209,7 +228,7 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 	_axis_lock = ""
 	_preview_end_world = p2
 	_redraw_overlay()
-	await _submit_wall_and_chain(p1, p2, _last_created_guid)
+	await _submit_wall_and_chain(p1, p2, _last_created_guid, join_end)
 
 
 ## Clic con punto ya en plano horizontal (OCC 2D); evita ``project_ray`` del SubViewport 3D.
@@ -236,6 +255,8 @@ func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 		_preview_end_world = _first_point
 		_last_created_guid = ""
 		_axis_lock = ""
+		_loop_first_wall_guid = ""
+		_loop_anchor_world = Vector3.ZERO
 		_redraw_overlay()
 		draft_hint_changed.emit(
 			"P1 reiniciado (Alt) en (%0.2f, %0.2f). Clic siguiente = P2." % [_first_point.x, _first_point.y]
@@ -244,6 +265,10 @@ func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 		return
 	var point: Vector3 = _snap_origin_axes(point_raw)
 	var second_pt: Vector3 = _snap_second_point(_first_point, point)
+	second_pt = _maybe_snap_loop_close_xy(second_pt)
+	var join_end: String = ""
+	if _is_loop_close_snap(second_pt):
+		join_end = _loop_first_wall_guid
 	var seg_len: float = second_pt.distance_to(_first_point)
 	if seg_len < MIN_SEGMENT_M:
 		_log_warn("Segmento demasiado corto; elige P2 más lejos.")
@@ -255,11 +280,12 @@ func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 	_axis_lock = ""
 	_preview_end_world = p2
 	_redraw_overlay()
-	await _submit_wall_and_chain(p1, p2, _last_created_guid)
+	await _submit_wall_and_chain(p1, p2, _last_created_guid, join_end)
 
 
-func _submit_wall_and_chain(p1: Vector3, p2: Vector3, join_with_guid: String) -> void:
-	var ok: bool = await _submit_wall(p1, p2, join_with_guid)
+func _submit_wall_and_chain(p1: Vector3, p2: Vector3, join_with_guid: String, join_end_guid: String) -> void:
+	var was_establishing_loop: bool = _loop_first_wall_guid.is_empty()
+	var ok: bool = await _submit_wall(p1, p2, join_with_guid, join_end_guid)
 	if not ok or not _active:
 		_preview_end_world = Vector3.ZERO
 		if _active:
@@ -267,6 +293,12 @@ func _submit_wall_and_chain(p1: Vector3, p2: Vector3, join_with_guid: String) ->
 		return
 
 	if _active:
+		if join_end_guid != "":
+			_loop_first_wall_guid = ""
+			_loop_anchor_world = Vector3.ZERO
+		elif was_establishing_loop:
+			_loop_first_wall_guid = _last_created_guid
+			_loop_anchor_world = Vector3(p1.x, p1.y, BASE_STOREY_ELEVATION_M)
 		_first_point = Vector3(p2.x, p2.y, BASE_STOREY_ELEVATION_M)
 		_has_first = true
 		_axis_lock = ""
@@ -298,6 +330,24 @@ func _snap_origin_axes(p: Vector3) -> Vector3:
 	if abs(o.y) < SNAP_ORIGIN_M:
 		o.y = 0.0
 	return o
+
+
+func _maybe_snap_loop_close_xy(candidate: Vector3) -> Vector3:
+	if _loop_first_wall_guid.is_empty():
+		return candidate
+	var anchor_xy := Vector2(_loop_anchor_world.x, _loop_anchor_world.y)
+	var cand_xy := Vector2(candidate.x, candidate.y)
+	if anchor_xy.distance_to(cand_xy) <= CLOSE_LOOP_SNAP_M:
+		return Vector3(_loop_anchor_world.x, _loop_anchor_world.y, BASE_STOREY_ELEVATION_M)
+	return candidate
+
+
+func _is_loop_close_snap(second_pt: Vector3) -> bool:
+	if _loop_first_wall_guid.is_empty():
+		return false
+	var anchor_xy := Vector2(_loop_anchor_world.x, _loop_anchor_world.y)
+	var p2_xy := Vector2(second_pt.x, second_pt.y)
+	return anchor_xy.distance_to(p2_xy) < 1e-3
 
 
 func _snap_second_point(from: Vector3, raw: Vector3) -> Vector3:
@@ -351,7 +401,7 @@ func _emit_length_hint() -> void:
 	)
 
 
-func _submit_wall(p1: Vector3, p2: Vector3, join_with_guid: String) -> bool:
+func _submit_wall(p1: Vector3, p2: Vector3, join_with_guid: String, join_end_guid: String) -> bool:
 	var params: Dictionary = {
 		"p1": {"x": p1.x, "y": p1.y, "z": BASE_STOREY_ELEVATION_M},
 		"p2": {"x": p2.x, "y": p2.y, "z": BASE_STOREY_ELEVATION_M},
@@ -360,6 +410,8 @@ func _submit_wall(p1: Vector3, p2: Vector3, join_with_guid: String) -> bool:
 	}
 	if join_with_guid != "":
 		params["join_with_guid"] = join_with_guid
+	if join_end_guid != "":
+		params["join_end_guid"] = join_end_guid
 	var resp: Dictionary = await RpcClient.call_rpc("ifc.create_wall", params)
 	if not is_inside_tree():
 		wall_submit_finished.emit()

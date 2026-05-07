@@ -13,6 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from axonbim.history import sqlite_store as history_store
 from axonbim.ifc.session import get_session
 from axonbim.rpc.dispatcher import Dispatcher, RpcError
 from axonbim.rpc.models import ErrorCode
@@ -47,6 +48,7 @@ async def save(params: dict[str, Any]) -> dict[str, Any]:
 
     size = target.stat().st_size
     _log.info("Proyecto guardado: %s (%d bytes)", target, size)
+    history_store.set_scope(str(target.resolve()))
     return {"path": str(target), "bytes": size}
 
 

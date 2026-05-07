@@ -22,6 +22,8 @@ Punto de entrada estándar para agentes de IA (Cursor, Codex, Claude Code, otros
 
 2. **Documentación de referencia** (no son reglas, son specs):
    - `docs/architecture/jsonrpc-protocol.md` — esquema completo del puente.
+   - `docs/architecture/geometry-analytical-vs-ocp.md` — cuándo el tronco usa geometría analítica vs OCP.
+   - `docs/roadmap/README.md` — desglose por fases (sub-hitos: qué / cómo / por qué); complementa `ROADMAP.md`.
    - `docs/architecture/topological-naming.md` — generación de hashes B-Rep.
    - `docs/architecture/iso-19650.md` — estados y trazabilidad.
    - `docs/normativa/README.md` — índice maestro de normativas (MIVED, MOPC, otros).

@@ -89,6 +89,47 @@ def delete_wall(session: IfcSession, guid: str) -> None:
     _log.info("Muro eliminado: guid=%s", guid)
 
 
+def restore_wall(
+    session: IfcSession,
+    guid: str,
+    spec: WallSpec,
+    *,
+    name: str | None = None,
+) -> WallResult:
+    """Recrea un ``IfcWall`` con un ``GlobalId`` fijo tras un borrado (deshacer ``delete``).
+
+    Args:
+        session: Sesión IFC activa.
+        guid: ``GlobalId`` que debía tener el muro antes de borrarlo.
+        spec: Parámetros de la caja en el instante previo al borrado.
+        name: Nombre de presentación; si es ``None`` se autogenera.
+
+    Returns:
+        ``WallResult`` con el mismo ``guid`` y malla analítica coherente con ``spec``.
+
+    Raises:
+        ValueError: Si ya existe un muro con ese ``guid``.
+    """
+    if _wall_by_guid(session, guid) is not None:
+        raise ValueError(f"Ya existe IfcWall con GlobalId={guid!r}")
+    mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
+    wall_name = name or _next_wall_name(session)
+    wall = session.file.create_entity("IfcWall", GlobalId=str(guid), Name=wall_name)
+    _run(
+        "spatial.assign_container",
+        session.file,
+        relating_structure=session.storey,
+        products=[wall],
+    )
+    length = math.hypot(spec.p2[0] - spec.p1[0], spec.p2[1] - spec.p1[1])
+    _assign_box_representation(
+        session, wall, length=length, thickness=spec.thickness, height=spec.height
+    )
+    _place_wall(session, wall, p1=spec.p1, p2=spec.p2)
+    _log.info("Muro restaurado: guid=%s", guid)
+    return WallResult(guid=str(guid), mesh=mesh)
+
+
 def update_wall_geometry(session: IfcSession, guid: str, spec: WallSpec) -> WallResult:
     """Regenera representacion IFC y malla Godot para un ``IfcWall`` existente."""
     wall = _wall_by_guid(session, guid)

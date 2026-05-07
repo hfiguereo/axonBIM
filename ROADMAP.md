@@ -4,6 +4,8 @@ Hoja de ruta estratégica. Asume una dedicación promedio de **10 horas semanale
 
 > Este documento es planificación de producto, **no** una regla para el agente. El código se evalúa por su correctitud actual, no por la fase del roadmap.
 
+**Desglose operativo (sub-hitos: qué / cómo / por qué):** [`docs/roadmap/README.md`](docs/roadmap/README.md).
+
 ---
 
 ## Principios de modelado
@@ -33,7 +35,9 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 | **DXF** | `draw.export_dxf_walls` (proyección analítica de muros, capa `WALLS`) | Distinto de planta normada CCRD §3.7. |
 | **Godot UI** | Cinta, pestañas de vista (modelado + 2D), docks desacoplables, vista flotante, tema `axon_theme.tres`, subventanas nativas (`embed_subwindows`), `EventBus` (piloto), `ViewportManager` (política de render del `SubViewport`) | Mejora producto sin cambiar la autoridad del backend. |
 | **Worker headless** | Proceso Godot opcional en **puerto auxiliar** (`5800` default), métodos `worker.*` piloto; `WorkerManager` en Python; **ADR-0003** | Solo tareas **auxiliares** serializables; **no** sustituye IfcOpenShell/OCP como fuente de verdad. |
-| **Modelado** | Crear muro, tipologías, Push/Pull, edición por elemento, `geom.extrude_face` con estadísticas OCP, `history.undo` / `history.redo`, malla analítica + ruta B-Rep en evolución | Fase 2 **en progreso**; criterio “50+ paredes + identidad estable” sigue pendiente de cierre formal. |
+| **Modelado** | Crear muro, tipologías, Push/Pull, edición por elemento, `geom.extrude_face` con estadísticas OCP, `history.undo` / `history.redo`, malla analítica + ruta B-Rep en evolución | Fase 2: **cierre documental** en [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md) + test `test_fifty_five_walls_extrude_subset_stable`. |
+
+**Fases 3 y 4** siguen **abiertas**. Inventario explícito de pendientes: [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md).
 
 ---
 
@@ -63,12 +67,12 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 
 - [x] Herramienta gráfica Push/Pull en Godot (cara + arrastre; modo edición por elemento).
 - [x] Backend recibe vector de extrusión (`geom.extrude_face`), usa cadena **OCP/OpenCASCADE** para validar/generar malla paralela y devuelve topología + `debug_ocp_mesh_stats` (convivencia con malla analítica).
-- [x] Sistema de IDs topológicos persistentes en **evolución** (formato Fase 2; ver `docs/architecture/topological-naming.md` y tests de regresión). *Cierre formal del criterio “estable entre operaciones” pendiente.*
+- [x] Sistema de IDs topológicos persistentes en **evolución** (formato Fase 2; ver `docs/architecture/topological-naming.md` y tests de regresión). *Estabilidad entre operaciones cubierta por regresión geométrica + test de estrés multi-muro.*
 - [x] Undo/Redo en sesión vía RPC (`history.undo` / `history.redo`) integrado en la UI.
-- [ ] Undo/Redo con **persistencia** en SQLite (`axon_internal.db`) entre reinicios.
+- [x] Undo/Redo con **persistencia** en SQLite (`session_history.db` en el directorio de datos de AxonBIM, o ruta `AXONBIM_HISTORY_DB`) entre reinicios del backend. *(El módulo `axonbim/persistence/` sigue reservado para metadatos de proyecto más amplios.)*
 - [x] Tests de regresión geométrica (snapshots con tolerancia 1e-6; suites RPC ampliadas).
 
-**Criterio de salida:** un modelo de 50+ paredes editado interactivamente sin perder identidad topológica entre operaciones. *(Pendiente de demostración sistemática; el código ya soporta flujos de edición múltiple.)*
+**Criterio de salida:** un modelo de 50+ paredes editado interactivamente sin perder identidad topológica entre operaciones. **Demostración:** test de integración `tests/integration/test_phase2_many_walls_stress.py` (55 muros + extrusiones). Ver [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md).
 
 ---
 

@@ -151,7 +151,7 @@ Solo del backend al frontend. Eventos asíncronos:
 | Método | Params | Result |
 |--------|--------|--------|
 | `ifc.open` | `{ "path": "<file>" }` | `{ "project_guid": "...", "stats": {...} }` |
-| `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m>, "join_with_guid": "<opcional>" }` | `{ "guid": "...", "mesh": {...}, "workspace_xy_half_m": [halfX_m, halfY_m] }` (medias en planta desde origen; crecen con margen **~12%** cuando el trazo las excede). Si `join_with_guid` refiere el muro previo y el ángulo es ~90°, el backend retrocede `p1` medio espesor para cerrar la esquina en cadena. |
+| `ifc.create_wall` | `{ "p1": [x,y,z], "p2": [x,y,z], "height": <m>, "thickness": <m>, "join_with_guid": "<opcional>", "join_end_guid": "<opcional>" }` | `{ "guid": "...", "mesh": {...}, "workspace_xy_half_m": [halfX_m, halfY_m] }` (medias en planta desde origen; crecen con margen **~12%** cuando el trazo las excede). Si `join_with_guid` refiere el muro previo y el ángulo es ~90°, el backend retrocede `p1` medio espesor para cerrar la esquina en cadena. Si `join_end_guid` refiere el **primer** muro del contorno y `p2` coincide con su `p1` en planta con esquina ~90°, el backend **extiende** `p2` medio espesor sobre el eje del tramo (cierre de habitación, simétrico al ajuste de cadena). |
 | `ifc.get_wall_spec` | `{ "guid": "<GlobalId>" }` | `{ "wall_spec": { "p1": {...}, "p2": {...}, "height": <m>, "thickness": <m> } }` |
 | `ifc.set_wall_typology` | `{ "guid": "<GlobalId>", "height": <m>, "thickness": <m>, "typology_id": "<opcional>" }` | `{ "guid": "...", "mesh": {...} }` |
 | `ifc.delete` | `{ "guid": "..." }` | `{ "ok": true }` |
@@ -184,10 +184,12 @@ El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 
 | Método | Params | Result |
 |--------|--------|--------|
-| `project.save` | `{ "path": "..." }` | `{ "ok": true }` |
-| `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...}, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" }` |
-| `history.redo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...}, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" }` |
+| `project.save` | `{ "path": "..." }` | `{ "path": "...", "bytes": <int> }` |
+| `history.undo` | `{}` | `{ "applied": true, "guid": "...", "mesh": {...} \| null, "topo_map": {...} }` o `{ "applied": false, "reason": "empty" \| "unsupported:..." }` |
+| `history.redo` | `{}` | Igual criterio que `history.undo`. |
 | `project.set_state` | `{ "state": "WIP\|Shared\|Published", "comment": "..." }` | `{ "ok": true, "snapshot_path": "..." }` |
+
+**Historial persistente (SQLite):** tipos de operación reversibles en el tronco: `extrude_face`, `set_wall_typology`, `delete_wall`, `create_wall` (la pila de redo usa además `recreate_wall` y `redo_delete_wall` de forma interna). **Ámbito:** hasta el primer `project.save` en la sesión del proceso, la pila usa el ámbito `__unsaved__`; tras guardar, el ámbito pasa a la **ruta absoluta canónica** del `.ifc` guardado, de modo que pilas de distintos archivos no se mezclan. Variable de entorno `AXONBIM_HISTORY_DB` fija el fichero SQLite (desarrollo/tests).
 
 ### 5.6 Notificaciones del backend
 
