@@ -9,7 +9,7 @@
 
 ## Contexto
 
-AxonBIM separa **frontend Godot** (UI y viewport) y **backend Python** (IfcOpenShell, OCP, persistencia IFC). Algunas tareas futuras (raycasts de prueba, cajas envolventes sobre mallas ya serializadas, prototipos de intersección visual) podrían beneficiarse del motor de escena sin bloquear el hilo de UI.
+AxonBIM separa **frontend Godot** (UI y viewport) y **backend Python** (IfcOpenShell, geometría analítica, persistencia IFC). Algunas tareas futuras (raycasts de prueba, cajas envolventes sobre mallas ya serializadas, prototipos de intersección visual) podrían beneficiarse del motor de escena sin bloquear el hilo de UI.
 
 Riesgo: duplicar la **verdad geométrica** del modelo IFC en dos runtimes. Hace falta un límite explícito y un contrato de red que no confunda al worker con el backend principal.
 
@@ -18,7 +18,7 @@ Riesgo: duplicar la **verdad geométrica** del modelo IFC en dos runtimes. Hace 
 **Adoptar un proceso Godot 4.x en modo `--headless`** que escucha en **TCP loopback dedicado** (`127.0.0.1`), con el **mismo framing LSP** (`Content-Length`) y JSON-RPC 2.0 que el servidor Python, pero en un **puerto distinto** del RPC principal del backend.
 
 - El **backend Python permanece la única fuente de verdad** para mutaciones IFC y geometría B-Rep documentada.
-- El **worker** solo ejecuta métodos **auxiliares** acotados, con parámetros y resultados **serializables** (números, booleanos, arrays de escalar). No sustituye IfcOpenShell ni OCP salvo que un ADR futuro lo autorice explícitamente.
+- El **worker** solo ejecuta métodos **auxiliares** acotados, con parámetros y resultados **serializables** (números, booleanos, arrays de escalar). No sustituye IfcOpenShell salvo que un ADR futuro lo autorice explícitamente.
 - **Orientación de conexión:** el worker actúa como **servidor** TCP en el puerto auxiliar; **Python u otros clientes** se conectan como **clientes** para invocar `worker.*`. El frontend interactivo **no** sustituye su `RpcClient` principal por el worker; cualquier orquestación pasa por decisiones del backend o queda en pruebas/herramientas hasta que el protocolo principal lo incorpore.
 
 ## Alternativas consideradas
@@ -30,7 +30,7 @@ Riesgo: duplicar la **verdad geométrica** del modelo IFC en dos runtimes. Hace 
 - **Contras:** Mezcla sesiones, autenticación inexistente y multiplexación de “quién es cliente de servicios auxiliares” más frágil; el dispatcher actual no distingue roles.
 - **Motivo por el que se descartó:** Mayor complejidad en el servidor principal antes de tener un piloto estable.
 
-### Alternativa B — Sin proceso Godot; todo en Python/OCP
+### Alternativa B — Sin proceso Godot; todo en el proceso Python
 
 - **Descripción:** No spawnear Godot; usar solo Python para AABB, raycast analítico, etc.
 - **Pros:** Un solo runtime; menos procesos.

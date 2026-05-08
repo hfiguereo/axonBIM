@@ -2,7 +2,7 @@
 
 **Referencia:** [`ROADMAP.md`](../../ROADMAP.md) §Fase 3 · **Extracto normativo (paráfrasis):** [`docs/normativa/mived/ccrd-vol-i.md`](../normativa/mived/ccrd-vol-i.md).
 
-**Nota de alcance:** la entrega MIVED puede avanzar con **proyección analítica** y reglas 2D; **OCP/OCC no es requisito** para muchos sub-hitos si el *cómo* lo deja explícito. Donde un sub-hito beneficie de sólidos, se indica como opción, no como bloqueo.
+**Nota de alcance:** la entrega MIVED puede avanzar con **proyección analítica** y reglas 2D; un kernel CAD pesado **no es requisito** para muchos sub-hitos si el *cómo* lo deja explícito. Donde un sub-hito beneficie de sólidos completos, se indica como opción, no como bloqueo.
 
 **Criterio de salida (pendiente):** planta arquitectónica residencial MIVED lista para presentación oficial ([`ROADMAP.md`](../../ROADMAP.md) §Fase 3).
 
@@ -12,11 +12,11 @@ Esto **no** cierra la fase: es la base técnica sobre la que se construye la cap
 
 ---
 
-### SH-F3-16 — `draw.ortho_snapshot` (proyección analítica y opción OCP)
+### SH-F3-16 — `draw.ortho_snapshot` (proyección analítica)
 
 - **Estado:** Cerrado
-- **Qué:** Vistas ortogonales `top` / `front` / `right` con líneas 2D rasterizables y metadatos de encuadre; motor `projection_engine` **analítico** por defecto, **OCP** opcional.
-- **Cómo:** Handlers `draw.*`, geometría de muro/caja y/o malla OCP según parámetros.
+- **Qué:** Vistas ortogonales `top` / `front` / `right` y cardinales con líneas 2D rasterizables y metadatos de encuadre; **solo** pipeline analítico alineado con Godot.
+- **Cómo:** Handlers `draw.*`, geometría de muro/caja.
 - **Por qué:** Sin snapshot estable no hay canvas 2D ni export que alimente la Fase 3.
 - **Hecho cuando:** RPC documentado y consumido por Godot con estados de error/fallback aceptados.
 - **Evidencia / enlaces:** `docs/architecture/jsonrpc-protocol.md`, tests `test_handlers_draw.py`, UI canvas 2D.
@@ -37,7 +37,7 @@ Esto **no** cierra la fase: es la base técnica sobre la que se construye la cap
 ### SH-F3-18 — UI 2D base en Godot (pestañas, PNG, DXF, Project Browser)
 
 - **Estado:** Cerrado (parcial respecto al criterio de salida de fase)
-- **Qué:** Pestañas de vista modelado/2D, export PNG de vistas ortográficas, export DXF muros, vistas 2D en Project Browser con estados de carga/error/fallback en canvas OCC.
+- **Qué:** Pestañas de vista modelado/2D, export PNG de vistas ortográficas, export DXF muros, vistas 2D en Project Browser con estados de carga/error/fallback en **lienzo 2D vectorial** Godot.
 - **Cómo:** `main_scene` / docks / RPC `draw.ortho_snapshot` y `draw.export_dxf_walls`.
 - **Por qué:** Da **superficie de producto** para iterar simbología y entrega sin reescribir el visor 3D cada vez.
 - **Hecho cuando:** Demo manual reproducible según `docs/manual-de-axonbim.md` (secciones 2D vigentes).
@@ -97,7 +97,7 @@ Esto **no** cierra la fase: es la base técnica sobre la que se construye la cap
 
 - **Estado:** Abierto
 - **Qué:** Patrones de sombreado según convención adoptada (materiales, zonas, recortes simples).
-- **Cómo:** Generación vectorial (DXF hatch) y/o raster en PNG; evitar dependencia OCP si el alcance es 2D puro.
+- **Cómo:** Generación vectorial (DXF hatch) y/o raster en PNG; mantener independencia del modo visual donde el alcance sea 2D puro.
 - **Por qué:** “Simbología técnica completa” sin sombreado suele fallar en revisión de planos.
 - **Hecho cuando:** Leyenda + ejemplo en proyecto sintético exportado.
 - **Evidencia / enlaces:** —
@@ -119,7 +119,7 @@ Esto **no** cierra la fase: es la base técnica sobre la que se construye la cap
 
 - **Estado:** Abierto
 - **Qué:** Al menos una sección **analítica** (corte por plano) con muros y forjados simplificados si aplica.
-- **Cómo:** Corte contra cajas/volumenes simples; **opcional** refinar con OCP si hace falta calidad B-Rep.
+- **Cómo:** Corte contra cajas/volumenes simples; **opcional** refinar con kernel B-Rep si hace falta mayor fidelidad.
 - **Por qué:** El ROADMAP lista secciones como pendiente explícito en UI/entrega.
 - **Hecho cuando:** Export PNG o PDF de sección de proyecto demo reproducible.
 - **Evidencia / enlaces:** —
@@ -184,7 +184,7 @@ Esto **no** cierra la fase: es la base técnica sobre la que se construye la cap
 ### SH-F3-13 — Evaluación explícita de `ifcopenshell.draw`
 
 - **Estado:** Abierto
-- **Qué:** Decisión documentada: adoptar, envolver o rechazar para casos concretos **sin duplicar** OCC salvo beneficio claro.
+- **Qué:** Decisión documentada: adoptar, envolver o rechazar para casos concretos **sin duplicar** geometría salvo beneficio claro.
 - **Cómo:** Spike corto + ADR o sección en reporte de fase.
 - **Por qué:** El ROADMAP lo lista como pendiente opcional; sin decisión explícita es punto ciego de mantenimiento.
 - **Hecho cuando:** ADR o informe de spike archivado.

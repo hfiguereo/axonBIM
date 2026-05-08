@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/main/main_scene.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/project_view.gd" id="2"]
@@ -10,8 +10,14 @@
 [ext_resource type="Script" path="res://scripts/viewport_3d/orbit_camera_rig.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/nav_viewport_gizmo.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/viewport_3d/workspace_floor_grid.gd" id="10"]
-[ext_resource type="Script" path="res://scripts/viewport_2d/ortho_occ_canvas.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/viewport_2d/ortho_vector_canvas.gd" id="11"]
 [ext_resource type="Theme" path="res://themes/axon_theme.tres" id="12"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_open_ifc.svg" id="13"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_export_2d.svg" id="14"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_export_dxf.svg" id="15"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_view2d_mode.svg" id="16"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_settings.svg" id="17"]
+[ext_resource type="Texture2D" path="res://assets/icons/actions/action_storey_add.svg" id="18"]
 
 [sub_resource type="Sky" id="Sky_3d"]
 sky_material = null
@@ -70,7 +76,7 @@ text = "Backend: ..."
 [node name="RibbonTabs" type="TabBar" parent="UI/Root/Ribbon"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 28)
-tab_count = 3
+tab_count = 4
 clip_tabs = false
 scroll_to_selected = false
 
@@ -167,6 +173,7 @@ text = "Proyecto"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Abrir IFC..."
+icon = ExtResource("13")
 
 [node name="SaveButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
 unique_name_in_owner = true
@@ -178,16 +185,19 @@ icon = ExtResource("6")
 unique_name_in_owner = true
 layout_mode = 2
 text = "Generar vistas 2D..."
+icon = ExtResource("14")
 
 [node name="ExportWallDxfButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Exportar muros DXF (planta)..."
+icon = ExtResource("15")
 
 [node name="View2DModeButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsInicio/PanelArchivo/VBoxArchivo"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Modo 2D: Auto (vectorial->orto)"
+icon = ExtResource("16")
 
 [node name="RibbonToolsPlaceholder" type="CenterContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack"]
 unique_name_in_owner = true
@@ -199,6 +209,80 @@ size_flags_vertical = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.52, 0.55, 1)
 text = "Contenido de cinta: próximamente en esta pestaña."
+
+[node name="RibbonToolsPreferencias" type="HBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+visible = false
+theme_override_constants/separation = 10
+
+[node name="PanelGraficos" type="PanelContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias"]
+layout_mode = 2
+
+[node name="VBoxGraficos" type="VBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LblGraficos" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos/VBoxGraficos"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Gráficos (motor del viewport)"
+
+[node name="PrefRendererOption" type="OptionButton" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos/VBoxGraficos"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LblCudaNote" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos/VBoxGraficos"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.55, 0.62, 0.68, 1)
+autowrap_mode = 2
+custom_minimum_size = Vector2(240, 0)
+text = "Godot: OpenGL (compat) o Vulkan/Forward+. CUDA (estilo Blender Cycles) no aplica al viewport 3D."
+
+[node name="PrefSaveRendererButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos/VBoxGraficos"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Guardar motor (reinicio)"
+
+[node name="PanelArranque" type="PanelContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias"]
+layout_mode = 2
+
+[node name="VBoxArranque" type="VBoxContainer" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LblArranque" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque/VBoxArranque"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "Arranque Linux (GPU)"
+
+[node name="PrefGpuProfileOption" type="OptionButton" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque/VBoxArranque"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PrefWriteEnvButton" type="Button" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque/VBoxArranque"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Escribir .env.axonbim"
+
+[node name="LblEnvHint" type="Label" parent="UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque/VBoxArranque"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.55, 0.62, 0.68, 1)
+autowrap_mode = 2
+custom_minimum_size = Vector2(240, 0)
+text = "Raíz del repo (no versionado): ./start lee AXONBIM_GPU_PROFILE antes de linux_profile."
+
+[node name="PrefRestartDialog" type="AcceptDialog" parent="."]
+unique_name_in_owner = true
+title = "AxonBIM"
+dialog_text = ""
 
 [node name="Workspace" type="VBoxContainer" parent="UI/Root"]
 layout_mode = 2
@@ -293,12 +377,9 @@ grow_horizontal = 2
 unique_name_in_owner = true
 layout_mode = 2
 clip_tabs = false
-tab_count = 4
+tab_count = 1
 current_tab = 0
-tab_0/title = "Modelado"
-tab_1/title = "Planta 2D"
-tab_2/title = "Frente 2D"
-tab_3/title = "Derecha 2D"
+tab_0/title = "Modelado 3D"
 
 [node name="View2DPlaceholder" type="PanelContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay"]
 unique_name_in_owner = true
@@ -319,13 +400,13 @@ theme_override_constants/separation = 8
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "Vista ortogonal lista para OCC"
+text = "Vista ortogonal lista para snapshot 2D"
 
 [node name="View2DPlaceholderHint" type="Label" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/View2DPlaceholder/View2DPlaceholderVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 2
-text = "Este tab ya existe y está listo para conectarse al render 2D OCC. Puedes usar \"Generar vistas 2D...\" para export rápido en PNG."
+text = "Este tab ya existe y está listo para la vista 2D vectorial en Godot. Puedes usar \"Generar vistas 2D...\" para export rápido en PNG."
 
 [node name="View2DPreview" type="Control" parent="UI/Root/Workspace/MainSplit/InnerSplit/ViewportContainer/ViewportOverlay/View2DPlaceholder/View2DPlaceholderVBox"]
 unique_name_in_owner = true
@@ -473,6 +554,7 @@ value = 3.0
 unique_name_in_owner = true
 layout_mode = 2
 text = "Añadir nivel"
+icon = ExtResource("18")
 
 [node name="StoreyDatumEditPanel" type="VBoxContainer" parent="UI/Root/Workspace/MainSplit/InnerSplit/RightDock/PropsScroll/PropsVBox"]
 unique_name_in_owner = true

@@ -29,13 +29,13 @@ async def test_draw_ortho_snapshot_returns_lines_for_top_view() -> None:
         }
     )
     out = await draw_handlers.ortho_snapshot({"view": "top", "width_px": 900, "height_px": 600})
+    assert "projection_engine" not in out
     assert out["view"] == "top"
     assert out["line_count"] > 0
     assert out["width_px"] == 900
     assert out["height_px"] == 600
     assert len(out["world_bounds_uv"]) == 4
     assert out["meters_per_px"] > 0.0
-    assert out["projection_engine"] == "analytical"
 
 
 async def test_draw_ortho_snapshot_rejects_unknown_fields() -> None:
@@ -124,22 +124,6 @@ async def test_register_draw_handlers_exposes_ortho_snapshot() -> None:
     assert "draw.export_dxf_walls" in disp.registered_methods()
 
 
-async def test_draw_ortho_snapshot_projection_engine_ocp() -> None:
-    await ifc_handlers.create_wall(
-        {
-            "p1": {"x": 0.0, "y": 0.0},
-            "p2": {"x": 4.0, "y": 0.0},
-            "height": 3.0,
-            "thickness": 0.2,
-        }
-    )
-    out = await draw_handlers.ortho_snapshot(
-        {"view": "top", "width_px": 640, "height_px": 480, "projection_engine": "ocp"}
-    )
-    assert out["projection_engine"] == "ocp"
-    assert out["line_count"] > 0
-
-
 async def test_draw_export_dxf_walls_writes_file(tmp_path) -> None:
     await ifc_handlers.create_wall(
         {
@@ -157,3 +141,26 @@ async def test_draw_export_dxf_walls_writes_file(tmp_path) -> None:
     doc = ezdxf.readfile(str(out_path))
     for layer_name in arch_layer_names():
         assert layer_name in doc.layers
+
+
+async def test_draw_ortho_snapshot_south_mirrors_u_bounds_vs_north() -> None:
+    """Sur invierte u respecto a Norte para alinear el vectorial 2D con la cámara Godot (+Y)."""
+    await ifc_handlers.create_wall(
+        {
+            "p1": {"x": 0.0, "y": 0.0},
+            "p2": {"x": 6.0, "y": 0.0},
+            "height": 3.0,
+            "thickness": 0.2,
+        }
+    )
+    north = await draw_handlers.ortho_snapshot({"view": "north", "width_px": 900, "height_px": 600})
+    south = await draw_handlers.ortho_snapshot({"view": "south", "width_px": 900, "height_px": 600})
+    assert north["view"] == "north"
+    assert south["view"] == "south"
+    nu = north["world_bounds_uv"]
+    su = south["world_bounds_uv"]
+    cn = (float(nu[0]) + float(nu[2])) * 0.5
+    cs = (float(su[0]) + float(su[2])) * 0.5
+    assert cn > 0.0
+    assert cs < 0.0
+    assert abs(cn + cs) < 0.05

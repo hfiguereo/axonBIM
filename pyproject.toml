@@ -8,7 +8,7 @@ license = { file = "LICENSE" }
 authors = [
     { name = "Arq. Hector Nathanael Figuereo" },
 ]
-keywords = ["BIM", "IFC", "CAD", "Godot", "OpenCASCADE"]
+keywords = ["BIM", "IFC", "CAD", "Godot"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: X11 Applications",
@@ -23,7 +23,6 @@ classifiers = [
 dependencies = [
     "pydantic>=2.6,<3.0",
     "ifcopenshell>=0.8,<0.9",
-    "cadquery-ocp>=7.7.0",
     "ezdxf>=1.2",
     "numpy>=1.26",
 ]
@@ -130,7 +129,6 @@ exclude = ["frontend/", "build/", "dist/"]
 [[tool.mypy.overrides]]
 module = [
     "ifcopenshell.*",
-    "OCP.*",
     "ezdxf.*",
 ]
 ignore_missing_imports = true

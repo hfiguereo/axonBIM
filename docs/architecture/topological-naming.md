@@ -4,13 +4,13 @@
 
 En modelado paramétrico B-Rep (Boundary Representation), cada operación geométrica puede regenerar la topología: caras se dividen, aristas se fusionan, vértices aparecen y desaparecen. Si el usuario "estiró la cara superior" del muro y luego ejecutamos una booleana, **¿cuál es ahora la cara superior?**
 
-OpenCASCADE asigna IDs internos efímeros que cambian entre operaciones. Si Godot guardara esos IDs, el siguiente "Push/Pull" sobre la misma cara fallaría: la cara ya no existe con ese ID.
+Los kernels CAD típicos asignan IDs internos efímeros que cambian entre operaciones. Si Godot guardara esos IDs, el siguiente "Push/Pull" sobre la misma cara fallaría: la cara ya no existe con ese ID.
 
 Este es el **Topological Naming Problem** — el talón de Aquiles de FreeCAD durante años, y la razón por la que muchos modelos paramétricos se "rompen" al editar.
 
 ## Estrategia de AxonBIM
 
-Cada cara, arista y vértice B-Rep recibe un **`topo_id` persistente** generado por el backend. El frontend nunca conoce la indexación interna de OCP; solo maneja `topo_id`s opacos.
+Cada cara, arista y vértice B-Rep recibe un **`topo_id` persistente** generado por el backend. El frontend nunca conoce la indexación interna del kernel geométrico; solo maneja `topo_id`s opacos.
 
 ### Algoritmo de generación
 

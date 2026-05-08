@@ -15,7 +15,7 @@
 │  │            │ JSON-RPC sobre socket    │ │
 │  │            ▼                          │ │
 │  │  Python 3.12 congelado (PyInstaller) │ │
-│  │   + IfcOpenShell, OCP, ezdxf,        │ │
+│  │   + IfcOpenShell, ezdxf, numpy,      │ │
 │  │     todas las wheels resueltas       │ │
 │  └─────────────────────────────────────┘ │
 └─────────────────────────────────────────┘
@@ -27,11 +27,11 @@
 |----------|-------------|------------|
 | Tamaño final | Menor (~80–150 MB) | Mayor (~500 MB+) |
 | Portabilidad | Excelente | Buena |
-| Manejo de C-extensions complejas (OCP, IfcOpenShell) | Requiere hooks custom | Funciona out-of-the-box |
+| Manejo de C-extensions complejas (IfcOpenShell, NumPy, …) | Requiere hooks custom | Funciona out-of-the-box |
 | Velocidad de arranque | Rápida tras "warm-up" | Idéntica a Python normal |
 | Curva de aprendizaje | Media | Baja |
 
-**Decisión inicial:** **PyInstaller** con hooks custom para OCP. Si los hooks resultan inviables, fallback a Conda-pack.
+**Decisión inicial:** **PyInstaller** con hooks custom para IfcOpenShell y dependencias nativas del árbol `uv`. Si los hooks resultan inviables, fallback a Conda-pack.
 
 ## 3. Build pipeline (esbozo)
 
@@ -44,7 +44,6 @@ uv run pyinstaller \
   --onedir \
   --name axonbim-backend \
   --collect-all ifcopenshell \
-  --collect-all OCP \
   --collect-all ezdxf \
   --hidden-import sqlite3 \
   src/axonbim/__main__.py
@@ -138,7 +137,7 @@ El flag `--self-test` arranca el backend, abre un IFC de prueba, ejecuta una boo
 
 ## 7. Pendientes para Fase 4
 
-- [ ] Resolver hooks de PyInstaller para OCP (probable necesidad de `--collect-binaries`).
+- [ ] Resolver hooks de PyInstaller para extensiones nativas del backend (IfcOpenShell, NumPy, …).
 - [ ] Decidir si firmar el Flatpak (requiere clave GPG del autor).
 - [ ] Publicar en Flathub (proceso de revisión ~2-4 semanas).
 - [ ] Generar reproducible builds (idealmente).

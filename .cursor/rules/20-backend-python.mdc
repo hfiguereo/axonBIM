@@ -43,7 +43,7 @@ Solo en archivos fuente bajo `src/` y `tests/` (no en configs, migraciones SQL, 
 
 ## Geometría y BIM
 
-- Operaciones booleanas, NURBS, B-Rep: **exclusivamente** vía OCP/OpenCASCADE. Prohibido reimplementar.
+- Operaciones booleanas, NURBS, B-Rep complejas: **no reimplementar** en Python puro cuando exista biblioteca madura acordada por ADR; hoy el tronco prioriza **mesh analítica** alineada con Godot.
 - Lectura/escritura IFC: **IfcOpenShell**. Nunca parsear el .ifc a mano.
 - Salida 2D (planos): **ezdxf** consumiendo `ifcopenshell.draw`. Aplicar simbología CCRD-MIVED desde `docs/normativa/mived/ccrd-vol-i.md` §3.7. Si una constante figura como pendiente, **no improvises** (ver regla `30-bim-normativa.mdc`).
 - IDs topológicos: SHA-1 sobre representación canónica (ver `docs/architecture/topological-naming.md`).
@@ -73,7 +73,7 @@ Solo en archivos fuente bajo `src/` y `tests/` (no en configs, migraciones SQL, 
 ```
 src/axonbim/
 ├── rpc/           # servidor JSON-RPC y handlers
-├── geometry/      # wrappers OCP, booleanas, B-Rep, IDs topológicos
+├── geometry/      # meshing analítico, IDs topológicos
 ├── ifc/           # IfcOpenShell, lectura/escritura, validación
 ├── drawing/       # generación 2D (ezdxf) + MIVED
 ├── persistence/   # SQLite, modelos, ISO 19650

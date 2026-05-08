@@ -9,7 +9,9 @@ extends Node3D
 ## Mayús+LMB=pan, Ctrl/Cmd+LMB arrastre vertical=zoom. Pellizco: ``InputEventMagnifyGesture``.
 ## Algunos trackpads reportan scroll como ``InputEventPanGesture``; se mapea a zoom.
 ##
-## Presets **top** / **front** / **right** usan proyección **ortogonal**; al orbitar
+## Presets **top** / **north** / **south** / **east** / **west** usan proyección **ortogonal**
+## (Z arriba; **+Y = norte del proyecto**). ``front``/``right`` se aceptan como alias legacy.
+## Al orbitar
 ## (MMB o Alt+LMB) se pasa a **perspectiva** conservando la dirección de vista.
 ##
 ## Al alternar entre ortogonales y perspectiva se emite ``viewport_projection_mode_changed``:
@@ -125,10 +127,16 @@ func handle_key_view(event: InputEventKey) -> bool:
 			set_view_preset("top")
 			return true
 		KEY_KP_1, KEY_2:
-			set_view_preset("front")
+			set_view_preset("north")
 			return true
 		KEY_KP_3, KEY_3:
-			set_view_preset("right")
+			set_view_preset("west")
+			return true
+		KEY_KP_9:
+			set_view_preset("south")
+			return true
+		KEY_KP_4:
+			set_view_preset("east")
 			return true
 		KEY_KP_0, KEY_4:
 			set_view_preset("persp")
@@ -156,9 +164,17 @@ func reset_view() -> void:
 
 
 func set_view_preset(name: String) -> void:
-	match name:
-		"top", "front", "right":
-			_view_preset = name
+	var n := name
+	match n:
+		"front":
+			n = "north"
+		"right":
+			n = "west"
+		_:
+			pass
+	match n:
+		"top", "north", "south", "east", "west":
+			_view_preset = n
 		"persp":
 			_view_preset = "persp"
 			_yaw = deg_to_rad(35.0)
@@ -174,11 +190,11 @@ func set_preset_top() -> void:
 
 
 func set_preset_front() -> void:
-	set_view_preset("front")
+	set_view_preset("north")
 
 
 func set_preset_right() -> void:
-	set_view_preset("right")
+	set_view_preset("west")
 
 
 func set_preset_iso() -> void:
@@ -193,7 +209,7 @@ func is_perspective_preset() -> bool:
 
 
 func current_view_preset() -> String:
-	"""Nombre del preset activo: ``top``/``front``/``right``/``persp``."""
+	"""Nombre del preset activo: ``top``/``north``/``south``/``east``/``west``/``persp``."""
 	return _view_preset
 
 
@@ -263,11 +279,17 @@ func _place_ortho_camera(kind: String) -> void:
 		"top":
 			camera.position = Vector3(0.0, 0.0, d)
 			camera.look_at(Vector3.ZERO, Vector3(0.0, 1.0, 0.0))
-		"front":
+		"north":
 			camera.position = Vector3(0.0, -d, 0.0)
 			camera.look_at(Vector3.ZERO, Vector3(0.0, 0.0, 1.0))
-		"right":
+		"south":
+			camera.position = Vector3(0.0, d, 0.0)
+			camera.look_at(Vector3.ZERO, Vector3(0.0, 0.0, 1.0))
+		"west":
 			camera.position = Vector3(d, 0.0, 0.0)
+			camera.look_at(Vector3.ZERO, Vector3(0.0, 0.0, 1.0))
+		"east":
+			camera.position = Vector3(-d, 0.0, 0.0)
 			camera.look_at(Vector3.ZERO, Vector3(0.0, 0.0, 1.0))
 		_:
 			camera.position = Vector3(0.0, 0.0, d)
@@ -308,9 +330,9 @@ func frame_ortho_aabb(aabb: AABB) -> void:
 	var center: Vector3 = aabb.position + aabb.size * 0.5
 	global_position = center
 	var span: float = maxf(aabb.size.x, aabb.size.y)
-	if _view_preset == "front":
+	if _view_preset in ["north", "south"]:
 		span = maxf(aabb.size.x, aabb.size.z)
-	elif _view_preset == "right":
+	elif _view_preset in ["east", "west"]:
 		span = maxf(aabb.size.y, aabb.size.z)
 	span = maxf(span * ORTHO_FRAME_MARGIN, 2.0)
 	_distance = maxf(12.0, span / (2.0 * ORTHO_SIZE_SCALE))
@@ -338,8 +360,8 @@ func apply_view_state(state: Dictionary) -> void:
 		_distance = clampf(float(state["distance"]), MIN_DISTANCE, MAX_DISTANCE)
 	if state.has("preset"):
 		var preset: String = str(state["preset"])
-		if preset in ["persp", "top", "front", "right"]:
-			_view_preset = preset
+		if preset in ["persp", "top", "north", "south", "east", "west", "front", "right"]:
+			set_view_preset(preset)
 	_apply()
 
 

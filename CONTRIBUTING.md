@@ -79,7 +79,7 @@ git pull origin develop
 Formato convencional, en **español imperativo**, ≤72 caracteres en la primera línea:
 
 ```
-feat(geom): añade fillet en aristas vía OCP
+feat(draw): añade margen configurable en snapshot ortográfico
 fix(rpc): evita deadlock cuando el cliente cierra durante una llamada
 refactor(ifc): extrae lectura de propiedades a módulo separado
 docs(mived): completa tabla de grosores de línea para muros

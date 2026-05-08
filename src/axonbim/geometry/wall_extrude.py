@@ -1,5 +1,5 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
-"""Extrusion analitica de una cara de muro caja (Fase 2, previo a booleanas OCP)."""
+"""Extrusion analitica de una cara de muro caja (Fase 2, previo a booleanas B-Rep)."""
 
 from __future__ import annotations
 
@@ -56,9 +56,20 @@ def outward_normals(spec: WallSpec) -> list[Vec3]:
     ]
 
 
-def face_topo_id_table(spec: WallSpec) -> list[str]:
-    """Un ``topo_id`` por cara lógica (misma convencion que la malla serializada)."""
-    mesh = wall_box_mesh(spec.p1, spec.p2, spec.height, spec.thickness)
+def face_topo_id_table(spec: WallSpec, *, parent_guid: str) -> list[str]:
+    """Un ``topo_id`` por cara lógica (orden ``wall_box_mesh``).
+
+    Args:
+        spec: Especificación del muro en el instante considerado.
+        parent_guid: GUID IFC del muro; debe coincidir con ``wall_mesh_for_spec``.
+    """
+    mesh = wall_box_mesh(
+        spec.p1,
+        spec.p2,
+        spec.height,
+        spec.thickness,
+        parent_guid=parent_guid,
+    )
     return [mesh.topo_ids[i * 2] for i in range(6)]
 
 
@@ -128,7 +139,7 @@ def extrude_wall_face(
     normals = outward_normals(spec)
     nx, ny, nz = normals[fi]
     d = vector[0] * nx + vector[1] * ny + vector[2] * nz
-    old_table = face_topo_id_table(spec)
+    old_table = face_topo_id_table(spec, parent_guid=parent_guid)
     new_base = apply_extrusion(spec, fi, d)
     new_spec = WallSpec(
         p1=new_base.p1,
@@ -138,7 +149,7 @@ def extrude_wall_face(
         openings=(),
     )
     new_mesh = wall_mesh_for_spec(new_spec, parent_guid=parent_guid)
-    new_table = face_topo_id_table(new_spec)
+    new_table = face_topo_id_table(new_spec, parent_guid=parent_guid)
     topo_map: dict[str, str] = {}
     for old_id, new_id in zip(old_table, new_table, strict=True):
         if old_id != new_id:

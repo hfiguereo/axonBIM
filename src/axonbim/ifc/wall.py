@@ -2,7 +2,7 @@
 """Creacion de muros IFC (``IfcWall``) con representacion geometrica extrudida.
 
 En Sprint 1.4 el muro es una caja (paralelepipedo). La mesh que viaja a Godot
-se calcula analiticamente en :mod:`axonbim.geometry.meshing` sin OCP; la
+se calcula analiticamente en :mod:`axonbim.geometry.meshing`; la
 representacion IFC escrita al disco usa ``ifcopenshell.util.shape_builder``
 para producir un ``IfcExtrudedAreaSolid`` valido.
 """
@@ -139,6 +139,9 @@ def update_wall_geometry(session: IfcSession, guid: str, spec: WallSpec) -> Wall
     if wall is None:
         raise ValueError(f"No existe IfcWall con GlobalId={guid!r}")
 
+    length = math.hypot(spec.p2[0] - spec.p1[0], spec.p2[1] - spec.p1[1])
+    _assign_box_representation(session, wall, length=length, thickness=spec.thickness, height=spec.height)
+    _place_wall(session, wall, p1=spec.p1, p2=spec.p2)
     mesh = wall_mesh_for_spec(spec, parent_guid=guid)
     return WallResult(guid=guid, mesh=mesh)
 

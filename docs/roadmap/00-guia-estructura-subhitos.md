@@ -48,7 +48,7 @@ Cada `fase-0x-subhitos.md` sigue este orden (omite secciones vacías):
 
 - Añadir sub-hitos **nuevos** con el siguiente `NN` libre.
 - Dividir un sub-hito **demasiado grande** en `SH-Fx-NNa` / `NNb` solo si aporta claridad; preferir descomponer en dos filas con IDs nuevos.
-- Mantener **OCP/OCC opcional** donde el producto pueda avanzar con pipeline **analítico** (especialmente entrega 2D normada); el *cómo* debe decirlo explícitamente para no asumir motor 3D pesado.
+- Mantener el pipeline **analítico** como columna vertebral donde el producto pueda avanzar sin motor CAD pesado (especialmente entrega 2D normada); el *cómo* debe decirlo explícitamente.
 
 ---
 

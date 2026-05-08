@@ -48,7 +48,7 @@
 ### SH-F4-03 — Congelar backend Python (PyInstaller o Conda-pack)
 
 - **Estado:** Abierto
-- **Qué:** Binario o árbol `onedir` con IfcOpenShell + OCP + ezdxf resolviendo extensiones.
+- **Qué:** Binario o árbol `onedir` con IfcOpenShell + ezdxf resolviendo extensiones.
 - **Cómo:** Pipeline documentado en `flatpak-pyinstaller.md`; hooks si hace falta.
 - **Por qué:** Usuario final no puede depender de `uv` ni de wheels en desarrollo.
 - **Hecho cuando:** Artefacto generado en CI o script local reproducible; arranque RPC verificado.

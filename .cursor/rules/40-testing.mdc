@@ -61,4 +61,4 @@ Workflow mínimo en `.github/workflows/ci.yml`:
 
 - Al añadir feature, escribe el test **en el mismo cambio**. PR sin tests no se considera completo.
 - Snapshots geométricos: tolerancia por defecto `1e-6`. Cambios mayores requieren regenerar snapshot con justificación en el commit.
-- No mockees OCP ni IfcOpenShell: son determinísticos y rápidos. Mock solo I/O (filesystem, RPC remoto).
+- No mockees IfcOpenShell salvo I/O (filesystem, RPC remoto).

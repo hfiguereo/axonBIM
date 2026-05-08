@@ -12,7 +12,7 @@ Software BIM open-source para Linux. Compite con SketchUp en fluidez gráfica y 
 | Capa | Tecnología | Responsabilidades exclusivas |
 |------|------------|------------------------------|
 | **Frontend** | Godot Engine 4.x (GDScript, Vulkan) | UI, viewport 3D, input del usuario, renderizado, animaciones, captura de gestos Push/Pull |
-| **Backend** | Python 3.12+ (IfcOpenShell, OCP/OpenCASCADE, ezdxf) | Geometría sólida, NURBS, booleanas, IFC, planos 2D, persistencia, normativa MIVED/ISO 19650 |
+| **Backend** | Python 3.12+ (IfcOpenShell, ezdxf) | Geometría **analítica** e IFC, planos 2D, persistencia, normativa MIVED/ISO 19650 |
 | **Puente** | JSON-RPC 2.0 sobre socket Unix local | Único canal de comunicación. Ver `docs/architecture/jsonrpc-protocol.md` |
 
 ## Reglas inviolables

@@ -17,12 +17,12 @@
 
 ---
 
-### SH-F2-02 — `geom.extrude_face` con validación y sonda OCP
+### SH-F2-02 — `geom.extrude_face` con validación analítica
 
 - **Estado:** Cerrado
-- **Qué:** Backend aplica extrusión analítica; devuelve malla + `topo_map` + métricas OCP de apoyo.
-- **Cómo:** `handlers/geom.py`, `wall_extrude`, `ocp_brep` como verificación paralela.
-- **Por qué:** Preparar terreno B-Rep sin bloquear el camino analítico; detectar divergencias temprano.
+- **Qué:** Backend aplica extrusión analítica; devuelve malla + `topo_map` + `debug_mesh_stats` sobre la malla devuelta.
+- **Cómo:** `handlers/geom.py`, `wall_extrude`.
+- **Por qué:** Mantener una única fuente de verdad geométrica alineada con Godot.
 - **Hecho cuando:** RPC estable; tests de geometría y handlers verdes.
 - **Evidencia / enlaces:** tests `tests/unit/geometry/`, `test_handlers_*`.
 
@@ -107,14 +107,14 @@
 
 ---
 
-### SH-F2-10 — Documentar límites de OCP vs analítico para contribuyentes
+### SH-F2-10 — Documentar pipeline analítico para contribuyentes
 
 - **Estado:** Cerrado
-- **Qué:** Una sección breve “cuándo tocar OCP” en docs de geometría.
-- **Cómo:** `docs/architecture/` o ampliar `phase-2-report.md`.
-- **Por qué:** Evita que cada PR asuma que OCC es obligatorio para Fase 2.
-- **Hecho cuando:** Texto aceptado y enlazado desde README de geometría interna.
-- **Evidencia / enlaces:** [`docs/architecture/geometry-analytical-vs-ocp.md`](../architecture/geometry-analytical-vs-ocp.md), `AGENTS.md`.
+- **Qué:** Texto breve sobre el pipeline analítico compartido (malla Godot + snapshot 2D).
+- **Cómo:** `docs/architecture/geometry-analytical.md`.
+- **Por qué:** Evita que cada PR asuma un segundo motor geométrico paralelo.
+- **Hecho cuando:** Texto aceptado y enlazado desde `AGENTS.md`.
+- **Evidencia / enlaces:** [`docs/architecture/geometry-analytical.md`](../architecture/geometry-analytical.md), `AGENTS.md`.
 
 ---
 

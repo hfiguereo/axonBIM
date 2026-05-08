@@ -8,7 +8,7 @@ alwaysApply: false
 
 ## Versión
 
-- **Godot 4.x** (mínimo 4.3). Renderer: **Forward+** (Vulkan). No usar Compatibility salvo justificación.
+- **Godot 4.x** (mínimo 4.3). **Renderer por defecto del repo:** **GL Compatibility** (OpenGL) en `frontend/project.godot` por estabilidad (ver [**ADR-0005**](../../docs/architecture/decisions/0005-renderizado-godot-gl-default-y-perfiles-gpu.md) y README). **Forward+ (Vulkan)** es **opt-in** en ajustes del proyecto; no cambiar el default global sin matriz de pruebas y decisión explícita.
 
 ## Lenguaje
 
@@ -40,6 +40,7 @@ No en `.tscn`, `.tres`, ni `project.godot`.
 
 ## Renderizado y rendimiento
 
+- **API gráfica:** ver [ADR-0005](../../docs/architecture/decisions/0005-renderizado-godot-gl-default-y-perfiles-gpu.md); el contrato de rendimiento incluye políticas de `SubViewport` (`ViewportManager`) y MSAA en la escena principal, no solo el driver.
 - Elementos repetitivos (paredes seriadas, mobiliario, perfiles estructurales): **`MultiMeshInstance3D`** obligatorio.
 - Geometría dinámica recibida del backend: `ArrayMesh` reconstruido in-place; reusar buffers cuando sea posible.
 - LOD automático en `MeshInstance3D` para modelos grandes.

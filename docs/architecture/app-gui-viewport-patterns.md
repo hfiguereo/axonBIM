@@ -93,7 +93,7 @@ En AxonBIM el paralelo operativo es:
 **Estado actual (transición Fase 1 → 2):**
 
 - Tras `ifc.create_wall`, el backend **registra** cada `topo_id` de la malla en [`topo_registry`](../../src/axonbim/geometry/topo_registry.py) y asocia la malla al `guid` del muro.
-- `geom.extrude_face` **resuelve** el `topo_id`, valida sesión y hoy devuelve la **misma malla** con `topo_map` vacío (**stub** hasta OCP/BRep en Fase 2). Así el **primer camino RPC** “cara → operación” ya es coherente con el protocolo y los tests.
+- `geom.extrude_face` **resuelve** el `topo_id`, valida sesión y devuelve malla + `topo_map` según la extrusión analítica vigente. Así el **primer camino RPC** “cara → operación” ya es coherente con el protocolo y los tests.
 - El siguiente paso en **Gui** es **picking**: raycast contra la malla en Godot, leer `topo_id` del triángulo, y llamar a `geom.extrude_face` (o herramienta modal equivalente).
 
 ---

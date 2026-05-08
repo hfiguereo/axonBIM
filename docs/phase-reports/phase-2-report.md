@@ -29,7 +29,7 @@
 
 | Zona | Rol |
 |------|-----|
-| `src/axonbim/handlers/geom.py` | `geom.extrude_face`: valida `topo_id`, extruye con cadena analítica + sonda OCP, registra undo. |
+| `src/axonbim/handlers/geom.py` | `geom.extrude_face`: valida `topo_id`, extruye con cadena analítica, devuelve `debug_mesh_stats`, registra undo. |
 | `src/axonbim/handlers/history.py` | `history.undo` / `history.redo` aplican snapshots de muro. |
 | `src/axonbim/history/sqlite_store.py` | Tablas `undo_stack` / `redo_stack` en SQLite. |
 | `src/axonbim/geometry/topo_registry.py` | `guid` ↔ malla ↔ `WallSpec`; resolución de cara por `topo_id`. |
@@ -45,7 +45,7 @@
 1. El usuario selecciona una cara en el viewport; Godot conoce el `topo_id` asociado a esa cara en la malla serializada.
 2. Se envía `geom.extrude_face` con vector en metros.
 3. El handler carga `WallSpec` y `Mesh` desde `topo_registry`, ejecuta `extrude_wall_face`, guarda snapshot anterior en SQLite (`push_undo`), actualiza IFC en memoria y sustituye malla en registro.
-4. La respuesta incluye `mesh`, `topo_map` y estadísticas opcionales de malla OCP de apoyo.
+4. La respuesta incluye `mesh`, `topo_map` y `debug_mesh_stats` de la malla devuelta.
 5. Godot refresca el nodo de malla y re-enlaza picking con los nuevos `topo_id` según `topo_map`.
 
 ---
@@ -87,6 +87,6 @@
 | **topo_id** | Identificador estable de una cara lógica en la malla expuesta al cliente. |
 | **topo_map** | Diccionario cara-antigua → cara-nueva tras una edición. |
 | **Push/Pull** | Gesto de extruir o acortar un volumen empujando una cara. |
-| **OCP** | OpenCASCADE vía bindings Python; usado para validación y métricas paralelas a la malla analítica. |
+| **debug_mesh_stats** | Resumen (vértices / triángulos / caras lógicas) de la malla devuelta por `geom.extrude_face`. |
 | **SQLite undo** | Persistencia LIFO de snapshots de muro para deshacer/rehacer. |
 | **RPC** | JSON-RPC 2.0 sobre TCP/socket entre Godot y Python. |

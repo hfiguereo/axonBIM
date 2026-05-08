@@ -17,7 +17,7 @@ run/main_scene="res://scenes/main/main.tscn"
 ; GL Compatibility por defecto: en Linux + NVIDIA (p. ej. RTX movil) + Flatpak,
 ; Forward+ (Vulkan) a veces provoca SIGABRT al cerrar o al iniciar. OpenGL es mas estable.
 ; Para Vulkan/Forward+ de nuevo: Project -> Project Settings -> Rendering -> Method.
-config/features=PackedStringArray("4.3", "GL Compatibility")
+config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -35,5 +35,5 @@ window/subwindows/embed_subwindows=false
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
+renderer/rendering_method="forward_plus"
 textures/vram_compression/import_etc2_astc=true

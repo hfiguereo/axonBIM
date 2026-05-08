@@ -30,6 +30,12 @@ func _log_info(message: String) -> void:
 		print("[INFO ] ", message)
 
 
+func _log_debug_mesh_stats(stats: Variant) -> void:
+	var logger: Node = get_node_or_null("/root/Logger")
+	if logger != null and logger.has_method("debug"):
+		logger.call("debug", "geom.extrude_face debug_mesh_stats: %s" % str(stats))
+
+
 func setup(camera: Camera3D, project_view: Node3D) -> void:
 	_camera = camera
 	_project_view = project_view
@@ -142,6 +148,9 @@ func _submit(vec: Vector3) -> void:
 		push_pull_completed.emit(false, _format_submit_error(err))
 		return
 	var result: Dictionary = resp["result"]
+	var stats: Variant = result.get("debug_mesh_stats")
+	if stats != null:
+		_log_debug_mesh_stats(stats)
 	var guid: String = str(result.get("guid", _pending_guid))
 	var mesh_dict: Dictionary = result["mesh"] as Dictionary
 	var topo_map: Dictionary = result.get("topo_map", {}) as Dictionary

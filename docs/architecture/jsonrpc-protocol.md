@@ -65,24 +65,36 @@ Content-Length: <bytes>\r\n
 
 ### 3.2 Response — éxito
 
+Ejemplo realista para **`geom.extrude_face`** (malla lista para `ArrayMesh` de Godot):
+
 ```json
 {
   "jsonrpc": "2.0",
   "id": 42,
   "result": {
+    "guid": "<GlobalId del IfcWall>",
     "mesh": {
       "vertices": [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, ...],
       "indices": [0, 1, 2, 0, 2, 3, ...],
-      "normals": [...]
+      "normals": [...],
+      "topo_ids": ["...", "...", ...],
+      "tri_logical_face": [0, 0, 1, 1, ...]
     },
     "topo_map": {
       "a1b2c3d4...": "f5e6d7c8..."
+    },
+    "debug_mesh_stats": {
+      "vertices": 36,
+      "triangles": 12,
+      "faces": 6
     }
   }
 }
 ```
 
-`topo_map` mapea IDs viejos a nuevos cuando una operación cambia la topología.
+- `topo_map`: IDs de cara **antes** → **después** cuando cambia la topología (vacío si todo es estable).
+- `debug_mesh_stats`: resumen de la **misma** malla que `mesh` (`vertices` = `len(vertices)/3`, `triangles` = `len(indices)/3`, `faces` = cardinalidad de valores distintos en `topo_ids`). Sirve para diagnóstico; el frontend puede ignorarlo.
+- Pipeline único analítico backend↔Godot: ver [`geometry-analytical.md`](geometry-analytical.md).
 
 ### 3.3 Response — error
 
@@ -165,7 +177,7 @@ Solo del backend al frontend. Eventos asíncronos:
 
 | Método | Params | Result |
 |--------|--------|--------|
-| `geom.extrude_face` | `{ "topo_id": "...", "vector": [x,y,z] }` | `{ "guid": "...", "mesh": {...}, "topo_map": {...}, "debug_ocp_mesh_stats": {"vertices": 36, "triangles": 12, "faces": 6} }` |
+| `geom.extrude_face` | `{ "topo_id": "...", "vector": [x,y,z] }` | `{ "guid": "...", "mesh": {...}, "topo_map": {...}, "debug_mesh_stats": {"vertices": <int>, "triangles": <int>, "faces": <int>} }` |
 | `geom.boolean` | `{ "op": "union\|difference\|intersection", "a_guid": "...", "b_guid": "..." }` | `{ "mesh": {...}, "result_guid": "..." }` |
 | `geom.fillet_edge` | `{ "topo_id": "...", "radius": <m> }` | `{ "mesh": {...}, "topo_map": {...} }` |
 
@@ -173,10 +185,33 @@ Solo del backend al frontend. Eventos asíncronos:
 
 | Método | Params | Result |
 |--------|--------|--------|
-| `draw.ortho_snapshot` | `{ "view": "top\|front\|right", "width_px": 1280, "height_px": 800, "margin_px": 24, "view_id": "<opcional>", "requested_scale_m_per_px": <opcional>, "view_range": { ... }, "projection_engine": "analytical\|ocp" (opcional, por defecto `analytical`) }` | Igual que antes; el resultado incluye `projection_engine` cuando hay muros (proyección de aristas desde caja analítica o malla OCP según el motor). Sin muros: comportamiento anterior. |
+| `draw.ortho_snapshot` | `{ "view": "top\|front\|right\|north\|south\|east\|west", "width_px": 1280, "height_px": 800, "margin_px": 24, "view_id": "<opcional>", "requested_scale_m_per_px": <opcional>, "view_range": { ... } }` | Líneas 2D en píxeles + `world_bounds_uv`, `meters_per_px`, `view_range`. Cardinales alineadas con cámaras ortográficas Godot (+Y = norte); `front` ≡ `north`, `right` ≡ `west`. |
 | `draw.export_dxf_walls` | `{ "out_path": ".../walls.dxf", "view": "top\|front\|right" (opcional, por defecto `top`), "view_range": { ... } (opcional) }` | `{ "path": "...", "segment_count": <int>, "view": "..." }` — DXF R2010 mínimo, capa `WALLS`, proyección **analítica** (metros en plano de la vista). |
 | `draw.export_plan` | `{ "level": "<storey_guid>", "format": "dxf\|pdf", "out_path": "...", "norma": "MIVED" }` | `{ "ok": true, "path": "..." }` |
 | `draw.export_section` | `{ "plane": {...}, "format": "...", "out_path": "..." }` | `{ "ok": true, "path": "..." }` |
+
+Ejemplo de **`result`** de `draw.ortho_snapshot` (campos relevantes; sin motor alternativo de proyección):
+
+```json
+{
+  "view": "top",
+  "width_px": 1280,
+  "height_px": 800,
+  "lines_px": [[120.5, 400.0, 880.2, 400.0]],
+  "world_bounds_uv": [-10.0, -10.0, 10.0, 10.0],
+  "meters_per_px": 0.02,
+  "line_count": 42,
+  "view_state": {},
+  "view_range": {
+    "cut_plane_m": 1.2,
+    "top_m": 3.0,
+    "bottom_m": 0.0,
+    "depth_m": 1.2
+  }
+}
+```
+
+Si `view_id` se envía en `params`, `view_state` guarda en sesión escala y rango para esa vista.
 
 Nota de producto actual (frontend): en vistas 2D el modo por defecto es `auto` (intenta
 snapshot vectorial analítico y cae a ortográfico de modelo si hay error o resultado vacío).
@@ -212,7 +247,7 @@ El método RPC sigue siendo único; el ruteo de modo ocurre en Godot.
 
 El **backend Python** (`python -m axonbim`, puerto TCP default `5799`) sigue siendo el **único** canal JSON-RPC para el frontend de producto (`RpcClient`) y la verdad IFC.
 
-Además puede existir un **segundo listener** en el mismo host: un proceso **Godot 4.x `--headless`** que expone JSON-RPC con **idéntico framing** (§2) pero en **otro puerto**, para tareas **auxiliares** (no mutan el IFC; no sustituyen IfcOpenShell/OCP salvo ADR futuro).
+Además puede existir un **segundo listener** en el mismo host: un proceso **Godot 4.x `--headless`** que expone JSON-RPC con **idéntico framing** (§2) pero en **otro puerto**, para tareas **auxiliares** (no mutan el IFC; no sustituyen IfcOpenShell salvo ADR futuro).
 
 | Concepto | Valor / notas |
 |----------|----------------|

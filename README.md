@@ -19,7 +19,7 @@
 La industria BIM en Linux está dominada por herramientas pesadas, propietarias o académicas. AxonBIM nace para ofrecer:
 
 - **Fluidez gráfica de nivel SketchUp** — push/pull, manipulación directa, viewport responsivo.
-- **Rigor paramétrico de nivel Revit** — geometría sólida B-Rep, IFC nativo, normativa estricta.
+- **Rigor paramétrico de nivel Revit** — semántica **IFC** en sesión, malla **analítica** alineada con el viewport (misma geometría que alimenta vistas 2D); normativa estricta en la senda documental. Sólidos B-Rep booleanos completos entran solo cuando un **ADR** lo autorice.
 - **Cumplimiento normativo dominicano (MIVED)** — exportación de planos lista para entrega oficial.
 - **Cero fricción de instalación** — un único Flatpak con todo el entorno Python congelado dentro.
 - **Principios de modelado** — equilibrio gesto / IFC / historial; [texto operativo en `ROADMAP.md`](ROADMAP.md#principios-de-modelado).
@@ -31,20 +31,19 @@ AxonBIM **no reinventa**. Integra tecnologías maduras y las orquesta:
 | Pieza | Rol |
 |-------|-----|
 | **Godot Engine 4.x** | Motor gráfico (GL Compatibility por defecto; Forward+/Vulkan opcional en ajustes) — UI, viewport |
-| **Python 3.12+** | Cerebro — geometría, IFC, normativa, persistencia |
-| **OCP / OpenCASCADE** | Geometría sólida y NURBS |
-| **IfcOpenShell** | Lectura/escritura IFC, generación 2D |
+| **Python 3.12+** | Cerebro — geometría **analítica**, IFC, normativa, persistencia |
+| **IfcOpenShell** | Lectura/escritura IFC y soporte al modelo semántico |
 | **ezdxf** | Exportación DXF bajo simbología MIVED |
 | **SQLite** | Persistencia local, ISO 19650, undo/redo |
 
-La separación es estricta: **Godot muestra, Python decide**. Hablan por JSON-RPC sobre socket Unix.
+La separación es estricta: **Godot muestra, Python decide**. Hablan por **JSON-RPC** (TCP loopback **127.0.0.1** para Godot en desarrollo típico; socket Unix para tests y CLI — ver [`docs/architecture/jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md)).
 
 ## Arquitectura en una línea
 
 ```
 ┌────────────┐   JSON-RPC 2.0    ┌─────────────┐
-│   Godot    │◄─────socket──────►│   Python    │
-│ (frontend) │      Unix          │  (backend)  │
+│   Godot    │◄──TCP loopback────►│   Python    │
+│ (frontend) │   (+ Unix tests)   │  (backend)  │
 └────────────┘                    └─────────────┘
    GPU 100%                       CPU + persistencia
 ```
@@ -53,7 +52,7 @@ Detalle completo en [`.cursor/rules/00-architecture.mdc`](.cursor/rules/00-archi
 
 ## Estado
 
-Proyecto en **Fase 1** (puente de comunicación). Ver [ROADMAP.md](ROADMAP.md).
+**Alpha técnica** (p. ej. `v0.1.0-alpha.2`): puente RPC estable, modelado interactivo de **muros + Push/Pull**, niveles IFC, huecos y losas demo, vistas 2D vectoriales y export DXF — ver [`CHANGELOG.md`](CHANGELOG.md). En [`ROADMAP.md`](ROADMAP.md), las **Fases 1 y 2** están cerradas en sus hitos principales; el trabajo visible siguiente es **Fase 3** (planimetría MIVED / motor 2D normado) y **Fase 4** (distribución / ISO 19650 completo).
 
 ## Manual de usuario
 
@@ -197,6 +196,29 @@ Si **aun asi** crashea o ABRT sigue generando volcados:
 4. Solo si necesitas Forward+/Vulkan: *Project → Project Settings → Rendering →
    Method → Forward+*, sabiendo que puede volver a inestabilidad en tu GPU.
 
+Decisión y matriz detallada: [**ADR-0005**](docs/architecture/decisions/0005-renderizado-godot-gl-default-y-perfiles-gpu.md).
+
+#### Matriz resumida (entorno × API × GPU)
+
+| Entorno típico | API en `project.godot` | Perfil `AXONBIM_GPU_PROFILE` | Notas |
+|----------------|------------------------|------------------------------|--------|
+| Fedora, binario oficial, laptop híbrida | **GL Compatibility** (default) | `auto` (default) | Sin tocar PRIME; Mesa suele elegir iGPU para la ventana. |
+| Mismo, forzar dGPU (NVIDIA lista) | GL default u opt-in Forward+ | `dedicated` | Exporta `DRI_PRIME=1` vía `linux_profile.sh`; requiere drivers propietarios operativos. |
+| Flatpak Godot + NVIDIA | GL default | `auto` | Preferir pruebas con binario oficial si hay SIGABRT; Forward+ más riesgoso en sandbox. |
+| Mensajes GLX / sondas NVIDIA molestas | GL default | `integrated` | No fuerza PRIME; prueba manual `__GLX_VENDOR_LIBRARY_NAME=mesa ./start` si usas GLX (ver abajo). |
+
+**Contrato aplicación (no solo driver):** el `SubViewport` principal puede pausar el render 3D cuando una **vista 2D vectorial** cubre el lienzo (`ViewportManager`); el visor usa MSAA configurable en la escena principal. Enlaces en el ADR-0005.
+
+#### Variables: `AXONBIM_GPU_PROFILE` (Linux, vía `./start` / `run_dev.sh`)
+
+- **`auto`** (default): no se exportan variables de selección de GPU; se respeta `DRI_PRIME` u otras que **tú** hayas definido en el shell.
+- **`integrated`**: no exporta PRIME; pensado para “dejar al SO” o combinar con variables manuales del README.
+- **`dedicated`**: exporta **`DRI_PRIME=1`** para solicitar la GPU discreta en portátiles híbridos (PRIME offload).
+
+Ejemplo: `AXONBIM_GPU_PROFILE=dedicated ./start`
+
+- Archivo opcional **`.env.axonbim`** en la raíz del repo (mismo nivel que `frontend/`): `./start` lo carga antes de `linux_profile.sh`. Plantilla: [`scripts/dev/env.axonbim.example`](scripts/dev/env.axonbim.example). La pestaña **Preferencias** de la cinta en Godot también puede escribir este archivo.
+
 #### Consola: `failed to load driver: nvidia-drm`, `glx: failed to create dri3 screen`, `pci id … driver (null)`
 
 En **portátiles híbridos** (Intel integrada + NVIDIA), el binario de Godot a veces
@@ -204,15 +226,24 @@ En **portátiles híbridos** (Intel integrada + NVIDIA), el binario de Godot a v
 aunque al final diga algo como *Using Device: Intel … Mesa*. **No indica que
 AxonBIM esté roto** si la ventana abre y el viewport responde.
 
-- `./start` y `scripts/dev/run_dev.sh` exportan **`DRI_PRIME=0`** cuando no lo
-  definiste tú, para preferir la GPU integrada y reducir ese ruido.
+- **Ya no** se exporta `DRI_PRIME=0` por defecto (valor inválido en Mesa y aviso *Invalid value (0) for DRI_PRIME*). Usa `AXONBIM_GPU_PROFILE` o define tú `DRI_PRIME` si tu distro lo documenta así.
 - Si quieres forzar **solo el stack Mesa** en GLX (otro caso de mensajes
   persistentes): prueba una vez
   `__GLX_VENDOR_LIBRARY_NAME=mesa ./start` (no lo fijamos por defecto porque
-  en algunos equipos querrás la NVIDIA con `DRI_PRIME=1`).
+  en algunos equipos querrás la NVIDIA con `DRI_PRIME=1` o `AXONBIM_GPU_PROFILE=dedicated`).
 - Para usar la **NVIDIA** de verdad con drivers propietarios, instálalos y
   configura PRIME/offload según la guía de Fedora/RPM Fusion; hasta entonces es
   normal que la dGPU no cargue como DRI3 principal.
+
+#### Verificación rápida (render + GPU + RPC)
+
+1. Arranca `./start` (o `godot --path frontend` con backend en marcha).
+2. En consola de Godot debe aparecer traza **OpenGL** / **GL Compatibility** (no se exige Vulkan).
+3. Pulsa **Ping backend**: el RTT debe mostrar milisegundos.
+4. Orbita el viewport 3D (MMB / atajos de vista) sin errores continuos.
+5. Cierra la ventana: no debe terminar en SIGABRT habitual (si Flatpak+NVIDIA falla, prueba binario oficial; ver sección anterior).
+
+Humo opcional (CI local, requiere `godot` en PATH): `bash scripts/dev/smoke_godot.sh`.
 
 #### "Crear muro" no hace nada
 
@@ -240,7 +271,7 @@ AxonBIM/
 Lee [CONTRIBUTING.md](CONTRIBUTING.md). Resumen:
 
 - Ramas: `feature/<scope>-…`, `fix/<scope>-…` desde `develop`.
-- Commits convencionales en español: `feat(geom): añade fillet en aristas`.
+- Commits convencionales en español: `feat(draw): añade margen configurable en snapshot`.
 - PRs requieren CI verde (lint + type check + tests).
 
 ## Licencia

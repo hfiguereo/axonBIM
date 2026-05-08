@@ -29,7 +29,7 @@ Adoptamos un **MVP en dos frentes** que deben compartir el mismo modelo de datos
 ### 2) Marcas de vista (plan → elevación)
 
 - En planta, el usuario coloca o edita una **marca** con **vector de vista** (o preset ortogonal equivalente: Este/Oeste/Norte/Sur) y metadatos de nombre.
-- Al confirmar o al mover la marca, el sistema **crea o actualiza** una entrada de vista técnica (pestaña / `view2d_*` / estado serializable de proyecto alineado con [ADR-0001](0001-vistas-ortogonales-occ-y-multi-viewport.md)) cuya cámara o proyección queda **alineada** a esa dirección respecto al modelo.
+- Al confirmar o al mover la marca, el sistema **crea o actualiza** una entrada de vista técnica (pestaña / `view2d_*` / estado serializable de proyecto alineado con [ADR-0001](0001-multi-viewport-y-vistas-ortogonales.md)) cuya cámara o proyección queda **alineada** a esa dirección respecto al modelo.
 - La marca tiene identidad estable en estado de proyecto; no es solo decoración: **Propiedades** editan parámetros; el **Project Browser** muestra la vista hija vinculada.
 
 ### Principios transversales
@@ -80,5 +80,5 @@ Adoptamos un **MVP en dos frentes** que deben compartir el mismo modelo de datos
 ## Referencias
 
 - PR que acompaña este ADR: N/A (definición previa a implementación)
-- ADRs relacionados: [0001](0001-vistas-ortogonales-occ-y-multi-viewport.md), [0002](0002-estrategia-combinada-2d-analitica-orto-y-export-dxf.md)
+- ADRs relacionados: [0001](0001-multi-viewport-y-vistas-ortogonales.md), [0002](0002-estrategia-combinada-2d-analitica-orto-y-export-dxf.md)
 - Especificación puente: `docs/architecture/jsonrpc-protocol.md`

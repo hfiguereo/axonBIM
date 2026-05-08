@@ -26,7 +26,7 @@ Ninguna vía por sí sola cubre todos los casos de producto en este momento:
 Adoptar una estrategia combinada estable:
 
 1. **Visualización 2D por defecto:** modo `auto` en frontend.
-   - Intenta snapshot 2D analítico (`draw.ortho_snapshot`, `projection_engine=analytical`).
+   - Intenta snapshot 2D analítico (`draw.ortho_snapshot`).
    - Si falla o retorna sin líneas, cae a vista ortográfica de modelo.
 2. **Conmutación de usuario:** exponer modos de vista 2D en UI:
    - `Auto (vectorial->orto)`,
@@ -34,8 +34,7 @@ Adoptar una estrategia combinada estable:
    - `Modelo ortográfico`.
 3. **Exportación DXF:** `draw.export_dxf_walls` usa proyección analítica del backend y
    se mantiene independiente del modo visual activo.
-4. **Rol OCC/OCP:** conservar OCP para `geom.*` y casos sin equivalente analítico;
-   reducir su uso en `draw.*` para muros caja cuando la vía analítica cubra el caso.
+4. **Ampliaciones futuras:** operaciones `geom.*` que exijan sólidos completos se adoptarán por ADR cuando entren en el tronco; `draw.*` permanece en la vía **analítica** mientras cubra el producto.
 
 ## Alternativas consideradas
 
@@ -49,9 +48,9 @@ Adoptar una estrategia combinada estable:
 - **Pros:** interacción inmediata sin reglas adicionales.
 - **Contras:** no produce salida vectorial técnica por sí mismo.
 
-### Alternativa C - OCC obligatorio para todo `draw.*`
+### Alternativa C - Kernel B-Rep obligatorio para todo `draw.*`
 
-- **Pros:** continuidad con el kernel B-Rep en snapshots.
+- **Pros:** continuidad formal con sólidos en snapshots.
 - **Contras:** mayor costo y dependencia donde la proyección analítica ya resuelve.
 
 ## Consecuencias
@@ -59,7 +58,7 @@ Adoptar una estrategia combinada estable:
 ### Positivas
 
 - Ruta de producto clara entre precisión técnica y cobertura interactiva.
-- Menor acoplamiento de snapshots 2D al pipeline OCP en casos simples.
+- Menor acoplamiento de snapshots 2D al futuro pipeline de sólidos en casos simples.
 - Export DXF trazable desde la geometría autoritativa del backend.
 
 ### Negativas / trade-offs aceptados

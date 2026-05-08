@@ -1,4 +1,4 @@
-# ADR-0001: Adoptar ortogonales OCC con multi-viewport
+# ADR-0001: Multi-viewport y vistas ortogonales alineadas al backend
 
 - **Estado:** Proposed
 - **Fecha:** 2026-05-05
@@ -15,16 +15,16 @@ AxonBIM hoy usa un solo `SubViewport` 3D en Godot con cámara orbital y presets 
 - composición de varias vistas simultáneas (planta/alzado/sección),
 - preparación de salidas tipo lámina (sheet) con escalas y recortes por viewport.
 
-Además, la intención del producto exige que las ortogonales técnicas se alineen con el núcleo geométrico del backend (OCC/OpenCASCADE) para evitar divergencias de interpretación entre “vista de trabajo” y “vista documental”.
+Además, la intención del producto exige que las ortogonales técnicas se alineen con el **núcleo geométrico del backend Python** (misma semántica que la malla IFC expuesta a Godot) para evitar divergencias entre “vista de trabajo” y “vista documental”.
 
 ## Decisión
 
-Adoptaremos una arquitectura de **multi-viewport en Godot** con estado por vista y proyección ortogonal alimentada por geometría calculada en backend/OCC.
+Adoptaremos una arquitectura de **multi-viewport en Godot** con estado por vista y proyección ortogonal alimentada por geometría calculada en el backend (pipeline analítico actual, RPC `draw.*`).
 
 Concretamente:
 
 1. Godot seguirá siendo responsable de UI y renderizado, pero cada viewport tendrá su propio estado (`camera`, `scale_hint`, `clip`, `mode`).
-2. Las ortogonales “de documentación” consultarán al backend para datos de encuadre/recorte derivados de OCC.
+2. Las ortogonales “de documentación” consultarán al backend para datos de encuadre/recorte derivados del modelo de sesión.
 3. La serialización de proyecto incorporará un bloque de `viewports` para permitir independencia de escalas y futura maquetación en hojas.
 
 ## Alternativas consideradas
@@ -39,7 +39,7 @@ Concretamente:
 ### Alternativa B — Resolver todas las vistas en backend y dibujar 2D puro en frontend
 
 - **Descripción:** Godot sólo recibiría proyecciones 2D finales para todo.
-- **Pros:** máxima consistencia normativa con OCC.
+- **Pros:** máxima consistencia normativa con la geometría de sesión en Python.
 - **Contras:** experiencia interactiva más rígida; incremento de complejidad RPC y latencia.
 - **Motivo por el que se descartó:** reduce flexibilidad de interacción y sobrecarga temprana del puente.
 
@@ -48,7 +48,7 @@ Concretamente:
 ### Positivas
 
 - Escala por viewport independiente y futura reutilización en hojas.
-- Mejor alineación entre vistas ortogonales y geometría OCC.
+- Mejor alineación entre vistas ortogonales y geometría servida por el backend.
 - Camino claro para layouts de documentación tipo Revit.
 
 ### Negativas / trade-offs aceptados
@@ -65,7 +65,7 @@ Concretamente:
 
 - [ ] Paso 1: introducir `ViewportState` serializable (escala, modo, clip, encuadre).
 - [ ] Paso 2: crear layout inicial de 2–4 `SubViewport` en Godot con sincronización básica.
-- [ ] Paso 3: exponer endpoints backend para encuadre ortogonal OCC y recorte.
+- [ ] Paso 3: exponer endpoints backend para encuadre ortogonal y recorte coherente con `draw.ortho_snapshot`.
 - [ ] Paso 4: persistir/recuperar estados de viewport en proyecto.
 - [ ] Paso 5: prototipo de hoja con viewports independientes.
 

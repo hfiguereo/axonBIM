@@ -11,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from axonbim.drawing.dxf_walls import write_wall_projection_dxf
 from axonbim.geometry import topo_registry
 from axonbim.geometry.meshing import Mesh, wall_mesh_for_spec
-from axonbim.geometry.ocp_brep import wall_box_mesh_ocp
 from axonbim.geometry.wall_spec import WallSpec
 from axonbim.geometry.workspace_xy import WorkspaceXYHalfExtents
 from axonbim.ifc.session import get_session
@@ -30,14 +29,13 @@ class OrthoSnapshotParams(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    view: Literal["top", "front", "right"] = "top"
+    view: Literal["top", "front", "right", "north", "south", "east", "west"] = "top"
     width_px: int = Field(default=_DEFAULT_WIDTH_PX, ge=256, le=4096)
     height_px: int = Field(default=_DEFAULT_HEIGHT_PX, ge=256, le=4096)
     margin_px: int = Field(default=_DEFAULT_MARGIN_PX, ge=0, le=256)
     view_id: str | None = Field(default=None, min_length=1)
     requested_scale_m_per_px: float | None = Field(default=None, gt=0.0)
     view_range: dict[str, float] | None = None
-    projection_engine: Literal["analytical", "ocp"] = "analytical"
 
 
 class ExportDxfWallsParams(BaseModel):
@@ -95,10 +93,23 @@ def _segment_passes_view_range_top(z1: float, z2: float, view_range: dict[str, f
 
 
 def _project_point(view: str, x: float, y: float, z: float) -> tuple[float, float]:
+    """Proyecta (x,y,z) mundo a (u,v) metros en el plano de dibujo 2D.
+
+    Alineado con las cámaras ortográficas de Godot (Z arriba, +Y = norte del proyecto):
+    ``north`` equivale al antiguo ``front`` (cámara en -Y); ``south`` es la elevación
+    opuesta (cámara en +Y, eje horizontal u invertido). ``west`` equivale a ``right``
+    (cámara en +X); ``east`` invierte u respecto a ``west``.
+    """
     if view == "top":
         return (x, y)
-    if view == "front":
+    if view in ("front", "north"):
         return (x, z)
+    if view == "south":
+        return (-x, z)
+    if view in ("right", "west"):
+        return (y, z)
+    if view == "east":
+        return (-y, z)
     return (y, z)
 
 
@@ -148,24 +159,15 @@ def _build_lines_world(
     view: str,
     specs: dict[str, WallSpec],
     view_range: dict[str, float],
-    engine: Literal["analytical", "ocp"],
 ) -> list[tuple[float, float, float, float]]:
-    """Segmentos UV en metros; ``analytical`` usa mesh caja sin OCP (misma semántica que Godot)."""
+    """Segmentos UV en metros desde la malla analítica de caja (alineada con Godot)."""
     lines: list[tuple[float, float, float, float]] = []
     seen: set[tuple[int, int, int, int]] = set()
     for guid, spec in specs.items():
-        if engine == "ocp":
-            mesh = wall_box_mesh_ocp(
-                spec,
-                parent_guid=guid,
-                op_signature=f"draw.ortho_snapshot:{view}:ocp",
-                linear_deflection_m=0.03,
-            )
-        else:
-            mesh = wall_mesh_for_spec(
-                spec,
-                parent_guid=guid,
-            )
+        mesh = wall_mesh_for_spec(
+            spec,
+            parent_guid=guid,
+        )
         _append_edges_from_tri_mesh(view, mesh, view_range, lines, seen)
     return lines
 
@@ -212,7 +214,7 @@ def _workspace_uv_bounds(
     """Rectángulo (u_min, v_min, u_max, v_max) en metros cuando no hay geometría que encuadre."""
     if view == "top":
         return (-wxy.half_x_m, -wxy.half_y_m, wxy.half_x_m, wxy.half_y_m)
-    if view == "front":
+    if view in ("front", "north", "south"):
         z0 = float(view_range["bottom_m"])
         z1 = float(view_range["top_m"])
         if z1 - z0 < _MIN_Z_SPAN_M:
@@ -249,22 +251,16 @@ def _fit_bounds_to_pixels(
 
 
 async def ortho_snapshot(params: dict[str, Any]) -> dict[str, Any]:
-    """Devuelve líneas ortogonales 2D para una vista (motor analítico u OCP).
+    """Devuelve líneas ortogonales 2D para una vista (proyección analítica de la caja de muro).
 
     Sin elementos de muro en la sesión, devuelve ``lines_px`` vacío y un encuadre UV
     coherente con el rectángulo de trabajo en planta (``workspace_xy``), para alinear
-    el lienzo 2D antes del primer muro.
-
-    ``projection_engine``:
-        ``analytical`` — triangulación de la misma caja que ``wall_box_mesh`` (rápido,
-        alineado con la malla Godot). ``ocp`` — ``wall_box_mesh_ocp`` para casos que
-        requieran coincidencia explícita con el kernel B-Rep.
+    el lienzo 2D en Godot antes del primer muro.
     """
     args = OrthoSnapshotParams.model_validate(params)
     specs = topo_registry.all_wall_specs()
     view_range = _normalized_view_range(args.view, args.view_range)
     session = get_session()
-    engine = args.projection_engine
     if not specs:
         min_u, min_v, max_u, max_v = _workspace_uv_bounds(args.view, view_range, session.workspace_xy)
         lines_px, bounds_world, m_per_px = _fit_bounds_to_pixels(
@@ -277,7 +273,7 @@ async def ortho_snapshot(params: dict[str, Any]) -> dict[str, Any]:
             margin_px=args.margin_px,
         )
     else:
-        lines_world = _build_lines_world(args.view, specs, view_range, engine)
+        lines_world = _build_lines_world(args.view, specs, view_range)
         lines_px, bounds_world, m_per_px = _fit_to_pixels(
             lines_world,
             width_px=args.width_px,
@@ -300,7 +296,6 @@ async def ortho_snapshot(params: dict[str, Any]) -> dict[str, Any]:
             "top_m": view_range["top_m"],
             "bottom_m": view_range["bottom_m"],
             "depth_m": view_range["depth_m"],
-            "projection_engine": engine,
         }
         session.view2d_states[args.view_id] = state
     return {
@@ -313,7 +308,6 @@ async def ortho_snapshot(params: dict[str, Any]) -> dict[str, Any]:
         "line_count": len(lines_px),
         "view_state": state,
         "view_range": view_range,
-        "projection_engine": engine,
     }
 
 
@@ -334,7 +328,7 @@ async def export_dxf_walls(params: dict[str, Any]) -> dict[str, Any]:
             "No hay muros en la sesión para exportar.",
         )
     view_range = _normalized_view_range(args.view, args.view_range)
-    lines_world = _build_lines_world(args.view, specs, view_range, "analytical")
+    lines_world = _build_lines_world(args.view, specs, view_range)
     write_wall_projection_dxf(path, args.view, lines_world)
     return {
         "path": str(path),

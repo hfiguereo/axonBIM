@@ -3,7 +3,7 @@
 
 Paralelo conceptual a tener **sub-elementos** (cara, arista) direccionables en
 App mientras Gui hace picking. Sprint 1.4 solo registraba mallas de
-``ifc.create_wall``; Fase 2 añade ``WallSpec`` para extruir caras sin OCP.
+``ifc.create_wall``; Fase 2 añade ``WallSpec`` para extruir caras sobre la malla analítica.
 """
 
 from __future__ import annotations

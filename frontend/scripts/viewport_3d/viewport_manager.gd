@@ -2,17 +2,17 @@
 class_name ViewportManager
 extends RefCounted
 
-## Política de render del ``SubViewport`` principal (ahorro cuando OCC 2D cubre el lienzo).
+## Política de render del ``SubViewport`` principal (ahorro cuando una vista 2D vectorial cubre el lienzo).
 ##
 ## No contiene matemáticas de cámara; solo ``UPDATE_*``, MSAA y ``debug_draw``.
 
 var _subviewport: SubViewport
-var _use_occ_2d_views: bool
+var _pause_3d_when_vector2d_tab: bool
 
 
-func setup(subviewport: SubViewport, use_occ_2d_views: bool) -> void:
+func setup(subviewport: SubViewport, pause_3d_when_vector2d_tab: bool) -> void:
 	_subviewport = subviewport
-	_use_occ_2d_views = use_occ_2d_views
+	_pause_3d_when_vector2d_tab = pause_3d_when_vector2d_tab
 
 
 func apply_msaa(msaa: int) -> void:
@@ -32,8 +32,8 @@ func update_main_canvas_render_policy(active_view_tab: int, main_canvas_occluded
 		_subviewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
 	var modelado: bool = active_view_tab == 0
-	var occ_covers: bool = _use_occ_2d_views and not modelado
-	if occ_covers:
+	var vector2d_covers: bool = _pause_3d_when_vector2d_tab and not modelado
+	if vector2d_covers:
 		_subviewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	else:
 		_subviewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE

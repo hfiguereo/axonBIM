@@ -22,9 +22,10 @@ Punto de entrada estándar para agentes de IA (Cursor, Codex, Claude Code, otros
 
 2. **Documentación de referencia** (no son reglas, son specs):
    - `docs/architecture/jsonrpc-protocol.md` — esquema completo del puente.
-   - `docs/architecture/geometry-analytical-vs-ocp.md` — cuándo el tronco usa geometría analítica vs OCP.
+   - `docs/architecture/decisions/0005-renderizado-godot-gl-default-y-perfiles-gpu.md` — render GL default y perfiles GPU (Linux).
+   - `docs/architecture/geometry-analytical.md` — pipeline analítico compartido entre malla Godot y snapshot 2D.
    - `docs/roadmap/README.md` — desglose por fases (sub-hitos: qué / cómo / por qué); complementa `ROADMAP.md`.
-   - `docs/architecture/topological-naming.md` — generación de hashes B-Rep.
+   - `docs/architecture/topological-naming.md` — convención de `topo_id` persistentes para caras lógicas (alineada con identidad estable en IFC/B-Rep).
    - `docs/architecture/iso-19650.md` — estados y trazabilidad.
    - `docs/normativa/README.md` — índice maestro de normativas (MIVED, MOPC, otros).
    - `docs/normativa/mived/ccrd-vol-i.md` — extracto operativo del Código de Construcción RD.
@@ -53,6 +54,12 @@ uv run ruff check . && uv run mypy --strict src/
 
 # Frontend — tests GUT headless (requiere godot 4.x)
 godot --headless --path frontend -s addons/gut/gut_cmdln.gd -gtest=res://tests/
+
+# Humo mínimo: proyecto Godot abre y cierra (headless; ver README / ADR-0005)
+# bash scripts/dev/smoke_godot.sh
+#
+# Tras añadir SVG u otras texturas bajo frontend/: importar para generar *.import (y cache bajo .godot/)
+# godot --headless --path frontend --import
 ```
 
 ## Cuando dudes

@@ -16,11 +16,20 @@
 #   AXONBIM_GODOT_REQUIRED_VERSION  Version minima de Godot (default 4.6.2)
 #   AXONBIM_GODOT_AUTO_UPDATE       En Linux: 1 auto-instala/actualiza oficial, 0 desactiva (default 1)
 #   AXONBIM_FORCE_X11               En Linux: 1 para forzar X11 (default 0)
+#   AXONBIM_GPU_PROFILE             En Linux: auto|integrated|dedicated (default auto). Ver README / ADR-0005.
+#   .env.axonbim                     Opcional en la raíz del repo (ignorado por git): se hace source antes de linux_profile.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
+
+if [[ -f "${ROOT}/.env.axonbim" ]]; then
+	set -a
+	# shellcheck source=/dev/null
+	source "${ROOT}/.env.axonbim"
+	set +a
+fi
 
 PORT="${AXONBIM_RPC_PORT:-5799}"
 export AXONBIM_RPC_PORT="${PORT}"

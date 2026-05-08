@@ -367,9 +367,9 @@ Las decisiones más importantes de esta fase, explicadas sin jerga. Cuando el pr
 
 ### 5.4. Geometría analítica para el muro en Fase 1
 
-**Alternativa descartada:** usar OpenCASCADE (OCP) desde el día 1 para generar la malla. **Por qué no:** OCP pesa ~500 MB, requiere compiladores, lo metería en CI con un costo alto, y para una caja de muro es overkill.
+**Alternativa descartada:** enlazar desde el día 1 un kernel CAD pesado (cientos de MB de binarios y toolchain complejo en CI) solo para triangular una caja.
 
-**Decisión:** en Fase 1, `wall_box_mesh` genera la caja con 8 vértices en Python puro. Cuando la Fase 2 introduzca booleanas (agujeros para puertas/ventanas), ahí sí se activa OCP.
+**Decisión:** en Fase 1, `wall_box_mesh` genera la caja con 8 vértices en Python puro. Las booleanas y sólidos más ricos se evaluarán por ADR cuando el producto las exija.
 
 ### 5.5. `sqlite3` de la librería estándar para persistencia interna
 
@@ -377,7 +377,7 @@ Las decisiones más importantes de esta fase, explicadas sin jerga. Cuando el pr
 
 ### 5.6. Conda-pack como mecanismo de empaquetado para Fase 4
 
-**Alternativa descartada:** PyInstaller como primaria. **Por qué no:** PyInstaller falla con bibliotecas que cargan C extensions de forma dinámica (IfcOpenShell, Cadquery-OCP). Conda-pack empaqueta un entorno Conda completo, incluyendo las DLL/`.so`.
+**Alternativa descartada:** PyInstaller como primaria. **Por qué no:** PyInstaller suele requerir hooks para paquetes con extensiones C cargadas dinámicamente (IfcOpenShell es el ejemplo habitual del tronco). Conda-pack empaqueta un entorno Conda completo, incluyendo las DLL/`.so`.
 
 **PyInstaller** queda como plan B si Conda-pack da problemas en Flatpak.
 
@@ -439,7 +439,7 @@ Lo prioritario:
 
 1. **Selección de cara** en el viewport 3D (raycast, highlight).
 2. **Herramienta Push/Pull** — arrastrar una cara la empuja en su normal.
-3. **Operaciones booleanas** con OpenCASCADE en el backend (suma, resta, intersección).
+3. **Operaciones booleanas** en el backend con biblioteca madura elegida por ADR (suma, resta, intersección).
 4. **Topological naming persistente** — cada cara mantiene su GUID aunque la geometría cambie. Este es el problema *difícil* de la fase.
 5. **Undo/Redo con SQLite** — cada operación se apunta en `axon_internal.db`; puedes rebobinar.
 6. **Tests de regresión geométrica** — snapshots de mallas con tolerancia 1e-6 para evitar que un refactor cambie silenciosamente la geometría.
@@ -455,7 +455,7 @@ Lo prioritario:
 - **ArrayMesh** — estructura de malla nativa de Godot, optimizada para GPU.
 - **asyncio** — librería estándar de Python para programación asíncrona (un proceso atiende múltiples cosas sin hilos).
 - **Autoload** — en Godot, un script o escena siempre cargada y accesible globalmente (singleton).
-- **B-Rep** — *Boundary Representation*. Modelo geométrico basado en caras, aristas y vértices (lo que usa OCP e IFC).
+- **B-Rep** — *Boundary Representation*. Modelo geométrico basado en caras, aristas y vértices (IFC y motores CAD lo usan internamente).
 - **Booleana** — operación geométrica de unión, resta o intersección entre sólidos.
 - **CCRD** — *Código Consolidado de Reglamentos Dominicanos* emitido por MIVED.
 - **CI/CD** — *Continuous Integration / Continuous Delivery*. Automatización que se ejecuta al subir cambios (tests, build).
@@ -472,7 +472,6 @@ Lo prioritario:
 - **Malla (Mesh)** — geometría discreta compuesta por vértices + triángulos. Es lo que pinta la GPU.
 - **MIVED** — Ministerio de la Vivienda, Edificaciones y Desarrollo de República Dominicana.
 - **MOPC** — Ministerio de Obras Públicas y Comunicaciones.
-- **OCP** (Cadquery-OCP) — binding Python de OpenCASCADE, motor CAD geométrico de referencia.
 - **Pydantic** — librería Python de validación de datos por modelos tipados.
 - **RPC** — *Remote Procedure Call*. Llamada a función que vive en otro proceso.
 - **Singleton** — objeto único en toda la aplicación.

@@ -17,7 +17,7 @@ La **funcionalidad mínima aspiracional** no es clonar Revit ni SketchUp: es com
 | **SketchUp** | Trazo directo en vista, inferencias, pocos modos, feedback inmediato | Plugins masivos, geometría “suelta” sin IFC, layout de planos comercial |
 | **Revit** | Tipologías, propiedades por elemento, vistas derivadas del modelo, entrega documental | Familias paramétricas complejas, worksharing, MEP/estructura completos, render integrado |
 
-**Lectura honesta:** hoy AxonBIM cubre **muros + extrusión topológica + vistas 2D técnicas tempranas**; faltan **huecos en muro, losas, niveles/storey ricos, hojas con cajetín MIVED** y otras piezas de la tabla anterior para acercarse a un “mínimo habitable” frente a esos referentes. El inventario priorizado sigue en [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md) y en [`docs/roadmap/fase-03-subhitos.md`](docs/roadmap/fase-03-subhitos.md).
+**Lectura honesta:** hoy el tronco cubre **muros + Push/Pull (`geom.extrude_face`) + historial**, **niveles `IfcBuildingStorey`**, **huecos rectangulares en muro** (RPC + demo UI), **losas prismáticas demo**, **vistas 2D vectoriales** (`draw.ortho_snapshot`, misma geometría analítica que la malla Godot), export **DXF** de muros y **apertura IFC** con rehidratación de muros caja. Siguen fuera de un “mínimo habitable” frente a Revit **hojas con cajetín MIVED**, **simbología 2D normada completa**, **cotas/secciones**, **estados ISO 19650** operativos en producto y **empaquetado** sin terminal. Inventario priorizado: [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md) y [`docs/roadmap/fase-03-subhitos.md`](docs/roadmap/fase-03-subhitos.md).
 
 ---
 
@@ -70,11 +70,11 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 | Área | Qué hay hoy | Notas |
 |------|-------------|--------|
 | **Puente RPC** | TCP `5799` + Unix socket; `RpcClient`; protocolo en `jsonrpc-protocol.md` | Base Fase 1. |
-| **OCC / 2D** | `draw.ortho_snapshot` con motor **analítico** u **OCP** (`projection_engine`); canvas 2D OCC en Godot con estados y fallback a ortográfico legacy | Cubre “motor 2D” operativo; **no** es aún plano MIVED completo (Fase 3). |
+| **Vistas 2D / snapshot** | `draw.ortho_snapshot` (**analítico**); lienzo 2D vectorial en Godot + fallback ortográfico legacy | Cubre “motor 2D” operativo; **no** es aún plano MIVED completo (Fase 3). |
 | **DXF** | `draw.export_dxf_walls` (proyección analítica de muros; geometría en `WALLS`, registro de capas `AXON_*` en plantilla) | Distinto de planta normada CCRD §3.7. |
 | **Godot UI** | Cinta, pestañas de vista (modelado + 2D), docks desacoplables, vista flotante, tema `axon_theme.tres`, subventanas nativas (`embed_subwindows`), `EventBus` (piloto), `ViewportManager` (política de render del `SubViewport`) | Mejora producto sin cambiar la autoridad del backend. |
-| **Worker headless** | Proceso Godot opcional en **puerto auxiliar** (`5800` default), métodos `worker.*` piloto; `WorkerManager` en Python; **ADR-0003** | Solo tareas **auxiliares** serializables; **no** sustituye IfcOpenShell/OCP como fuente de verdad. |
-| **Modelado** | Crear muro, tipologías, Push/Pull, edición por elemento, `geom.extrude_face` con estadísticas OCP, `history.undo` / `history.redo`, malla analítica + ruta B-Rep en evolución | Fase 2: **cierre documental** en [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md) + test `test_fifty_five_walls_extrude_subset_stable`. |
+| **Worker headless** | Proceso Godot opcional en **puerto auxiliar** (`5800` default), métodos `worker.*` piloto; `WorkerManager` en Python; **ADR-0003** | Solo tareas **auxiliares** serializables; **no** sustituye IfcOpenShell como fuente de verdad. |
+| **Modelado** | Crear muro, tipologías, Push/Pull, edición por elemento, `geom.extrude_face` con `debug_mesh_stats`, `history.undo` / `history.redo`, malla analítica | Fase 2: **cierre documental** en [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md) + test `test_fifty_five_walls_extrude_subset_stable`. |
 
 **Fases 3 y 4** siguen **abiertas**. Inventario explícito de pendientes: [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md).
 
@@ -105,17 +105,17 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 **Hitos:**
 
 - [x] Herramienta gráfica Push/Pull en Godot (cara + arrastre; modo edición por elemento).
-- [x] Backend recibe vector de extrusión (`geom.extrude_face`), usa cadena **OCP/OpenCASCADE** para validar/generar malla paralela y devuelve topología + `debug_ocp_mesh_stats` (convivencia con malla analítica).
+- [x] Backend recibe vector de extrusión (`geom.extrude_face`), aplica extrusión **analítica** y devuelve topología + `debug_mesh_stats` de la malla resultante.
 - [x] Sistema de IDs topológicos persistentes en **evolución** (formato Fase 2; ver `docs/architecture/topological-naming.md` y tests de regresión). *Estabilidad entre operaciones cubierta por regresión geométrica + test de estrés multi-muro.*
 - [x] Undo/Redo en sesión vía RPC (`history.undo` / `history.redo`) integrado en la UI.
 - [x] Undo/Redo con **persistencia** en SQLite (`session_history.db` en el directorio de datos de AxonBIM, o ruta `AXONBIM_HISTORY_DB`) entre reinicios del backend. *(El módulo `axonbim/persistence/` sigue reservado para metadatos de proyecto más amplios.)*
 - [x] Tests de regresión geométrica (snapshots con tolerancia 1e-6; suites RPC ampliadas).
 
-**Hacia paridad mínima “cáscara de vivienda” (siguiente oleada de modelado):** *no forman parte del criterio de salida ya cerrado de Fase 2; orden e IDs en* [`docs/roadmap/fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) §*Oleada «cáscara de vivienda»* *e inventario Fases 3–4.*
+**Oleada «cáscara de vivienda» (post-criterio Fase 2):** *no entró en el criterio de salida formal de Fase 2 (50+ muros + extrusiones); los sub-hitos **SH-F2-11…13** están **cerrados** en* [`docs/roadmap/fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md)*. Prioridades siguientes en Fases 3–4:*
 
 - [x] **SH-F2-11** — Niveles / `IfcBuildingStorey` y forjado de trabajo en producto *(ver* [`fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) *SH-F2-11: RPC + UI + `project.open` + rehidratación de muros caja).*
-- [ ] **SH-F2-12** — Huecos en muro (puerta/ventana MVP), hosteados en IFC + malla.
-- [ ] **SH-F2-13** — Losas / forjado simple por contorno (MVP).
+- [x] **SH-F2-12** — Huecos en muro (puerta/ventana MVP), hosteados en IFC + malla *(cerrado; ver* [`fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) *SH-F2-12)*.
+- [x] **SH-F2-13** — Losas / forjado simple por contorno (MVP) *(cerrado; ver* [`fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md) *SH-F2-13)*.
 
 **Criterio de salida:** un modelo de 50+ paredes editado interactivamente sin perder identidad topológica entre operaciones. **Demostración:** test de integración `tests/integration/test_phase2_many_walls_stress.py` (55 muros + extrusiones). Ver [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md).
 
@@ -125,11 +125,11 @@ Resumen de lo que **ya existe** en el repositorio y cómo encaja con las fases (
 
 **Objetivo:** Representación técnica bajo estándar dominicano.
 
-**Contexto:** El motor **OCC** en el nombre histórico del roadmap se alinea hoy con **OpenCASCADE vía OCP** en el backend (`draw.ortho_snapshot`, mallas de muro, extrusión). La **salida gráfica normada** (CCRD/MIVED) es una capa adicional sobre ese pipeline.
+**Contexto:** Las vistas 2D consumen **la misma geometría analítica** que alimenta las mallas en Godot (`draw.ortho_snapshot`). La **salida gráfica normada** (CCRD/MIVED) es una capa adicional sobre ese pipeline.
 
 **Hitos:**
 
-- [x] Generador de vistas 2D en Python: **`draw.ortho_snapshot`** (analítico u OCP) + **`draw.export_dxf_walls`** (analítico). *Pendiente:* integración explícita con `ifcopenshell.draw` donde aporte valor sin duplicar OCC.
+- [x] Generador de vistas 2D en Python: **`draw.ortho_snapshot`** (analítico) + **`draw.export_dxf_walls`** (analítico). *Pendiente:* integración explícita con `ifcopenshell.draw` donde aporte valor sin duplicar proyección propia.
 - [ ] Aplicación estricta de simbología y grosores del **CCRD Vol. I** (MIVED) — ver `docs/normativa/mived/ccrd-vol-i.md` §3.7.
 - [ ] Sustitución de proyecciones “planas” por **simbología técnica** completa (hatches, arcos de puerta, líneas de ventana) según norma.
 - [x] UI en Godot: pestañas de vista, modos 2D, export PNG, DXF muros, **Project Browser** con vistas 2D. *Pendiente:* secciones, PDF, checklist MIVED completo.

@@ -2,6 +2,7 @@
 extends Node
 
 ## Escena raiz de AxonBIM (Fase 2 — UI cinta + Push/Pull + undo RPC).
+## Brújula de proyecto: **+Y = norte** (planta en XY, Z arriba). Las elevaciones N/S/E/O se nombran respecto a ese eje.
 
 const OrbitRig := preload("res://scripts/viewport_3d/orbit_camera_rig.gd")
 const CreateWallTool := preload("res://scripts/tools/create_wall_tool.gd")
@@ -26,7 +27,7 @@ const VIEWPORT_ORTHO_CLEAR_BG: Color = Color(0.13, 0.14, 0.165, 1.0)
 const VIEWPORT_PERSP_AMBIENT_ENERGY: float = 0.48
 const VIEWPORT_ORTHO_AMBIENT_ENERGY: float = 0.40
 const UI_ACCENT_DANGER: Color = Color(0.93, 0.32, 0.26, 1.0)
-const USE_OCC_2D_VIEWS: bool = false
+const USE_VECTOR_2D_FULLSCREEN_TAB: bool = false
 ## Árbol de diagnóstico RPC (EventBus). Desactivado por defecto; activar solo en desarrollo.
 const EXPERIMENTAL_EVENTBUS_RPC_INSPECTOR: bool = false
 const VIEW2D_STATE_LOADING: String = "loading"
@@ -82,6 +83,12 @@ var _storey_tree_items: Dictionary = {}
 @onready var _ribbon_tabs: TabBar = $%RibbonTabs
 @onready var _ribbon_tools_inicio: Control = $%RibbonToolsInicio
 @onready var _ribbon_tools_placeholder: Control = $%RibbonToolsPlaceholder
+@onready var _ribbon_tools_preferencias: Control = $%RibbonToolsPreferencias
+@onready var _pref_renderer_option: OptionButton = $%PrefRendererOption
+@onready var _pref_gpu_profile_option: OptionButton = $%PrefGpuProfileOption
+@onready var _pref_save_renderer_button: Button = $%PrefSaveRendererButton
+@onready var _pref_write_env_button: Button = $%PrefWriteEnvButton
+@onready var _pref_restart_dialog: AcceptDialog = $%PrefRestartDialog
 @onready var _ribbon: Control = $UI/Root/Ribbon
 @onready var _ribbon_body: Control = $UI/Root/Ribbon/RibbonBody
 @onready var _ping_button: Button = $%PingButton
@@ -152,12 +159,12 @@ var _view2d_items: Dictionary = {}  # id -> TreeItem
 var _view2d_defs: Dictionary = {}  # id -> {label, preset}
 var _view2d_runtime_state: Dictionary = {}  # id -> {preset,label,state,scale_m_per_px}
 var _next_view2d_idx: int = 1
-var _occ_wall_snapshot_debounce: Timer
-var _occ_wall_snapshot_pending_id: String = ""
+var _vector2d_snapshot_debounce: Timer
+var _vector2d_snapshot_pending_tab_id: String = ""
 var _view2d_render_mode: String = VIEW2D_MODE_AUTO
 var _view2d_mode_before_wall: String = ""
-var _has_last_valid_occ_uv: bool = false
-var _last_valid_occ_uv: Vector2 = Vector2.ZERO
+var _has_last_valid_snapshot_uv: bool = false
+var _last_valid_snapshot_uv: Vector2 = Vector2.ZERO
 var _kb_wall_cursor_world: Vector3 = Vector3.ZERO
 var _kb_wall_cursor_ready: bool = false
 var _visual_style_current: String = VIS_STYLE_ARCH
@@ -236,21 +243,27 @@ func _on_experimental_inspector_notification(method: String, params: Dictionary)
 
 func _ready() -> void:
 	_viewport_manager = _ViewportManagerGd.new()
-	_viewport_manager.setup(_subviewport, USE_OCC_2D_VIEWS)
+	_viewport_manager.setup(_subviewport, USE_VECTOR_2D_FULLSCREEN_TAB)
 	_log_info("AxonBIM frontend iniciado (Fase 2 · UI cinta + acoples).")
 	_log_label.text = (
-		"Vista: 1-3 orto | 4 persp — ambos fondo plano sin horizonte artefacto | "
-		+ "MMB orbita orto→persp | Mayus+MMB pan | rueda zoom | Inicio/R reset"
+		"Vistas ortogonales y perspectiva: MMB orbita desde orto, Mayus+MMB pan, rueda zoom, Inicio/R reset. "
+		+ "Arbol: abre Planta / N / S / E / O (+Y=norte proyecto); pestañas solo si hay más de una vista abierta."
 	)
-	_apply_visual_polish()
 
 	_camera_rig.viewport_projection_mode_changed.connect(_on_viewport_projection_mode_changed)
 
 	_ribbon_tabs.set_tab_title(0, "Inicio")
 	_ribbon_tabs.set_tab_title(1, "Insertar")
 	_ribbon_tabs.set_tab_title(2, "Vista")
+	_ribbon_tabs.set_tab_title(3, "Preferencias")
+	var prefs_tab_icon: Texture2D = load("res://assets/icons/actions/action_settings.svg") as Texture2D
+	if prefs_tab_icon != null:
+		_ribbon_tabs.set_tab_icon(3, prefs_tab_icon)
+	_setup_preferences_ui()
 	_ribbon_tabs.tab_changed.connect(_on_ribbon_tab_changed)
 	_on_ribbon_tab_changed(_ribbon_tabs.current_tab)
+
+	_apply_visual_polish()
 
 	_wall_tool = CreateWallTool.new()
 	add_child(_wall_tool)
@@ -301,12 +314,12 @@ func _ready() -> void:
 	_viewport_container.gui_input.connect(_on_viewport_container_gui_input)
 	_project_tree.item_selected.connect(_on_project_tree_item_selected)
 
-	var occ_debounce := Timer.new()
-	occ_debounce.wait_time = 0.12
-	occ_debounce.one_shot = true
-	occ_debounce.timeout.connect(_on_occ_wall_snapshot_debounce_timeout)
-	add_child(occ_debounce)
-	_occ_wall_snapshot_debounce = occ_debounce
+	var snapshot_debounce := Timer.new()
+	snapshot_debounce.wait_time = 0.12
+	snapshot_debounce.one_shot = true
+	snapshot_debounce.timeout.connect(_on_vector2d_snapshot_debounce_timeout)
+	add_child(snapshot_debounce)
+	_vector2d_snapshot_debounce = snapshot_debounce
 
 	_build_project_tree()
 	_refresh_status()
@@ -375,11 +388,11 @@ func _refresh_workspace_hud() -> void:
 	var cam_hint := ""
 	if is_instance_valid(_camera_rig) and _camera_rig.has_method("get_viewport_scale_hint_fragment"):
 		cam_hint = str(_camera_rig.get_viewport_scale_hint_fragment())
-	var occ_hint: String = ""
+	var view_range_hint: String = ""
 	if _active_view_tab != 0 and _view_state_by_tab.has(_active_view_tab):
 		var row: Dictionary = _view_state_by_tab[_active_view_tab] as Dictionary
 		var vr: Dictionary = row.get("view_range", {}) as Dictionary
-		occ_hint = (
+		view_range_hint = (
 			" | %s · corte %.2fm · top %.2fm · bottom %.2fm"
 			% [
 				str(row.get("name", "Vista")),
@@ -390,11 +403,11 @@ func _refresh_workspace_hud() -> void:
 		)
 	_workspace_hud.text = (
 		"Espacio IFC planta ±X %.0f m · ±Y %.0f m (medias)   |   %s%s"
-		% [_workspace_xy_half_cached.x, _workspace_xy_half_cached.y, cam_hint, occ_hint]
+		% [_workspace_xy_half_cached.x, _workspace_xy_half_cached.y, cam_hint, view_range_hint]
 	)
 
 
-## Con vista 2D OCC a pantalla completa, el 3D no se redibuja cada fotograma (menos lag).
+## Con vista 2D vectorial a pantalla completa, el 3D no se redibuja cada fotograma (menos lag).
 func _sync_main_subviewport_render_policy() -> void:
 	if _viewport_manager == null:
 		return
@@ -402,16 +415,16 @@ func _sync_main_subviewport_render_policy() -> void:
 	_viewport_manager.update_main_canvas_render_policy(_active_view_tab, occluded)
 
 
-func _schedule_occ_view2d_refresh_after_wall(view2d_id: String) -> void:
-	if view2d_id == "" or _occ_wall_snapshot_debounce == null:
+func _schedule_vector2d_snapshot_refresh_after_wall(view2d_id: String) -> void:
+	if view2d_id == "" or _vector2d_snapshot_debounce == null:
 		return
-	_occ_wall_snapshot_pending_id = view2d_id
-	_occ_wall_snapshot_debounce.start()
+	_vector2d_snapshot_pending_tab_id = view2d_id
+	_vector2d_snapshot_debounce.start()
 
 
-func _on_occ_wall_snapshot_debounce_timeout() -> void:
-	var id: String = _occ_wall_snapshot_pending_id
-	_occ_wall_snapshot_pending_id = ""
+func _on_vector2d_snapshot_debounce_timeout() -> void:
+	var id: String = _vector2d_snapshot_pending_tab_id
+	_vector2d_snapshot_pending_tab_id = ""
 	if id == "":
 		return
 	_render_view2d_for_id(id)
@@ -421,7 +434,7 @@ func _on_view_tabs_changed(tab: int) -> void:
 	if _active_view_tab != tab:
 		_save_active_view_state(_active_view_tab)
 	_active_view_tab = tab
-	_has_last_valid_occ_uv = false
+	_has_last_valid_snapshot_uv = false
 	var modelado: bool = tab == 0
 	_sync_main_subviewport_render_policy()
 	_workspace_hud.visible = true
@@ -431,6 +444,7 @@ func _on_view_tabs_changed(tab: int) -> void:
 	if rig == null:
 		_sync_mini_tabs_from_main()
 		_apply_visual_style(_visual_style_current)
+		_sync_view_tabs_bar_visibility()
 		return
 	rig.set_orthographic_zoom_locked(false)
 	_apply_view_state_for_tab(tab)
@@ -442,64 +456,54 @@ func _on_view_tabs_changed(tab: int) -> void:
 	_refresh_top_palette_controls()
 	_apply_visual_style(_visual_style_current)
 	_refresh_main_viewport_docked_state()
-
-
-func _default_view_range_for_tab(tab: int) -> Dictionary:
-	if tab == 1:
-		return {
-			"cut_plane_m": DEFAULT_PLAN_CUT_M,
-			"top_m": DEFAULT_PLAN_TOP_M,
-			"bottom_m": DEFAULT_PLAN_BOTTOM_M,
-			"depth_m": DEFAULT_PLAN_DEPTH_M,
-		}
-	return {"cut_plane_m": 0.0, "top_m": 10.0, "bottom_m": -10.0, "depth_m": 10.0}
-
-
-func _preset_for_tab(tab: int) -> String:
-	match tab:
-		0:
-			return "persp"
-		1:
-			return "top"
-		2:
-			return "front"
-		3:
-			return "right"
-		_:
-			return "top"
-
-
-func _default_view_name_for_tab(tab: int) -> String:
-	match tab:
-		0:
-			return "Modelado 3D"
-		1:
-			return "Planta Nivel 00"
-		2:
-			return "Frente A"
-		3:
-			return "Derecha A"
-		_:
-			return "Vista %d" % tab
+	_sync_view_tabs_bar_visibility()
 
 
 func _init_default_view_states() -> void:
 	var rig: OrbitRig = _camera_rig as OrbitRig
-	for i in range(_view_tabs_bar.tab_count):
-		var preset: String = _preset_for_tab(i)
-		rig.set_view_preset(preset)
-		_view_state_by_tab[i] = {
-			"name": _default_view_name_for_tab(i),
-			"preset": preset,
-			"camera": rig.capture_view_state(),
-			"camera_snapshot": _capture_main_camera_snapshot(),
-			"view_range": _default_view_range_for_tab(i),
-			"visual_style": _visual_style_current,
-			"scale_2d": 1.0,
-			"is_default": i <= 3,
-		}
-		_view_tabs_bar.set_tab_title(i, str(_view_state_by_tab[i]["name"]))
+	if rig == null:
+		return
+	while _view_tabs_bar.tab_count > 1:
+		_view_tabs_bar.remove_tab(_view_tabs_bar.tab_count - 1)
+	_view_tabs_bar.set_tab_title(0, "Modelado 3D")
+	_view_tabs_bar.current_tab = 0
+	_view_state_by_tab.clear()
 	rig.set_view_preset("persp")
+	_view_state_by_tab[0] = {
+		"name": "Modelado 3D",
+		"preset": "persp",
+		"camera": rig.capture_view_state(),
+		"camera_snapshot": _capture_main_camera_snapshot(),
+		"view_range": {"cut_plane_m": 0.0, "top_m": 10.0, "bottom_m": -10.0, "depth_m": 10.0},
+		"visual_style": _visual_style_current,
+		"scale_2d": 1.0,
+		"is_default": true,
+	}
+	_sync_view_tabs_bar_visibility()
+
+
+func _sync_view_tabs_bar_visibility() -> void:
+	if _view_tabs_bar == null:
+		return
+	_view_tabs_bar.visible = _view_tabs_bar.tab_count > 1
+
+
+## Mapea preset de cámara Godot al parámetro ``view`` de ``draw.ortho_snapshot`` (misma cadena salvo legacy).
+func _draw_view_kind_for_rpc(preset: String) -> String:
+	match preset:
+		"top", "north", "south", "east", "west", "front", "right":
+			return preset
+		_:
+			return "top"
+
+
+func _cycle_open_view_tab(dir: int) -> void:
+	if _view_tabs_bar.tab_count <= 1:
+		return
+	var n: int = _view_tabs_bar.tab_count
+	var cur: int = _view_tabs_bar.current_tab
+	var nxt: int = posmod(cur + dir, n)
+	_switch_view_tab_keyboard(nxt)
 
 
 func _create_or_reuse_view_tab(name: String, preset: String, view_range: Dictionary, is_default: bool) -> int:
@@ -522,6 +526,7 @@ func _create_or_reuse_view_tab(name: String, preset: String, view_range: Diction
 		"scale_2d": 1.0,
 		"is_default": is_default,
 	}
+	_sync_view_tabs_bar_visibility()
 	return tab_idx
 
 
@@ -543,7 +548,7 @@ func _apply_view_state_for_tab(tab: int) -> void:
 	var row: Dictionary = _view_state_by_tab[tab] as Dictionary
 	var cam: Dictionary = row.get("camera", {}) as Dictionary
 	if cam.is_empty():
-		rig.set_view_preset(str(row.get("preset", _preset_for_tab(tab))))
+		rig.set_view_preset(str(row.get("preset", "persp")))
 	else:
 		rig.apply_view_state(cam)
 	var style: String = str(row.get("visual_style", VIS_STYLE_ARCH))
@@ -1416,7 +1421,7 @@ func _duplicate_active_view() -> void:
 
 
 func _set_wall_trace_mode(enable: bool) -> void:
-	if not USE_OCC_2D_VIEWS:
+	if not USE_VECTOR_2D_FULLSCREEN_TAB:
 		return
 	if _active_view_tab == 0:
 		return
@@ -1435,7 +1440,7 @@ func _render_view2d_for_id(id: String) -> void:
 	if _view2d_render_mode == VIEW2D_MODE_ORTHO:
 		_activate_legacy_ortho_view2d(preset, "Vista 2D: modo Modelo ortográfico activo.")
 		return
-	_render_occ_view2d_async(id)
+	_render_vector2d_snapshot_async(id)
 
 
 func _activate_legacy_ortho_view2d(preset: String, message: String) -> void:
@@ -1478,19 +1483,15 @@ func _update_view2d_mode_button_text() -> void:
 
 
 func _tab_to_preset(tab: int) -> String:
-	match tab:
-		1:
-			return "top"
-		2:
-			return "front"
-		3:
-			return "right"
-		_:
-			return "persp"
+	if tab == 0:
+		return "persp"
+	if _view_state_by_tab.has(tab):
+		return str(_view_state_by_tab[tab].get("preset", "top"))
+	return "persp"
 
 
-## Convierte ``(u,v)`` del snapshot OCC a mundiales **X/Y** en el plano del nivel activo (``_work_plane_elevation_m``).
-func _occ_uv_to_floor_point_world(uv: Vector2) -> Vector3:
+## Convierte ``(u,v)`` del snapshot 2D a mundiales **X/Y** en el plano del nivel activo (``_work_plane_elevation_m``).
+func _snapshot_uv_to_floor_point_world(uv: Vector2) -> Vector3:
 	var preset: String = _tab_to_preset(_active_view_tab)
 	var ref: Vector2 = Vector2.ZERO
 	if _wall_tool != null and _wall_tool.has_method("get_chain_floor_reference_xy"):
@@ -1499,6 +1500,10 @@ func _occ_uv_to_floor_point_world(uv: Vector2) -> Vector3:
 	match preset:
 		"top":
 			return Vector3(uv.x, uv.y, zb)
+		"north", "south":
+			return Vector3(uv.x, ref.y, zb)
+		"east", "west":
+			return Vector3(ref.x, uv.x, zb)
 		"front":
 			return Vector3(uv.x, ref.y, zb)
 		"right":
@@ -1507,7 +1512,7 @@ func _occ_uv_to_floor_point_world(uv: Vector2) -> Vector3:
 			return Vector3(uv.x, uv.y, zb)
 
 
-func _is_valid_occ_uv(uv: Vector2) -> bool:
+func _is_valid_snapshot_uv(uv: Vector2) -> bool:
 	return not (is_inf(uv.x) or is_inf(uv.y) or is_nan(uv.x) or is_nan(uv.y))
 
 
@@ -1532,7 +1537,7 @@ func _set_view2d_status(id: String, status: String, message: String) -> void:
 	_view_2d_placeholder_hint.text = message
 
 
-func _render_occ_view2d_async(id: String) -> void:
+func _render_vector2d_snapshot_async(id: String) -> void:
 	if not _view2d_defs.has(id):
 		return
 	var d: Dictionary = _view2d_defs[id] as Dictionary
@@ -1541,12 +1546,11 @@ func _render_occ_view2d_async(id: String) -> void:
 	_view_2d_placeholder_title.text = "%s · Plano vectorial" % label
 	_set_view2d_status(id, VIEW2D_STATE_LOADING, "Generando snapshot 2D analítico...")
 	var params: Dictionary = {
-		"view": preset,
+		"view": _draw_view_kind_for_rpc(preset),
 		"width_px": max(256, int(_view_2d_preview.size.x)),
 		"height_px": max(256, int(_view_2d_preview.size.y)),
 		"margin_px": 24,
 		"view_id": id,
-		"projection_engine": "analytical",
 	}
 	if _view2d_runtime_state.has(id):
 		var existing: Dictionary = _view2d_runtime_state[id] as Dictionary
@@ -1570,9 +1574,9 @@ func _render_occ_view2d_async(id: String) -> void:
 	if _view_2d_preview.has_method("set_snapshot"):
 		_view_2d_preview.call("set_snapshot", lines)
 	var bounds_uv: Array = res.get("world_bounds_uv", []) as Array
-	if _view_2d_preview.has_method("set_occ_mapping"):
+	if _view_2d_preview.has_method("set_uv_mapping"):
 		_view_2d_preview.call(
-			"set_occ_mapping",
+			"set_uv_mapping",
 			bounds_uv,
 			int(res.get("width_px", 0)),
 			int(res.get("height_px", 0)),
@@ -1597,7 +1601,7 @@ func _render_occ_view2d_async(id: String) -> void:
 	_set_view2d_status(
 		id,
 		VIEW2D_STATE_READY,
-		"Snapshot OCC listo (%d líneas) · escala aprox %.4f m/px"
+		"Snapshot 2D listo (%d líneas) · escala aprox %.4f m/px"
 		% [int(res.get("line_count", 0)), scale_m_per_px],
 	)
 	_log_label.text = "Vista 2D vectorial lista: %s" % label
@@ -1640,6 +1644,18 @@ func _apply_ui_polish() -> void:
 		UI_BORDER,
 		10
 	)
+	_apply_panel_style(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos,
+		UI_PANEL,
+		UI_BORDER,
+		10
+	)
+	_apply_panel_style(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque,
+		UI_PANEL,
+		UI_BORDER,
+		10
+	)
 	_apply_panel_style($UI/Root/Workspace/MainSplit/LeftDock/LeftDockHeader, UI_PANEL, UI_BORDER, 8)
 	_apply_panel_style(
 		$UI/Root/Workspace/MainSplit/InnerSplit/RightDock/RightDockHeader, UI_PANEL, UI_BORDER, 8
@@ -1658,6 +1674,8 @@ func _apply_ui_polish() -> void:
 	_apply_button_style(_export_2d_views_button, UI_ACCENT_BLUE)
 	_apply_button_style(_export_wall_dxf_button, UI_ACCENT_BLUE)
 	_apply_button_style(_view2d_mode_button, UI_ACCENT_BLUE)
+	_apply_button_style(_pref_save_renderer_button, UI_ACCENT_BLUE)
+	_apply_button_style(_pref_write_env_button, UI_ACCENT_BLUE)
 	_apply_button_style(_add_view2d_button, UI_ACCENT_BLUE)
 	_apply_button_style(_delete_view2d_button, UI_ACCENT_DANGER)
 	_apply_panel_style(%ViewTabsHost, UI_PANEL_ELEVATED, UI_BORDER, 8)
@@ -1674,6 +1692,14 @@ func _apply_ui_polish() -> void:
 	_style_label(_status_label, UI_TEXT)
 	_style_label(_rtt_label, UI_MUTED)
 	_style_label(_log_label, UI_TEXT)
+	_style_label(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelGraficos/VBoxGraficos/LblCudaNote,
+		UI_MUTED
+	)
+	_style_label(
+		$UI/Root/Ribbon/RibbonBody/RibbonStack/RibbonToolsPreferencias/PanelArranque/VBoxArranque/LblEnvHint,
+		UI_MUTED
+	)
 	_style_label($UI/Root/Workspace/MainSplit/LeftDock/LeftDockHeader/LeftDockTitle, UI_TEXT)
 	_style_label(
 		$UI/Root/Workspace/MainSplit/InnerSplit/RightDock/RightDockHeader/RightDockTitle, UI_TEXT
@@ -1835,16 +1861,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_do_undo_async()
 		elif k.pressed and k.alt_pressed and not k.ctrl_pressed and not k.meta_pressed:
 			if k.keycode == KEY_1:
-				_switch_view_tab_keyboard(1)
+				_switch_view_tab_keyboard(0)
 				get_viewport().set_input_as_handled()
 			elif k.keycode == KEY_2:
-				_switch_view_tab_keyboard(2)
+				_cycle_open_view_tab(+1)
 				get_viewport().set_input_as_handled()
 			elif k.keycode == KEY_3:
-				_switch_view_tab_keyboard(3)
-				get_viewport().set_input_as_handled()
-			elif k.keycode == KEY_4:
-				_switch_view_tab_keyboard(0)
+				_cycle_open_view_tab(-1)
 				get_viewport().set_input_as_handled()
 		elif k.pressed and k.keycode == KEY_DELETE and _delete_wall_shortcut_allowed():
 			_on_delete_wall_pressed()
@@ -1877,7 +1900,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif k.pressed and k.keycode == KEY_ESCAPE and _is_edit_mode_active():
 			_exit_edit_mode("Modo edición: cerrado")
-		elif k.pressed and _active_view_tab != 0 and USE_OCC_2D_VIEWS:
+		elif k.pressed and _active_view_tab != 0 and USE_VECTOR_2D_FULLSCREEN_TAB:
 			if k.keycode == KEY_PAGEUP:
 				_adjust_active_view_cut(+0.1)
 				get_viewport().set_input_as_handled()
@@ -1894,7 +1917,7 @@ func _switch_view_tab_keyboard(tab: int) -> void:
 
 
 func _activate_wall_stable_2d_mode_if_needed() -> void:
-	if not USE_OCC_2D_VIEWS or _active_view_tab == 0:
+	if not USE_VECTOR_2D_FULLSCREEN_TAB or _active_view_tab == 0:
 		return
 	if _view2d_mode_before_wall == "":
 		_view2d_mode_before_wall = _view2d_render_mode
@@ -1913,7 +1936,7 @@ func _restore_view2d_mode_after_wall() -> void:
 	_view2d_render_mode = _view2d_mode_before_wall
 	_view2d_mode_before_wall = ""
 	_update_view2d_mode_button_text()
-	if USE_OCC_2D_VIEWS and _active_view_tab != 0:
+	if USE_VECTOR_2D_FULLSCREEN_TAB and _active_view_tab != 0:
 		var preset: String = _tab_to_preset(_active_view_tab)
 		var id: String = _find_view2d_id_by_preset(preset)
 		if id != "":
@@ -2005,7 +2028,7 @@ func _adjust_active_view_cut(delta_m: float) -> void:
 	if not _view_state_by_tab.has(_active_view_tab):
 		return
 	var row: Dictionary = _view_state_by_tab[_active_view_tab] as Dictionary
-	var preset: String = str(row.get("preset", _preset_for_tab(_active_view_tab)))
+	var preset: String = str(row.get("preset", "top"))
 	var vr: Dictionary = row.get("view_range", _default_view_range_for_preset(preset)) as Dictionary
 	var cut: float = float(vr.get("cut_plane_m", DEFAULT_PLAN_CUT_M))
 	var bottom: float = float(vr.get("bottom_m", DEFAULT_PLAN_BOTTOM_M))
@@ -2059,9 +2082,179 @@ func _on_push_pull_completed(success: bool, message: String) -> void:
 
 
 func _on_ribbon_tab_changed(tab: int) -> void:
-	var inicio: bool = tab == 0
-	_ribbon_tools_inicio.visible = inicio
-	_ribbon_tools_placeholder.visible = not inicio
+	_ribbon_tools_inicio.visible = tab == 0
+	_ribbon_tools_preferencias.visible = tab == 3
+	_ribbon_tools_placeholder.visible = tab != 0 and tab != 3
+
+
+## Ruta absoluta de la raíz del repositorio (carpeta padre de ``frontend/``) según ``res://``.
+func _axonbim_repo_root() -> String:
+	return ProjectSettings.globalize_path("res://").get_base_dir()
+
+
+func _env_axonbim_path() -> String:
+	return _axonbim_repo_root().path_join(".env.axonbim")
+
+
+func _read_renderer_method_from_project_file() -> String:
+	var path := ProjectSettings.globalize_path("res://project.godot")
+	if not FileAccess.file_exists(path):
+		return "gl_compatibility"
+	var txt := FileAccess.get_file_as_string(path)
+	var re := RegEx.new()
+	re.compile("renderer/rendering_method\\s*=\\s*\"([^\"]+)\"")
+	var m := re.search(txt)
+	if m == null:
+		return "gl_compatibility"
+	return m.get_string(1)
+
+
+func _feature_tag_for_renderer(method: String) -> String:
+	match method:
+		"forward_plus":
+			return "Forward Plus"
+		"mobile":
+			return "Mobile"
+		_:
+			return "GL Compatibility"
+
+
+func _write_project_godot_renderer(method: String) -> Error:
+	var path := ProjectSettings.globalize_path("res://project.godot")
+	if not FileAccess.file_exists(path):
+		return ERR_FILE_NOT_FOUND
+	var txt := FileAccess.get_file_as_string(path)
+	var re_rm := RegEx.new()
+	re_rm.compile("renderer/rendering_method\\s*=\\s*\"[^\"]*\"")
+	txt = re_rm.sub(txt, 'renderer/rendering_method="' + method + '"', true)
+	var feat := _feature_tag_for_renderer(method)
+	var re_cf := RegEx.new()
+	re_cf.compile("(config/features=PackedStringArray\\(\")([0-9.]+)(\",\\s*\")([^\"]+)(\"\\))")
+	if re_cf.search(txt) != null:
+		txt = re_cf.sub(txt, "$1$2$3" + feat + "$5", true)
+	var fout := FileAccess.open(path, FileAccess.WRITE)
+	if fout == null:
+		return FileAccess.get_open_error()
+	fout.store_string(txt)
+	fout.close()
+	return OK
+
+
+func _parse_axonbim_gpu_profile_from_text(text: String) -> String:
+	for raw_line in text.split("\n"):
+		var line: String = raw_line.strip_edges()
+		if line.is_empty() or line.begins_with("#"):
+			continue
+		if line.begins_with("AXONBIM_GPU_PROFILE="):
+			return line.substr("AXONBIM_GPU_PROFILE=".length()).strip_edges()
+	return "auto"
+
+
+func _read_gpu_profile_from_env_file() -> String:
+	var p := _env_axonbim_path()
+	if not FileAccess.file_exists(p):
+		return "auto"
+	var f := FileAccess.open(p, FileAccess.READ)
+	if f == null:
+		return "auto"
+	var content := f.get_as_text()
+	f.close()
+	return _parse_axonbim_gpu_profile_from_text(content)
+
+
+func _current_gpu_profile_choice() -> String:
+	var from_os := OS.get_environment("AXONBIM_GPU_PROFILE").strip_edges()
+	if not from_os.is_empty():
+		return from_os
+	return _read_gpu_profile_from_env_file()
+
+
+func _sync_pref_renderer_option_from_disk() -> void:
+	var method := _read_renderer_method_from_project_file()
+	for i in range(_pref_renderer_option.item_count):
+		var md: Variant = _pref_renderer_option.get_item_metadata(i)
+		if md is String and String(md) == method:
+			_pref_renderer_option.select(i)
+			return
+	_pref_renderer_option.select(0)
+
+
+func _sync_pref_gpu_profile_option_from_sources() -> void:
+	var prof := _current_gpu_profile_choice()
+	for i in range(_pref_gpu_profile_option.item_count):
+		var md: Variant = _pref_gpu_profile_option.get_item_metadata(i)
+		if md is String and String(md) == prof:
+			_pref_gpu_profile_option.select(i)
+			return
+	_pref_gpu_profile_option.select(0)
+
+
+func _setup_preferences_ui() -> void:
+	_pref_renderer_option.clear()
+	_pref_renderer_option.add_item("OpenGL — Compatibilidad")
+	_pref_renderer_option.set_item_metadata(0, "gl_compatibility")
+	_pref_renderer_option.add_item("Vulkan — Forward+")
+	_pref_renderer_option.set_item_metadata(1, "forward_plus")
+	_sync_pref_renderer_option_from_disk()
+	_pref_gpu_profile_option.clear()
+	var gpu_rows: Array = [
+		["Automático (detectar)", "auto"],
+		["GPU integrada", "integrated"],
+		["GPU dedicada", "dedicated"],
+	]
+	var gi := 0
+	while gi < gpu_rows.size():
+		var row: Variant = gpu_rows[gi]
+		_pref_gpu_profile_option.add_item(String(row[0]))
+		_pref_gpu_profile_option.set_item_metadata(gi, row[1])
+		gi += 1
+	_sync_pref_gpu_profile_option_from_sources()
+	_pref_save_renderer_button.pressed.connect(_on_pref_save_renderer_pressed)
+	_pref_write_env_button.pressed.connect(_on_pref_write_env_pressed)
+	if OS.get_name() != "Linux":
+		_pref_write_env_button.disabled = true
+		_pref_gpu_profile_option.disabled = true
+		_pref_write_env_button.tooltip_text = (
+			"Solo Linux: escribe AXONBIM_GPU_PROFILE para scripts/dev/linux_profile.sh al arrancar con ./start."
+		)
+
+
+func _on_pref_save_renderer_pressed() -> void:
+	var idx := _pref_renderer_option.selected
+	var method_v: Variant = _pref_renderer_option.get_item_metadata(idx)
+	if not method_v is String:
+		return
+	var method := String(method_v)
+	var err := _write_project_godot_renderer(method)
+	if err != OK:
+		_log_label.text = "Preferencias: no se pudo guardar project.godot (código %s)." % str(err)
+		return
+	_pref_restart_dialog.dialog_text = (
+		"Se guardó el motor de render en project.godot. "
+		+ "Cierra AxonBIM y vuelve a ejecutarlo (p. ej. ./start) para aplicar el cambio."
+	)
+	_pref_restart_dialog.popup_centered()
+	_log_label.text = "Preferencias: motor guardado (reinicio requerido)."
+
+
+func _on_pref_write_env_pressed() -> void:
+	var idx := _pref_gpu_profile_option.selected
+	var prof_v: Variant = _pref_gpu_profile_option.get_item_metadata(idx)
+	if not prof_v is String:
+		return
+	var prof := String(prof_v)
+	var content := (
+		"# Generado por AxonBIM (cinta Preferencias). Ver scripts/dev/linux_profile.sh.\n"
+		+ "AXONBIM_GPU_PROFILE=%s\n" % prof
+	)
+	var path := _env_axonbim_path()
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		_log_label.text = "Preferencias: no se pudo escribir .env.axonbim (%s)." % path
+		return
+	f.store_string(content)
+	f.close()
+	_log_label.text = "Preferencias: escrito %s (AXONBIM_GPU_PROFILE=%s)." % [path, prof]
 
 
 func _refresh_ribbon_compact_mode() -> void:
@@ -2080,6 +2273,7 @@ func _build_project_tree() -> void:
 	_view2d_items.clear()
 	_view2d_defs.clear()
 	_view2d_runtime_state.clear()
+	_next_view2d_idx = 1
 	var hidden_root: TreeItem = _project_tree.create_item()
 	var proyecto: TreeItem = _project_tree.create_item(hidden_root)
 	proyecto.set_text(0, "Proyecto (sesión)")
@@ -2089,11 +2283,13 @@ func _build_project_tree() -> void:
 	v3d.set_text(0, "Vista 3D")
 	v3d.set_metadata(0, "VIEW_3D")
 	_views2d_tree_parent = _project_tree.create_item(vistas)
-	_views2d_tree_parent.set_text(0, "Vistas 2D")
+	_views2d_tree_parent.set_text(0, "Vistas 2D (+Y = norte proyecto)")
 	_views2d_tree_parent.set_metadata(0, "CATEGORY_VIEWS2D")
 	_register_view2d_tree_item("Planta", "top")
-	_register_view2d_tree_item("Frente", "front")
-	_register_view2d_tree_item("Derecha", "right")
+	_register_view2d_tree_item("Norte", "north")
+	_register_view2d_tree_item("Sur", "south")
+	_register_view2d_tree_item("Este", "east")
+	_register_view2d_tree_item("Oeste", "west")
 	var ifc: TreeItem = _project_tree.create_item(proyecto)
 	ifc.set_text(0, "IFC")
 	_storeys_tree_parent = _project_tree.create_item(ifc)
@@ -2192,18 +2388,6 @@ func _default_view_range_for_preset(preset: String) -> Dictionary:
 	}
 
 
-func _view_tab_for_preset(preset: String) -> int:
-	match preset:
-		"top":
-			return 1
-		"front":
-			return 2
-		"right":
-			return 3
-		_:
-			return 1
-
-
 func _activate_view2d_from_tree(id: String) -> void:
 	if not _view2d_defs.has(id):
 		return
@@ -2236,8 +2420,8 @@ func _on_delete_view2d_pressed() -> void:
 
 
 func _close_view_tab(tab: int) -> void:
-	if tab <= 3:
-		_log_label.text = "Las vistas base no se eliminan."
+	if tab == 0:
+		_log_label.text = "La vista 3D base no se puede cerrar."
 		return
 	if not _view_state_by_tab.has(tab):
 		return
@@ -2246,6 +2430,22 @@ func _close_view_tab(tab: int) -> void:
 		_floating_views.erase(tab)
 		_floating_viewports.erase(tab)
 		win.queue_free()
+	var fv_new: Dictionary = {}
+	for k in _floating_views.keys():
+		var fi: int = int(k)
+		if fi > tab:
+			fv_new[fi - 1] = _floating_views[k]
+		else:
+			fv_new[fi] = _floating_views[k]
+	_floating_views = fv_new
+	var fp_new: Dictionary = {}
+	for k in _floating_viewports.keys():
+		var fi2: int = int(k)
+		if fi2 > tab:
+			fp_new[fi2 - 1] = _floating_viewports[k]
+		else:
+			fp_new[fi2] = _floating_viewports[k]
+	_floating_viewports = fp_new
 	_view_state_by_tab.erase(tab)
 	_view_tabs_bar.remove_tab(tab)
 	var remapped: Dictionary = {}
@@ -2255,6 +2455,7 @@ func _close_view_tab(tab: int) -> void:
 	_view_state_by_tab = remapped
 	_view_tabs_bar.current_tab = 0
 	_on_view_tabs_changed(0)
+	_sync_view_tabs_bar_visibility()
 	_log_label.text = "Vista cerrada."
 
 
@@ -2823,12 +3024,13 @@ func _on_create_wall_pressed() -> void:
 		_log_label.text = "Crear muro: herramienta cerrada."
 		_refresh_ribbon_compact_mode()
 		return
-	if _active_view_tab == 2 or _active_view_tab == 3:
-		_view_tabs_bar.current_tab = 1
-		_on_view_tabs_changed(1)
-		_log_label.text = (
-			"Crear muro: para trazar en 2D se usa Planta (frente/derecha no proyectan al plano XY)."
-		)
+	if _active_view_tab != 0:
+		var p_wall: String = _tab_to_preset(_active_view_tab)
+		if p_wall != "top":
+			var planta_id: String = _find_view2d_id_by_preset("top")
+			if planta_id != "":
+				_activate_view2d_from_tree(planta_id)
+				_log_label.text = "Crear muro: el trazo 2D usa la planta (XY); se abrió la vista Planta."
 	_push_pull_tool.deactivate()
 	_project_view.clear_selection()
 	_exit_edit_mode("")
@@ -2841,7 +3043,7 @@ func _on_create_wall_pressed() -> void:
 	_log_label.text = (
 		"Crear muro: primer trazo P1+P2; los siguientes salen solo con P2 desde el último extremo "
 		+ "(Alt+clic = nuevo P1). Teclado: flechas mueven, Enter confirma, Shift acelera, Backspace reinicia. "
-		+ "Global: W muro, E editar, Alt+Tab siguiente muro, Alt+Shift+Tab anterior, Alt+1/2/3/4 cambia vista."
+		+ "Global: W muro, E editar, Alt+Tab siguiente muro, Alt+Shift+Tab anterior, Alt+1=3D, Alt+2/3 cicla pestañas abiertas."
 	)
 	_refresh_ribbon_compact_mode()
 
@@ -3023,8 +3225,8 @@ func _export_wall_dxf_to_path(path: String, dialog: FileDialog) -> void:
 
 func _export_2d_views_to_dir(dir_path: String, dialog: FileDialog) -> void:
 	dialog.queue_free()
-	if USE_OCC_2D_VIEWS:
-		await _export_2d_views_occ_to_dir(dir_path)
+	if USE_VECTOR_2D_FULLSCREEN_TAB:
+		await _export_2d_snapshots_to_dir(dir_path)
 		return
 	await _export_2d_views_legacy_to_dir(dir_path)
 
@@ -3035,7 +3237,7 @@ func _export_2d_views_legacy_to_dir(dir_path: String) -> void:
 		_log_label.text = "No se pudo exportar vistas 2D: CameraRig inválido."
 		return
 	var prev: String = rig.current_view_preset()
-	var views: Array[String] = ["top", "front", "right"]
+	var views: Array[String] = ["top", "north", "south", "east", "west"]
 	for v in views:
 		rig.set_view_preset(v)
 		await get_tree().process_frame
@@ -3048,10 +3250,10 @@ func _export_2d_views_legacy_to_dir(dir_path: String) -> void:
 			rig.set_view_preset(prev)
 			return
 	rig.set_view_preset(prev)
-	_log_label.text = "Vistas 2D exportadas en %s (top/front/right)." % dir_path
+	_log_label.text = "Vistas 2D exportadas en %s (Planta + N/S/E/O)." % dir_path
 
 
-func _rasterize_occ_lines_to_image(width_px: int, height_px: int, lines: Array) -> Image:
+func _rasterize_snapshot_lines_to_image(width_px: int, height_px: int, lines: Array) -> Image:
 	var img: Image = Image.create(width_px, height_px, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0.09, 0.10, 0.12, 1.0))
 	var ink := Color(0.88, 0.91, 0.98, 1.0)
@@ -3082,8 +3284,8 @@ func _rasterize_occ_lines_to_image(width_px: int, height_px: int, lines: Array) 
 	return img
 
 
-func _export_2d_views_occ_to_dir(dir_path: String) -> void:
-	var views: Array[String] = ["top", "front", "right"]
+func _export_2d_snapshots_to_dir(dir_path: String) -> void:
+	var views: Array[String] = ["top", "north", "south", "east", "west"]
 	for v in views:
 		var id: String = _find_view2d_id_by_preset(v)
 		var vr: Dictionary = _default_view_range_for_preset(v)
@@ -3093,21 +3295,20 @@ func _export_2d_views_occ_to_dir(dir_path: String) -> void:
 		var resp: Dictionary = await RpcClient.call_rpc(
 			"draw.ortho_snapshot",
 			{
-				"view": v,
+				"view": _draw_view_kind_for_rpc(v),
 				"width_px": max(256, int(_view_2d_preview.size.x)),
 				"height_px": max(256, int(_view_2d_preview.size.y)),
 				"margin_px": 24,
 				"view_range": vr,
-				"projection_engine": "analytical",
 			},
 			30000
 		)
 		if not bool(resp.get("ok", false)):
-			_log_label.text = "OCC export (%s) falló, usando fallback legacy." % v
+			_log_label.text = "Export snapshot (%s) falló, usando fallback legacy." % v
 			await _export_2d_views_legacy_to_dir(dir_path)
 			return
 		var r: Dictionary = resp["result"] as Dictionary
-		var img: Image = _rasterize_occ_lines_to_image(
+		var img: Image = _rasterize_snapshot_lines_to_image(
 			int(r.get("width_px", 1200)),
 			int(r.get("height_px", 800)),
 			r.get("lines_px", []) as Array,
@@ -3115,9 +3316,9 @@ func _export_2d_views_occ_to_dir(dir_path: String) -> void:
 		var out_path: String = "%s/vista_%s.png" % [dir_path, v]
 		var err: int = img.save_png(out_path)
 		if err != OK:
-			_log_label.text = "Error exportando OCC %s (code=%d)" % [out_path, err]
+			_log_label.text = "Error exportando vista %s (code=%d)" % [out_path, err]
 			return
-	_log_label.text = "Vistas 2D OCC exportadas en %s (top/front/right)." % dir_path
+	_log_label.text = "Vistas 2D exportadas en %s (Planta + N/S/E/O)." % dir_path
 
 
 func _on_push_pull_apply_distance_pressed() -> void:
@@ -3137,42 +3338,42 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_viewport_container_gui_input(event: InputEvent) -> void:
-	var in_occ_2d: bool = USE_OCC_2D_VIEWS and _active_view_tab != 0 and _view2d_render_mode != VIEW2D_MODE_ORTHO
-	if in_occ_2d and _view_2d_preview.has_method("handle_input"):
+	var in_vector2d_canvas: bool = USE_VECTOR_2D_FULLSCREEN_TAB and _active_view_tab != 0 and _view2d_render_mode != VIEW2D_MODE_ORTHO
+	if in_vector2d_canvas and _view_2d_preview.has_method("handle_input"):
 		var consumed_2d: bool = bool(_view_2d_preview.call("handle_input", event))
 		if consumed_2d:
 			_viewport_container.get_viewport().set_input_as_handled()
 			_refresh_workspace_hud()
 			return
-	# En OCC 2D + trazo de muro activo no se permite navegar la camara 3D.
-	if not (in_occ_2d and _wall_tool.is_active()) and (_camera_rig as OrbitRig).handle_viewport_gui_input(event):
+	# En vista 2D vectorial + trazo de muro activo no se permite navegar la camara 3D.
+	if not (in_vector2d_canvas and _wall_tool.is_active()) and (_camera_rig as OrbitRig).handle_viewport_gui_input(event):
 		_viewport_container.get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseMotion:
 		var mm: InputEventMouseMotion = event
 		if _wall_tool.is_active():
-			if in_occ_2d and _view_2d_preview.has_method("to_projected_world_uv"):
+			if in_vector2d_canvas and _view_2d_preview.has_method("to_projected_world_uv"):
 				var uv_mm: Vector2 = _view_2d_preview.call("to_projected_world_uv", mm.position)
-				if _is_valid_occ_uv(uv_mm):
-					_has_last_valid_occ_uv = true
-					_last_valid_occ_uv = uv_mm
-					var pwm: Vector3 = _occ_uv_to_floor_point_world(uv_mm)
+				if _is_valid_snapshot_uv(uv_mm):
+					_has_last_valid_snapshot_uv = true
+					_last_valid_snapshot_uv = uv_mm
+					var pwm: Vector3 = _snapshot_uv_to_floor_point_world(uv_mm)
 					_wall_tool.handle_viewport_motion_world_floor(pwm)
 				else:
-					# En OCC 2D no degradamos a proyección 3D para evitar jitter
+					# En vista 2D vectorial no degradamos a proyección 3D para evitar jitter
 					# por desalineación de coordenadas entre backends gráficos.
-					if _has_last_valid_occ_uv:
-						var pwm_last: Vector3 = _occ_uv_to_floor_point_world(_last_valid_occ_uv)
+					if _has_last_valid_snapshot_uv:
+						var pwm_last: Vector3 = _snapshot_uv_to_floor_point_world(_last_valid_snapshot_uv)
 						_wall_tool.handle_viewport_motion_world_floor(pwm_last)
 						return
 					var pos_fallback_m: Vector2 = _subviewport.get_mouse_position()
-					if in_occ_2d and _view_2d_preview.has_method("to_snapshot_space"):
+					if in_vector2d_canvas and _view_2d_preview.has_method("to_snapshot_space"):
 						pos_fallback_m = _view_2d_preview.call("to_snapshot_space", mm.position)
 					_wall_tool.handle_viewport_motion(pos_fallback_m)
 					return
 			else:
 				var pos_m: Vector2 = _subviewport.get_mouse_position()
-				if in_occ_2d and _view_2d_preview.has_method("to_snapshot_space"):
+				if in_vector2d_canvas and _view_2d_preview.has_method("to_snapshot_space"):
 					pos_m = _view_2d_preview.call("to_snapshot_space", mm.position)
 				_wall_tool.handle_viewport_motion(pos_m)
 		if _push_pull_tool.is_active() and _push_pull_tool.is_selecting_face():
@@ -3180,27 +3381,27 @@ func _on_viewport_container_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			if in_occ_2d and _wall_tool.is_active() and _view_2d_preview.has_method("to_projected_world_uv"):
+			if in_vector2d_canvas and _wall_tool.is_active() and _view_2d_preview.has_method("to_projected_world_uv"):
 				var uv_cl: Vector2 = _view_2d_preview.call("to_projected_world_uv", mb.position)
-				if _is_valid_occ_uv(uv_cl):
-					_has_last_valid_occ_uv = true
-					_last_valid_occ_uv = uv_cl
-					var pwc: Vector3 = _occ_uv_to_floor_point_world(uv_cl)
+				if _is_valid_snapshot_uv(uv_cl):
+					_has_last_valid_snapshot_uv = true
+					_last_valid_snapshot_uv = uv_cl
+					var pwc: Vector3 = _snapshot_uv_to_floor_point_world(uv_cl)
 					_wall_tool.handle_viewport_click_world_floor(pwc)
 				else:
-					if _has_last_valid_occ_uv:
-						var pwc_last: Vector3 = _occ_uv_to_floor_point_world(_last_valid_occ_uv)
+					if _has_last_valid_snapshot_uv:
+						var pwc_last: Vector3 = _snapshot_uv_to_floor_point_world(_last_valid_snapshot_uv)
 						_wall_tool.handle_viewport_click_world_floor(pwc_last)
 						_viewport_container.get_viewport().set_input_as_handled()
 						return
 					var pos_fallback: Vector2 = _subviewport.get_mouse_position()
-					if in_occ_2d and _view_2d_preview.has_method("to_snapshot_space"):
+					if in_vector2d_canvas and _view_2d_preview.has_method("to_snapshot_space"):
 						pos_fallback = _view_2d_preview.call("to_snapshot_space", mb.position)
 					_wall_tool.handle_viewport_click(pos_fallback)
 				_viewport_container.get_viewport().set_input_as_handled()
 				return
 			var pos: Vector2 = _subviewport.get_mouse_position()
-			if in_occ_2d and _view_2d_preview.has_method("to_snapshot_space"):
+			if in_vector2d_canvas and _view_2d_preview.has_method("to_snapshot_space"):
 				pos = _view_2d_preview.call("to_snapshot_space", mb.position)
 			if _wall_tool.is_active():
 				_wall_tool.handle_viewport_click(pos)
@@ -3272,8 +3473,8 @@ func _on_wall_created(guid: String, workspace_half_xy: Vector2) -> void:
 	item.select(0)
 	_project_view.set_selection(guid)
 	_refresh_properties_panel()
-	if USE_OCC_2D_VIEWS and preset != "persp" and view2d_id != "":
-		_schedule_occ_view2d_refresh_after_wall(view2d_id)
+	if USE_VECTOR_2D_FULLSCREEN_TAB and preset != "persp" and view2d_id != "":
+		_schedule_vector2d_snapshot_refresh_after_wall(view2d_id)
 	_log_label.text = "Muro creado: %s (total=%d)" % [guid, _project_view.entity_count()]
 
 

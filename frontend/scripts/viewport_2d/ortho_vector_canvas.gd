@@ -1,8 +1,8 @@
 # (c) 2026 Arq. Hector Nathanael Figuereo. GPLv3.
 extends Control
 
-## Lienzo 2D para segmentos OCC del backend. El trazo modelo usa **X/Y** en el datum del nivel base;
-## la conversión píxel→mundo no depende de la cámara 3D (solo del snapshot y pan/zoom aquí).
+## Lienzo 2D en Godot para segmentos devueltos por ``draw.ortho_snapshot``. El trazo modelo usa **X/Y**
+## en el datum del nivel base; la conversión píxel→mundo no depende de la cámara 3D (solo del snapshot y pan/zoom aquí).
 
 const _WORLD_EPS: float = 1e-9
 
@@ -33,7 +33,7 @@ func clear_snapshot() -> void:
 
 
 ## Metadatos del último ``draw.ortho_snapshot`` (inverso de ``_fit_to_pixels`` en Python).
-func set_occ_mapping(bounds_uv: Array, width_px: int, height_px: int, margin_px: int) -> void:
+func set_uv_mapping(bounds_uv: Array, width_px: int, height_px: int, margin_px: int) -> void:
 	_bounds_uv = bounds_uv.duplicate()
 	_map_width_px = maxi(1, width_px)
 	_map_height_px = maxi(1, height_px)
@@ -41,7 +41,7 @@ func set_occ_mapping(bounds_uv: Array, width_px: int, height_px: int, margin_px:
 	queue_redraw()
 
 
-func has_valid_occ_mapping() -> bool:
+func has_valid_uv_mapping() -> bool:
 	return _bounds_uv.size() >= 4 and _map_width_px > 0 and _map_height_px > 0
 
 
@@ -98,7 +98,7 @@ func to_snapshot_space(screen_pos: Vector2) -> Vector2:
 ## Debe alinearse con ``src/axonbim/handlers/draw.py::_fit_to_pixels``.
 func to_projected_world_uv(screen_pos: Vector2) -> Vector2:
 	var sp: Vector2 = to_snapshot_space(screen_pos)
-	if not has_valid_occ_mapping():
+	if not has_valid_uv_mapping():
 		return Vector2(INF, INF)
 	var min_u: float = float(_bounds_uv[0])
 	var min_v: float = float(_bounds_uv[1])

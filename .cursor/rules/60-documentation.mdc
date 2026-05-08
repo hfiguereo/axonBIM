@@ -129,7 +129,7 @@ El carácter `©` puede sustituirse por `(c)` si editor/fuente no lo soportan. N
 Formato rastreable obligatorio. Ejemplo válido:
 
 ```python
-# TODO(hfiguereo, 2026-06): reemplazar por OCP boolean cuando Fase 2 llegue.
+# TODO(hfiguereo, 2026-06): reemplazar por boolean con kernel B-Rep cuando Fase 2 lo autorice por ADR.
 # FIXME(hfiguereo, 2026-05-12): race condition al guardar dos veces rápido.
 # XXX(hfiguereo, 2026-04-21): hack temporal, ver ADR-0003.
 ```

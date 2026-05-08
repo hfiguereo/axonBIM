@@ -2,6 +2,8 @@
 extends PanelContainer
 
 ## Botones de vista rapida (esquina del viewport), enlazados al rig orbital.
+##
+## Convención: **+Y = norte del proyecto** (planta en XY, Z arriba). N/S/E/O son elevaciones.
 
 @export var rig_path: NodePath = NodePath("../../SubViewport/World/CameraRig")
 
@@ -21,25 +23,37 @@ func _ready() -> void:
 	_add_btn(
 		vb,
 		"Planta",
-		"Ortogonal cenital (+Z); fondo plano técnico (sin horizonte de cielo). Tecla 1 o Num 7",
+		"Ortogonal cenital (+Z); fondo plano técnico. Tecla 1 o Num 7",
 		func() -> void: _rig.call("set_view_preset", "top")
 	)
 	_add_btn(
 		vb,
-		"Frente",
-		"Ortogonal hacia el plano Y; fondo plano. Tecla 2 o Num 1",
-		func() -> void: _rig.call("set_view_preset", "front")
+		"Norte",
+		"Elevación mirando hacia +Y (cámara en -Y). Num 1 / tecla 2",
+		func() -> void: _rig.call("set_view_preset", "north")
 	)
 	_add_btn(
 		vb,
-		"Derecha",
-		"Ortogonal hacia el plano X; fondo plano. Tecla 3 o Num 3",
-		func() -> void: _rig.call("set_view_preset", "right")
+		"Sur",
+		"Elevación mirando hacia -Y (cámara en +Y). Num 9",
+		func() -> void: _rig.call("set_view_preset", "south")
+	)
+	_add_btn(
+		vb,
+		"Este",
+		"Elevación mirando hacia +X (cámara en -X). Num 4",
+		func() -> void: _rig.call("set_view_preset", "east")
+	)
+	_add_btn(
+		vb,
+		"Oeste",
+		"Elevación mirando hacia -X (cámara en +X). Num 3 / tecla 3",
+		func() -> void: _rig.call("set_view_preset", "west")
 	)
 	_add_btn(
 		vb,
 		"Persp",
-		"Perspectiva (fondo plano; orbita desde orto mantiene encuadre). Tecla 4 o Num 0",
+		"Perspectiva (fondo plano). Tecla 4 o Num 0",
 		func() -> void: _rig.call("set_view_preset", "persp")
 	)
 	_add_btn(vb, "Inicio", "Pivote en origen y perspectiva. Inicio o R", func() -> void: _rig.call("reset_view"))

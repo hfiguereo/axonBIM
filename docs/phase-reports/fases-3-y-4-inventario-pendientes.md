@@ -31,7 +31,7 @@ Este documento **no** declara el cierre de las fases 3 ni 4. Resume, en lenguaje
 | Pendiente | Qué implica en la práctica |
 |-----------|----------------------------|
 | **ISO 19650** en runtime | `project.set_state` y contenedores inmutables según `docs/architecture/iso-19650.md`, con log/SQLite append-only. |
-| **Python congelado** | PyInstaller o Conda-pack con IfcOpenShell + OCP resolviendo extensiones nativas. |
+| **Python congelado** | PyInstaller o Conda-pack con IfcOpenShell + dependencias nativas resueltas (extensiones `.so`). |
 | **Flatpak** (y opcional **AppImage**) | Manifiesto, launcher, permisos de sandbox, pipeline de release. |
 | **Sitio web**, docs de usuario ampliadas, **vídeos** | Capa de descubrimiento y adopción fuera del repositorio Git. |
 | **Lanzamiento v1.0** | Tag y comunicación cuando los anteriores estén en orden. |

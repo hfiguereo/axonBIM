@@ -15,8 +15,8 @@ La estructura ``Mesh`` esta diseñada para ser convertida directamente a
   vacio en mallas legacy (se infiere ``i//2`` para mallas de exactamente 12
   triangulos de caja sin huecos)
 
-En Fase 2 esta funcionalidad se extiende con ``brep_to_mesh(shape)`` usando
-``BRepMesh_IncrementalMesh`` de OCP.
+En Fase 2 esta estructura puede extenderse con triangulación B-Rep cuando entre
+un kernel sólido en el tronco; hoy la malla es **analítica** y coincide con Godot.
 """
 
 from __future__ import annotations

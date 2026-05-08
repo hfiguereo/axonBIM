@@ -4,9 +4,10 @@ extends Node
 ## Herramienta **crear muro**: encadena segmentos P1→P2 sobre el **plano horizontal del nivel base**
 ## (referencia **X/Y** en planta; cota Z del forjado = ``work_plane_elevation_m``, sincronizada con el
 ## nivel IFC activo desde la escena principal).
-## obtiene por intersección de rayo con ese plano (la cámara solo proyecta, no redefine el mundo). En
-## **vista 2D OCC** la referencia inmediata es la geometría de la propia vista (suelo/forjado de ese
-## datum), no el raycast de la cámara 3D. Inverencia tipo Revit/SketchUp (snap **X/Y**; **Alt+clic** =
+## En **vista 3D**, el punto en planta (X/Y) se obtiene por intersección de rayo con ese plano
+## (la cámara solo proyecta, no redefine el mundo). En **vista 2D** (snapshot vectorial u ortográfica),
+## la referencia es la geometría de la propia vista (suelo/forjado de ese datum), no el raycast 3D.
+## Inverencia tipo Revit/SketchUp (snap **X/Y**; **Alt+clic** =
 ## nuevo P1). Al acercar el último **P2** al **primer vértice** del trazo (≈0,45 m), se acopla el cierre
 ## de habitación y el backend aplica el mismo tipo de ajuste de esquina que en la cadena (`join_end_guid`).
 
@@ -126,7 +127,7 @@ func has_first_point() -> bool:
 
 
 ## Posición **X/Y** en planta del trazo en curso (cota Z = ``work_plane_elevation_m``); para alzados
-## OCC donde un eje no se ve, se reutiliza el otro eje de la cadena.
+## donde un eje no se ve en pantalla, se reutiliza el otro eje de la cadena.
 func get_chain_floor_reference_xy() -> Vector2:
 	if _has_first:
 		return Vector2(_first_point.x, _first_point.y)
@@ -167,7 +168,7 @@ func handle_viewport_motion(screen_pos: Vector2) -> void:
 	_emit_length_hint()
 
 
-## Movimiento con punto ya proyectado al plano z=0 (vista OCC 2D alineada al backend, no raycast 3D).
+## Movimiento con punto ya proyectado al plano z=0 (vista 2D alineada al backend, no raycast 3D).
 func handle_viewport_motion_world_floor(point_world_xy: Vector3) -> void:
 	if not _active or not _has_first:
 		return
@@ -237,7 +238,7 @@ func handle_viewport_click(screen_pos: Vector2) -> void:
 	await _submit_wall_and_chain(p1, p2, _last_created_guid, join_end)
 
 
-## Clic con punto ya en plano horizontal (OCC 2D); evita ``project_ray`` del SubViewport 3D.
+## Clic con punto ya en plano horizontal (vista 2D); evita ``project_ray`` del SubViewport 3D.
 func handle_viewport_click_world_floor(point_world_xy: Vector3) -> void:
 	if not _active:
 		return
