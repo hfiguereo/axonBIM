@@ -36,7 +36,7 @@ uv run mypy --strict src/
 ### Herramientas auxiliares
 
 ```bash
-# Lint/format de GDScript
+# Lint/format de GDScript (aislado: evita mezclar con otros proyectos)
 pipx install gdtoolkit
 gdformat frontend/scripts
 gdlint frontend/scripts
@@ -44,6 +44,18 @@ gdlint frontend/scripts
 # Pre-commit hooks (recomendado)
 uv run pre-commit install
 ```
+
+### pip del sistema y aviso cadquery-ocp
+
+Si en algún momento instalaste AxonBIM con `pip install -e .` (o similar), puede quedar registrado en tu **site-packages de usuario** un metadato que declara `cadquery-ocp`, paquete **ya eliminado** del proyecto. Entonces `pip install …` de otra herramienta muestra un conflicto aunque no uses ese árbol para desarrollar.
+
+**Solución:** quitar el registro huérfano del usuario:
+
+```bash
+pip uninstall axonbim
+```
+
+Para desarrollo de AxonBIM usa **`uv sync`** y **`uv run`** dentro del clon (`.venv` del proyecto). Para **`gdtoolkit`**, **`pipx install gdtoolkit`** como arriba, no `pip install --user gdtoolkit`.
 
 ## Flujo de trabajo
 

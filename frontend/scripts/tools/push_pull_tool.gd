@@ -156,7 +156,7 @@ func _submit(vec: Vector3) -> void:
 	var topo_map: Dictionary = result.get("topo_map", {}) as Dictionary
 	_project_view.replace_entity_mesh(guid, mesh_dict)
 	if guid == _pending_guid:
-		_project_view.remap_active_face_topo(_pending_topo, topo_map)
+		_project_view.remap_active_face_topo(guid, _pending_topo, topo_map)
 	_project_view.set_selection(guid)
 	_active = false
 	_step = 0
@@ -171,7 +171,10 @@ func _format_submit_error(err: Variant) -> String:
 	var code: int = int(error_dict.get("code", 0))
 	var message: String = str(error_dict.get("message", "error desconocido"))
 	if code == TOPO_ID_NOT_FOUND:
-		return "La cara seleccionada ya no existe. Vuelve a seleccionar una cara."
+		return (
+			"La cara ya no existe en la sesión del backend (geometría regenerada o fallo previo en el cliente). "
+			+ "Sal de Push/Pull y vuelve a fijar la cara."
+		)
 	if code == INVALID_PARAMS:
 		return "Push/Pull no puede aplicar esa distancia: %s" % message
 	return "Push/Pull fallo (%d): %s" % [code, message]

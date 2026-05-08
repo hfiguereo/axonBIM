@@ -41,6 +41,7 @@ Si el backend no está disponible, la interfaz puede mostrar avisos de conexión
 | **Puerto ya en uso** | Otro proceso usa `5799`. Cierra la otra instancia o arranca con otro puerto y exporta `AXONBIM_RPC_PORT` / equivalente en Godot si tu flujo lo soporta. |
 | **Flatpak / sandbox** | Si ejecutas Godot empaquetado, el sandbox puede no ver el mismo loopback o variables; revisa permisos de red **loopback** y documentación del empaquetado que uses. |
 | **Historial raro al cambiar de archivo** | Tras **Guardar IFC…** o **Abrir IFC…**, el historial (deshacer) queda asociado a la **ruta canónica de ese `.ifc`**. Un proyecto sin guardar usa el ámbito interno `__unsaved__`. **Abrir** otro archivo **vacía** la pila undo/redo y carga el modelo desde disco. |
+| **Push/Pull y «cara ya no existe» / error RPC `topo_id`** | Tras un **error de script** en Godot o si la geometría se regeneró en el backend, el `topo_id` guardado en la selección puede quedar **obsoleto**. Sal de Push/Pull y **vuelve a elegir la cara** (primer clic). Si persiste, reinicia la herramienta o comprueba el log del backend. |
 
 Variables útiles (desarrollo): `AXONBIM_HISTORY_DB` (ruta del SQLite de deshacer), `AXONBIM_RPC_PORT`, `AXONBIM_LOG_LEVEL` (`DEBUG` habilita mensajes extra en consola Godot, p. ej. estadísticas de malla tras Push/Pull), `AXONBIM_SPAWN_GODOT_WORKER`, `AXONBIM_WORKER_PORT` (worker opcional, ver protocolo §5.7).
 

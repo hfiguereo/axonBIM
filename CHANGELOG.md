@@ -37,6 +37,7 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - Sub-hitos **SH-F2-11…13** (niveles, huecos, losas) en [`docs/roadmap/fase-02-subhitos.md`](docs/roadmap/fase-02-subhitos.md); enlace SH-F3-04 → SH-F2-12.
 - Manual: §2.1 **runbook** de fallos RPC / historial por archivo; tabla `project.save` y notas de `history.*` en [`jsonrpc-protocol.md`](docs/architecture/jsonrpc-protocol.md); [`CONTRIBUTING.md`](CONTRIBUTING.md) (plataforma e integración RPC).
 - Cierre documental **Fase 2** e inventario Fases 3–4: [`docs/phase-reports/phase-2-report.md`](docs/phase-reports/phase-2-report.md), [`docs/phase-reports/fases-3-y-4-inventario-pendientes.md`](docs/phase-reports/fases-3-y-4-inventario-pendientes.md); índice [`docs/phase-reports/README.md`](docs/phase-reports/README.md); desglose ROADMAP [`docs/roadmap/README.md`](docs/roadmap/README.md), plantilla [`docs/roadmap/00-guia-estructura-subhitos.md`](docs/roadmap/00-guia-estructura-subhitos.md). [`ROADMAP.md`](ROADMAP.md) alineado (SQLite, criterio 50+ muros).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md), [`README.md`](README.md), [`docs/manual-de-axonbim.md`](docs/manual-de-axonbim.md): conflicto **pip** por instalación antigua de `axonbim` / `cadquery-ocp`; runbook **Push/Pull** cuando el backend rechaza `topo_id`.
 
 ### Cambiado
 
@@ -44,6 +45,10 @@ versionado según [Semantic Versioning](https://semver.org/lang/es/).
 - ``geom.extrude_face`` / IFC: ``topo_map`` coherente con el GUID del muro (``face_topo_id_table`` con ``parent_guid``); ``update_wall_geometry`` regenera representación **Body** y placement al editar la caja (el `.ifc` guardado refleja extrusiones).
 - Linux: `scripts/dev/linux_profile.sh` ya no exporta `DRI_PRIME=0` (inválido en Mesa); perfil explícito `AXONBIM_GPU_PROFILE` (`auto` \| `integrated` \| `dedicated`).
 - `draw.ortho_snapshot`: parámetro `view` con **norte/sur/este/oeste** además de `top`/`front`/`right`; la proyección 2D queda alineada con las cámaras ortográficas de Godot (sur y este invierten el eje horizontal respecto a norte y oeste).
+
+### Corregido
+
+- Push/Pull: llamada a ``remap_active_face_topo`` con los **tres** argumentos esperados (`guid`, cara anterior, `topo_map`), evitando error de script en Godot tras ``geom.extrude_face`` exitoso; texto de error más claro cuando el backend no reconoce el ``topo_id``.
 
 ## [0.1.0-alpha.2] — 2026-05-07
 

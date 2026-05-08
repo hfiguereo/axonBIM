@@ -106,6 +106,8 @@ git lfs pull
 make install          # uv sync
 ```
 
+Si **`pip install`** en tu cuenta muestra un conflicto tipo «**axonbim** requiere **cadquery-ocp**», suele ser una instalación antigua en user-site: ejecuta `pip uninstall axonbim` y usa solo **`uv`** en este repo (véase [CONTRIBUTING — pip del sistema](CONTRIBUTING.md#pip-del-sistema-y-aviso-cadquery-ocp)).
+
 ### Comandos de desarrollo (via Makefile)
 
 ```bash
