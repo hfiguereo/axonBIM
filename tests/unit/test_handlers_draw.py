@@ -108,10 +108,16 @@ async def test_draw_ortho_snapshot_top_view_range_can_hide_geometry() -> None:
         }
     )
     visible = await draw_handlers.ortho_snapshot(
-        {"view": "top", "view_range": {"cut_plane_m": 1.2, "top_m": 3.0, "bottom_m": 0.0, "depth_m": 1.2}}
+        {
+            "view": "top",
+            "view_range": {"cut_plane_m": 1.2, "top_m": 3.0, "bottom_m": 0.0, "depth_m": 1.2},
+        }
     )
     hidden = await draw_handlers.ortho_snapshot(
-        {"view": "top", "view_range": {"cut_plane_m": 3.2, "top_m": 3.3, "bottom_m": 3.1, "depth_m": 0.0}}
+        {
+            "view": "top",
+            "view_range": {"cut_plane_m": 3.2, "top_m": 3.3, "bottom_m": 3.1, "depth_m": 0.0},
+        }
     )
     assert visible["line_count"] > 0
     assert hidden["line_count"] == 0

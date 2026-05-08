@@ -28,9 +28,7 @@ async def test_extrude_face_debug_mesh_stats_matches_mesh_payload() -> None:
     mesh_before = wall["mesh"]
     top_face_topo_id = str(mesh_before["topo_ids"][2])
 
-    out = await geom_handlers.extrude_face(
-        {"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.5]}
-    )
+    out = await geom_handlers.extrude_face({"topo_id": top_face_topo_id, "vector": [0.0, 0.0, 0.5]})
     mesh_after = out["mesh"]
     stats = out["debug_mesh_stats"]
 

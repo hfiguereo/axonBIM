@@ -48,7 +48,9 @@ class CreateStoreyParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=128, description="Nombre visible del nivel.")
-    elevation_m: float = Field(description="Cota Z del forjado en metros (IfcBuildingStorey.Elevation).")
+    elevation_m: float = Field(
+        description="Cota Z del forjado en metros (IfcBuildingStorey.Elevation)."
+    )
 
 
 class SetActiveStoreyParams(BaseModel):

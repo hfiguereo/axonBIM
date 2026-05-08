@@ -134,9 +134,7 @@ def _append_edges_from_tri_mesh(
             p3.append((vertices[base + 0], vertices[base + 1], vertices[base + 2]))
         pairs = ((0, 1), (1, 2), (2, 0))
         for a, b in pairs:
-            if view == "top" and not _segment_passes_view_range_top(
-                p3[a][2], p3[b][2], view_range
-            ):
+            if view == "top" and not _segment_passes_view_range_top(p3[a][2], p3[b][2], view_range):
                 continue
             u1, v1 = _project_point(view, p3[a][0], p3[a][1], p3[a][2])
             u2, v2 = _project_point(view, p3[b][0], p3[b][1], p3[b][2])
@@ -262,7 +260,9 @@ async def ortho_snapshot(params: dict[str, Any]) -> dict[str, Any]:
     view_range = _normalized_view_range(args.view, args.view_range)
     session = get_session()
     if not specs:
-        min_u, min_v, max_u, max_v = _workspace_uv_bounds(args.view, view_range, session.workspace_xy)
+        min_u, min_v, max_u, max_v = _workspace_uv_bounds(
+            args.view, view_range, session.workspace_xy
+        )
         lines_px, bounds_world, m_per_px = _fit_bounds_to_pixels(
             min_u,
             min_v,

@@ -44,6 +44,8 @@ coverage.xml
 # ---------- Godot ----------
 .godot/
 .import/
+# Identificadores de script (Godot 4.x); locales al editor, no versionar aquí
+*.gd.uid
 # Copias locales de volcados ABRT / diagnosticos (suelen ser >30 MiB)
 reporte de errores/
 export.cfg

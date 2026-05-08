@@ -475,7 +475,9 @@ def _append_face_with_holes(
             sub += 1
 
 
-def _hole_s_intervals_for_band(za: float, zb: float, holes: list[_SzRect]) -> list[tuple[float, float]]:
+def _hole_s_intervals_for_band(
+    za: float, zb: float, holes: list[_SzRect]
+) -> list[tuple[float, float]]:
     out: list[tuple[float, float]] = []
     for h in holes:
         z0i = max(za, h.z0)
@@ -485,7 +487,9 @@ def _hole_s_intervals_for_band(za: float, zb: float, holes: list[_SzRect]) -> li
     return out
 
 
-def _subtract_intervals(lo: float, hi: float, blocked: list[tuple[float, float]]) -> list[tuple[float, float]]:
+def _subtract_intervals(
+    lo: float, hi: float, blocked: list[tuple[float, float]]
+) -> list[tuple[float, float]]:
     if not blocked:
         return [(lo, hi)]
     blocked_sorted = sorted(blocked)

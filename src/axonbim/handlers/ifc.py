@@ -245,9 +245,13 @@ class CreateWallOpeningParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     wall_guid: str = Field(min_length=1, description="GlobalId del ``IfcWall`` anfitrión.")
-    along_start_m: float = Field(ge=0.0, description="Distancia del extremo p1 al borde izquierdo del hueco.")
+    along_start_m: float = Field(
+        ge=0.0, description="Distancia del extremo p1 al borde izquierdo del hueco."
+    )
     width_m: float = Field(gt=0.0)
-    sill_height_m: float = Field(ge=0.0, description="Altura del dintel respecto a la base del muro.")
+    sill_height_m: float = Field(
+        ge=0.0, description="Altura del dintel respecto a la base del muro."
+    )
     height_m: float = Field(gt=0.0, description="Altura del hueco.")
 
 
@@ -431,7 +435,9 @@ async def create_wall_opening(params: dict[str, Any]) -> dict[str, Any]:
         raise RpcError(ErrorCode.INVALID_PARAMS, str(exc)) from exc
 
     session = get_session()
-    host = WallSpec(p1=spec.p1, p2=spec.p2, height=spec.height, thickness=spec.thickness, openings=())
+    host = WallSpec(
+        p1=spec.p1, p2=spec.p2, height=spec.height, thickness=spec.thickness, openings=()
+    )
     try:
         opening_guid = opening_module.create_wall_opening(session, args.wall_guid, op, host)
     except ValueError as exc:

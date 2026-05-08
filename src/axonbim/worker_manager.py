@@ -129,7 +129,13 @@ class WorkerManager:
                 res = await self.call_worker_rpc("worker.ping", {}, msg_id=1)
                 if res.get("result", {}).get("pong") is True:
                     return
-            except (OSError, ConnectionError, TimeoutError, FramingError, json.JSONDecodeError) as exc:
+            except (
+                OSError,
+                ConnectionError,
+                TimeoutError,
+                FramingError,
+                json.JSONDecodeError,
+            ) as exc:
                 last_exc = exc
             await asyncio.sleep(0.12)
         msg = f"Worker no respondió a tiempo: {last_exc!r}"
@@ -187,4 +193,3 @@ class WorkerManager:
         finally:
             writer.close()
             await writer.wait_closed()
-

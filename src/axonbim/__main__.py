@@ -66,8 +66,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Puerto TCP. Implica --tcp. "
-            "Si se omite y --tcp tampoco, solo se habilita Unix socket."
+            "Puerto TCP. Implica --tcp. Si se omite y --tcp tampoco, solo se habilita Unix socket."
         ),
     )
     parser.add_argument(

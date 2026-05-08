@@ -243,9 +243,10 @@ def _aggregated_children(parent: Any, ifc_class: str) -> list[Any]:
 def _find_body_model_subcontext(ifc_file: ifcopenshell.file) -> Any:
     """Localiza el subcontexto ``Body`` / ``MODEL_VIEW`` para asignar geometría."""
     for ctx in ifc_file.by_type("IfcGeometricRepresentationSubContext"):
-        if getattr(ctx, "ContextIdentifier", None) == "Body" and getattr(
-            ctx, "TargetView", None
-        ) == "MODEL_VIEW":
+        if (
+            getattr(ctx, "ContextIdentifier", None) == "Body"
+            and getattr(ctx, "TargetView", None) == "MODEL_VIEW"
+        ):
             return ctx
     raise ValueError("IFC sin IfcGeometricRepresentationSubContext Body / MODEL_VIEW")
 
